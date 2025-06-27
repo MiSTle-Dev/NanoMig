@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Amiga/NanoMig configuration -->
+<config name="NanoMig" version="0">
+  <actions>
+    <!-- the init action is being executed immediately -->
+    <!-- when this file has been loaded -->
+    <action name="init">
+      <!-- (try to) load config from sd card -->
+      <load file="amiga.ini"/>
+      <set id="R" value="1"/>  <!-- keep machine in reset -->
+    </action>
+    
+    <!-- the ready action is being executed once all -->
+    <!-- initialization has been done -->
+    <action name="ready">
+      <set id="R" value="0"/>  <!-- release reset -->
+    </action>
+      
+    <action name="save">
+      <!-- save config to sd card -->
+      <save file="amiga.ini"/>
+    </action>
+      
+    <action name="reset">
+      <!-- trigger a system reset -->
+      <set id="R" value="1"/>
+      <delay ms="10"/>
+      <set id="R" value="0"/>      
+    </action>
+    
+    <action name="reset_hide">
+      <!-- trigger a system reset and hide OSD -->
+      <link action="reset"/>
+      <hide/>      
+    </action>      
+  </actions>
+  
+  <menu label="NanoMig">
+    <fileselector label="Floppy DF0:" ext="adf" index="0"/>
+    <menu label="System">
+      <list label="Chipset:" id="C" default="2" action="reset">
+	<listentry label="OCS-A500" value="0"/>
+	<listentry label="OCS-A1000" value="1"/>
+	<listentry label="ECS" value="2"/>
+      </list>
+      <list label="Chipmem:" id="Y" default="0" action="reset">
+	<listentry label="512kB" value="0"/>
+	<listentry label="1MB" value="1"/>
+	<listentry label="1.5MB" value="2"/>
+	<listentry label="2MB" value="3"/>
+      </list>
+      <list label="Slowmem:" id="X" default="1" action="reset">
+	<listentry label="None" value="0"/>
+	<listentry label="512kB" value="1"/>
+	<listentry label="1MB" value="2"/>
+	<listentry label="1.5MB" value="3"/>
+      </list>	
+      <list label="Video:" id="V" default="0">
+	<listentry label="PAL" value="0"/>
+	<listentry label="NTSC" value="1"/>
+      </list>
+    </menu>
+    <menu label="Storage">
+      <list label="Drives:" id="D" default="0">
+	<listentry label="1" value="0"/>
+	<listentry label="2" value="1"/>
+	<listentry label="3" value="2"/>
+	<listentry label="4" value="3"/>
+      </list>
+      <list label="Speed:" id="S" default="1">
+	<listentry label="Normal" value="0"/>
+	<listentry label="Fast" value="1"/>
+      </list>
+      <fileselector label="Floppy DF0:" ext="adf" index="0" default="df0.adf"/>
+      <fileselector label="Floppy DF1:" ext="adf" index="1" default="df1.adf"/>
+      <fileselector label="Floppy DF2:" ext="adf" index="2" default="df2.adf"/>
+      <fileselector label="Floppy DF3:" ext="adf" index="3" default="df3.adf"/>
+      <list label="IDE" id="I" default="1" action="reset">
+	<listentry label="Disabled" value="0"/>
+	<listentry label="Enabled" value="1"/>
+      </list>
+      <fileselector label="Harddisk DH0:" ext="hdf" index="4" default="dh0.hdf"/>
+      <fileselector label="Harddisk DH1:" ext="hdf" index="5" default="dh1.hdf"/>
+    </menu>
+    <menu label="Settings">
+      <list label="Scanlines:" id="L" default="0">
+	<listentry label="None" value="0"/>
+	<listentry label="Dim" value="1"/>
+	<listentry label="Black" value="2"/>
+      </list>
+      <list label="Filter:" id="F" default="0">
+	<listentry label="None" value="0"/>
+	<listentry label="Horizontal" value="1"/>
+	<listentry label="Vertical" value="2"/>
+	<listentry label="Hor+Ver" value="3"/>
+      </list>
+      <button label="Save settings" action="save"/>
+    </menu>
+    <button label="Reset" action="reset_hide"/>
+  </menu>    
+</config>

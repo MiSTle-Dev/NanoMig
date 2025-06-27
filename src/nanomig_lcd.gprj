@@ -78,6 +78,7 @@
         <File path="misc/sysctrl.v" type="file.verilog" enable="1"/>
         <File path="misc/video_analyzer.v" type="file.verilog" enable="1"/>
         <File path="misc/ws2812.v" type="file.verilog" enable="1"/>
+        <File path="misc/amiga_keymap.v" type="file.verilog" enable="1"/>
         <File path="nanomig.v" type="file.verilog" enable="1"/>
         <File path="tang/nano20k/flash_dspi.v" type="file.verilog" enable="1"/>
         <File path="tang/nano20k/gowin_clkdiv/gowin_clkdiv.v" type="file.verilog" enable="1"/>
@@ -95,5 +96,6 @@
         <File path="nanomig.rao" type="file.gao" enable="0"/>
         <File path="fx68k/microrom.mem" type="file.other" enable="1"/>
         <File path="fx68k/nanorom.mem" type="file.other" enable="1"/>
+        <File path="misc/amiga_xml.hex" type="file.other" enable="1"/>
     </FileList>
 </Project>

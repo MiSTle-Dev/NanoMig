@@ -1,7 +1,7 @@
 /*
     sysctrl.v
  
-    generic system control interface fro/via the MCU
+    generic system control interface from/via the MCU
 
     TODO: This is currently very core specific. This needs to be
     generic for all cores.
@@ -50,6 +50,10 @@ wire [7:0] data_in_rev = { data_in[0], data_in[1], data_in[2], data_in[3],
 reg coldboot = 1'b1;
 reg sys_int = 1'b1;
 
+// registers to report button interrupts
+reg [1:0] buttonsD, buttonsD2;
+reg	  buttons_irq_enable;
+
 // the system control interrupt or any other interrupt (e,g sdc, hid, ...)
 // activates the interrupt line to the MCU by pulling it low
 assign int_out_n = (int_in != 8'h00 || sys_int)?1'b0:1'b1;
@@ -59,7 +63,20 @@ reg main_reset = 1'b1;
 assign system_reset = main_reset;  
 
 reg [31:0] main_reset_timeout;   
+
+// include the menu rom derived from amiga.xml
+reg [11:0] menu_rom_addr;
+reg  [7:0] menu_rom_data;
+
+// generate hex e.g.: 
+// gzip -n amiga.xml
+// xxd -c1 -p amiga.xml.gz > amiga_xml.hex
+reg [7:0] amiga_xml[1024];
+initial $readmemh("amiga_xml.hex", amiga_xml);
    
+always @(posedge clk) 
+     menu_rom_data <= amiga_xml[menu_rom_addr];
+
 // process mouse events
 always @(posedge clk) begin  
    if(reset) begin
@@ -71,6 +88,7 @@ always @(posedge clk) begin
       main_reset <= 1'b1;   
       main_reset_timeout <= 32'd86_000_000;      
 
+      buttons_irq_enable <= 1'b1;  // allow buttons irq
       int_ack <= 8'h00;
       coldboot = 1'b1;      // reset is actually the power-on-reset
       sys_int = 1'b1;       // coldboot interrupt
@@ -87,6 +105,9 @@ always @(posedge clk) begin
       system_slowmem <= 2'd1;      
       system_ide_enable <= 1'b0;      
    end else begin // if (reset)
+      //  bring button state into local clock domain
+      buttonsD <= buttons;
+      buttonsD2 <= buttonsD;
 
       // release main reset after timeout
       if(main_reset_timeout) begin
@@ -104,47 +125,61 @@ always @(posedge clk) begin
 
       // iack bit 0 acknowledges the coldboot notification
       if(int_ack[0]) sys_int <= 1'b0;      
-      
+
+      // monitor buttons for changes and raise interrupt
+      if(buttons_irq_enable) begin
+        if(buttonsD2 != buttonsD) begin
+            // irq_enable prevents further interrupts until
+            // the button state has actually been read by the MCU
+            sys_int <= 1'b1;
+            buttons_irq_enable <= 1'b0;
+        end
+      end
+     
       if(data_in_strobe) begin      
         if(data_in_start) begin
-            state <= 4'd1;
+            state <= 4'd0;
             command <= data_in;
-        end else if(state != 4'd0) begin
+	    menu_rom_addr <= 12'h000;
+            data_out <= 8'h00;
+        end else begin
             if(state != 4'd15) state <= state + 4'd1;
 	    
             // CMD 0: status data
             if(command == 8'd0) begin
                 // return some pattern that would not appear randomly
 	            // on e.g. an unprogrammed device
-                if(state == 4'd1) data_out <= 8'h5c;   // \ magic marker to identify a valid
-                if(state == 4'd2) data_out <= 8'h42;   // / FPGA core
-                if(state == 4'd3) data_out <= 8'h04;   // core id 4 = Amiga
+                if(state == 4'd0) data_out <= 8'h5c;   // \ magic marker to identify a valid
+                if(state == 4'd1) data_out <= 8'h42;   // / FPGA core
+                if(state == 4'd2) data_out <= 8'h00;   // core id 0 = Generic core
             end
 	   
             // CMD 1: there are two MCU controlled LEDs
             if(command == 8'd1) begin
-                if(state == 4'd1) leds <= data_in[1:0];
+                if(state == 4'd0) leds <= data_in[1:0];
             end
 
             // CMD 2: a 24 color value to be mapped e.g. onto the ws2812
             if(command == 8'd2) begin
-                if(state == 4'd1) color[15: 8] <= data_in_rev;
-                if(state == 4'd2) color[ 7: 0] <= data_in_rev;
-                if(state == 4'd3) color[23:16] <= data_in_rev;
+                if(state == 4'd0) color[15: 8] <= data_in_rev;
+                if(state == 4'd1) color[ 7: 0] <= data_in_rev;
+                if(state == 4'd2) color[23:16] <= data_in_rev;
             end
 
             // CMD 3: return button state
             if(command == 8'd3) begin
-                data_out <= { 6'b000000, buttons };;
+               data_out <= { 6'b000000, buttons };;
+	       // re-enable interrupt once state has been read
+               buttons_irq_enable <= 1'b1;
             end
 
             // CMD 4: config values (e.g. set by user via OSD)
             if(command == 8'd4) begin
                // second byte can be any character which identifies the variable to set 
-               if(state == 4'd1) id <= data_in;
+               if(state == 4'd0) id <= data_in;
 
 	       // Amiga/Nanomig specific control values
-                if(state == 4'd2) begin
+                if(state == 4'd1) begin
                    // Value "R": reset(1) or run(0)
                    if(id == "R") begin
 		      main_reset <= data_in[0];
@@ -176,7 +211,7 @@ always @(posedge clk) begin
             // CMD 5: interrupt control
             if(command == 8'd5) begin
                 // second byte acknowleges the interrupts
-                if(state == 4'd1) int_ack <= data_in;
+                if(state == 4'd0) int_ack <= data_in;
 
 	        // interrupt[0] notifies the MCU of a FPGA cold boot e.g. if
                 // the FPGA has been loaded via USB
@@ -186,11 +221,19 @@ always @(posedge clk) begin
             // CMD 6: read system interrupt source
             if(command == 8'd6) begin
                 // bit[0]: coldboot flag
-                // bit[1]: port data is available
-                data_out <= { 7'b0000000, coldboot };
+	        // bit[2]: buttons state change has been detected
+                data_out <= { 5'b0000, !buttons_irq_enable, 1'b0, coldboot };
                 // reading the interrupt source acknowledges the coldboot notification
-                if(state == 4'd1) coldboot <= 1'b0;            
+                if(state == 4'd0) coldboot <= 1'b0;            
             end
+
+	    // CMD 7: port in/out, currently unused in amiga
+	   
+            // CMD 8: read (menu) config
+            if(command == 8'd8) begin
+	       data_out <= menu_rom_data;
+	       menu_rom_addr <= menu_rom_addr + 12'd1;		  
+	    end
          end
       end
    end

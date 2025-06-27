@@ -3,7 +3,7 @@
 <Project>
     <Template>FPGA</Template>
     <Version>5</Version>
-    <Device name="GW5AST-138B" pn="GW5AST-LV138FPG676AES">gw5ast138b-002</Device>
+    <Device name="" pn="GW5AT-LV60PG484AC1/I0">gw5at60b-002</Device>
     <FileList>
         <File path="fx68k/fx68k.sv" type="file.verilog" enable="1"/>
         <File path="fx68k/fx68kAlu.sv" type="file.verilog" enable="1"/>
@@ -80,19 +80,19 @@
         <File path="misc/ws2812.v" type="file.verilog" enable="1"/>
 	<File path="misc/amiga_keymap.v" type="file.verilog" enable="1"/>
         <File path="nanomig.v" type="file.verilog" enable="1"/>
-        <File path="tang/mega138k/gowin_clkdiv/gowin_clkdiv.v" type="file.verilog" enable="1"/>
-        <File path="tang/mega138k/gowin_dpb/ide_dpram.v" type="file.verilog" enable="1"/>
-        <File path="tang/mega138k/gowin_dpb/sector_dpram.v" type="file.verilog" enable="1"/>
-        <File path="tang/mega138k/gowin_pll/pll_142m.v" type="file.verilog" enable="1"/>
-        <File path="tang/mega138k/flash_dspi.v" type="file.verilog" enable="1"/>
-        <File path="tang/mega138k/sdram.v" type="file.verilog" enable="1"/>
-        <File path="tang/mega138k/top.sv" type="file.verilog" enable="1"/>
+        <File path="tang/console60k/flash_dspi.v" type="file.verilog" enable="1"/>
+        <File path="tang/console60k/gowin_clkdiv/gowin_clkdiv.v" type="file.verilog" enable="1"/>
+        <File path="tang/console60k/gowin_dpb/ide_dpram.v" type="file.verilog" enable="1"/>
+        <File path="tang/console60k/gowin_dpb/sector_dpram.v" type="file.verilog" enable="1"/>
+        <File path="tang/console60k/gowin_pll/pll_142m.v" type="file.verilog" enable="1"/>
+        <File path="tang/console60k/sdram.v" type="file.verilog" enable="1"/>
+        <File path="tang/console60k/top.sv" type="file.verilog" enable="1"/>
         <File path="tg68k/TG68K.vhd" type="file.vhdl" enable="1"/>
         <File path="tg68k/TG68K_ALU.vhd" type="file.vhdl" enable="1"/>
         <File path="tg68k/TG68K_Pack.vhd" type="file.vhdl" enable="1"/>
         <File path="tg68k/TG68KdotC_Kernel.vhd" type="file.vhdl" enable="1"/>
-        <File path="tang/mega138k/nanomig.cst" type="file.cst" enable="1"/>
-        <File path="tang/mega138k/nanomig.sdc" type="file.sdc" enable="1"/>
+        <File path="tang/console60k/nanomig.cst" type="file.cst" enable="1"/>
+        <File path="tang/console60k/nanomig.sdc" type="file.sdc" enable="1"/>
         <File path="fx68k/microrom.mem" type="file.other" enable="1"/>
         <File path="fx68k/nanorom.mem" type="file.other" enable="1"/>
     </FileList>

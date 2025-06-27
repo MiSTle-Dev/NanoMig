@@ -1,6 +1,7 @@
 # NanoMig
 
-NanoMig is a port of the [Minimig](https://en.wikipedia.org/wiki/Minimig) Commodore Amiga FPGA implementation to the [Tang Nano 20K](https://wiki.sipeed.com/hardware/en/tang/tang-nano-20k/nano-20k.html), [Tang Primer 25K](https://wiki.sipeed.com/hardware/en/tang/tang-primer-25k/primer-25k.html) and [Tang Mega 138K Pro](https://wiki.sipeed.com/hardware/en/tang/tang-mega-138k/mega-138k-pro.html) FPGA development boards.
+NanoMig is a port of the [Minimig](https://en.wikipedia.org/wiki/Minimig) Commodore Amiga FPGA implementation to the [Tang Nano 20K](https://wiki.sipeed.com/hardware/en/tang/tang-nano-20k/nano-20k.html), [Tang Primer 25K](https://wiki.sipeed.com/hardware/en/tang/tang-primer-25k/primer-25k.html), [Tang Mega 138K Pro](https://wiki.sipeed.com/hardware/en/tang/tang-mega-138k/mega-138k-pro.html) and [Tang Console with Mega 60k module](https://wiki.sipeed.com/hardware/en/tang/tang-console/mega-console.html) FPGA development boards.
+
 
 ![NanoMig](doc/nanomig.jpg)
 
@@ -18,7 +19,7 @@ Current state:
   * HDMI video and audio, PAL and NTSC
   * Keyboard, Mouse and Joystick via USB
   * Virtual IDE hard disk read an write support
-  * Runs on [Tang Nano 20k](https://wiki.sipeed.com/hardware/en/tang/tang-nano-20k/nano-20k.html), [Primer 25K](https://wiki.sipeed.com/hardware/en/tang/tang-primer-25k/primer-25k.html) and [Mega 138K Pro](https://wiki.sipeed.com/hardware/en/tang/tang-mega-138k/mega-138k-pro.html)
+  * Runs on [Tang Nano 20k](https://wiki.sipeed.com/hardware/en/tang/tang-nano-20k/nano-20k.html), [Primer 25K](https://wiki.sipeed.com/hardware/en/tang/tang-primer-25k/primer-25k.html), [Mega 138K Pro](https://wiki.sipeed.com/hardware/en/tang/tang-mega-138k/mega-138k-pro.html) and [Tang Console with Mega 60k module](https://wiki.sipeed.com/hardware/en/tang/tang-console/mega-console.html)
   * [Fully simulated](sim)
 
 Planned features:
@@ -51,13 +52,14 @@ These youtube shorts mainly document the progress:
 The necessary binaries can be found in the [project releases](https://github.com/harbaum/NanoMig/releases).
 
   * ```nanomig.fs``` needs to be flashed to the FPGA's flash memory
-    * ```openFPGALoader -fs nanomig.fs```
-  * Kickstart 1.3 ```kick13.rom``` needs to be flashed at offset 0x400000 _and_ 0x440000
+    * ```openFPGALoader -f nanomig.fs```
+    * Currently supported are Tang Nano 20k with HDMI (```nanomig.fs```), Tang Nano 20k with RGB LCD (```nanomig_lcd.fs```), Tang Primer 25k (```nanomig_tp25k.fs```), Tang Mega 138k (```nanomig_tm128k.fs```), and Tang Console 60k (```nanomig_tc60k.fs```)
+  * On Nano 20k, Primer 25k and Console 60K Kickstart 1.3 ```kick13.rom``` needs to be flashed to offset 0x400000 _and_ 0x440000. On Mega 138K use addresses 0xc00000 and 0xc40000 instead.
     * ```openFPGALoader --external-flash -o 0x400000 kick13.rom```
     * ```openFPGALoader --external-flash -o 0x440000 kick13.rom```
-  * For IDE HDD support Kickstart 3.1 ```kick31.rom``` needs to be flashed at offset 0x400000 only
+  * For IDE HDD support Kickstart 3.1 ```kick31.rom``` needs to be flashed at offset 0x400000 (Mega: 0xc00000) only
     * ```openFPGALoader --external-flash -o 0x400000 kick31.rom```
-  * The [latest firmware](http://github.com/harbaum/FPGA-Companion) needs to be flashed to the support MCU
+  * The [latest FPGA Companion firmware](http://github.com/harbaum/FPGA-Companion) needs to be flashed to the support MCU
     * Currenly supported are [M0S Dock (BL616)](https://github.com/harbaum/FPGA-Companion/tree/main/src/bl616), [Raspberry Pi Pico (RP2040)](https://github.com/harbaum/FPGA-Companion/tree/main/src/rp2040) and [ESP32-S2/S3](https://github.com/harbaum/FPGA-Companion/tree/main/src/esp32) 
   * A default ADF disk image named ```df0.adf``` should be placed on SD card (e.g. workbench 1.3)
   * For the SD card to work [all components incl. the support MCU](https://github.com/harbaum/NanoMig/issues/5) have to work properly

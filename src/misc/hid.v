@@ -38,6 +38,12 @@ reg irq_enable;
 reg [5:0] db9_portD;
 reg [5:0] db9_portD2;
 
+wire [6:0] amiga_keycode;   
+keymap keymap (
+ .code  ( data_in[6:0]  ),
+ .amiga ( amiga_keycode )
+);  
+   
 // process mouse events
 always @(posedge clk) begin
    if(reset) begin
@@ -63,26 +69,26 @@ always @(posedge clk) begin
 
       if(data_in_strobe) begin      
         if(data_in_start) begin
-            state <= 4'd1;
+            state <= 4'd0;
             command <= data_in;
-        end else if(state != 4'd0) begin
+        end else begin
             if(state != 4'd15) state <= state + 4'd1;
 	    
             // CMD 0: status data
             if(command == 8'd0) begin
                 // return some dummy data for now ...
-                if(state == 4'd1) data_out <= 8'h5c;
-                if(state == 4'd2) data_out <= 8'h42;
+                if(state == 4'd0) data_out <= 8'h01;   // hid version 1
+                if(state == 4'd1) data_out <= 8'h00;   // subversion 0
             end
 	   
             // CMD 1: keyboard data
 	    // this Amiga variant of hid.v does not maintain a matrix. Instead
 	    // it just sends events 
             if(command == 8'd1) begin
-                if(state == 4'd1) begin
+                if(state == 4'd0 && amiga_keycode != 7'h7f) begin
 		   kbd_mouse_level <= !kbd_mouse_level;
 		   kbd_mouse_type <= 2'd2;
-		   kbd_mouse_data <= data_in;
+		   kbd_mouse_data <= { data_in[7], amiga_keycode };
 		end
             end
 	       
@@ -91,13 +97,13 @@ always @(posedge clk) begin
 	        // we need to be careful here. The receiver runs on the 7Mhz clock
 	        // and we need to make sure that these two subsequent events don't come
 	        // too fast	       
-                if(state == 4'd1) mouse_buttons <= data_in[2:0];
-                if(state == 4'd2) begin
+                if(state == 4'd0) mouse_buttons <= data_in[2:0];
+                if(state == 4'd1) begin
 		   kbd_mouse_level <= !kbd_mouse_level;
 		   kbd_mouse_type <= 2'd0;
 		   kbd_mouse_data <= data_in;
 		end
-                if(state == 4'd3) begin
+                if(state == 4'd2) begin
 		   kbd_mouse_level <= !kbd_mouse_level;
 		   kbd_mouse_type <= 2'd1;
 		   kbd_mouse_data <= data_in;
@@ -106,8 +112,8 @@ always @(posedge clk) begin
 
             // CMD 3: receive digital joystick data
             if(command == 8'd3) begin
-                if(state == 4'd1) device <= data_in;
-                if(state == 4'd2) begin
+                if(state == 4'd0) device <= data_in;
+                if(state == 4'd1) begin
                     if(device == 8'd0) joystick0 <= data_in;
                     if(device == 8'd1) joystick1 <= data_in;
                 end 
@@ -115,7 +121,7 @@ always @(posedge clk) begin
 
             // CMD 4: send digital joystick data to MCU
             if(command == 8'd4) begin
-                if(state == 4'd1) irq_enable <= 1'b1;    // (re-)enable interrupt
+                if(state == 4'd0) irq_enable <= 1'b1;    // (re-)enable interrupt
                 data_out <= {2'b00, db9_portD };               
             end
 

@@ -1,12 +1,12 @@
 /*
-    top.sv - Minimig on tang mega 138k toplevel
+    top.sv - Minimig on tang console 60k toplevel
 */ 
 
 /* we need two copies in case of 256k kickroms
-     openFPGALoader --external-flash -o 0xc00000 kick13.rom
-     openFPGALoader --external-flash -o 0xc40000 kick13.rom
+     openFPGALoader --external-flash -o 0x400000 kick13.rom
+     openFPGALoader --external-flash -o 0x440000 kick13.rom
    or a single copy of e.g. a 512k diag rom
-     openFPGALoader --external-flash -o 0xc00000 DiagROM
+     openFPGALoader --external-flash -o 0x400000 DiagROM
 */
  
 module top(
@@ -15,8 +15,7 @@ module top(
   input			reset_n, // S2
   input			user_n, // S1
 
-  output [5:0]	leds_n,
-  output		ws2812,
+  output [1:0]	leds,
 
   // spi flash interface
   output		mspi_cs,
@@ -40,35 +39,11 @@ module top(
   // interface to external BL616/M0S on middle PMOD
   inout [7:0]	m0s,
 
-  // two dual shock controllers on left PMOD, only P1 is used
-  // by MiSTeryNano for joystick
-  output		ds1_csn,
-  output		ds1_sclk,
-  output		ds1_mosi,
-  input			ds1_miso,
-  output		ds2_csn,
-  output		ds2_sclk,
-  output		ds2_mosi,
-  input			ds2_miso, 
-
   // SD card slot
   output		sd_clk,
   inout			sd_cmd, // MOSI
   inout [3:0]	sd_dat, // 0: MISO
 
-  output		lcd_clk,
-  output		lcd_en, //lcd data enable     
-  output [5:0]	lcd_r, //lcd red
-  output [5:0]	lcd_g, //lcd green
-  output [5:0]	lcd_b, //lcd blue
-  output		lcd_bl, //drive low to turn bl off
-
-  // I2S DAC
-  output		i2s_bclk,
-  output		i2s_lrck,
-  output		i2s_din,
-  output		pa_en,
-           
   // hdmi/tdms
   output		tmds_clk_n,
   output		tmds_clk_p,
@@ -76,11 +51,9 @@ module top(
   output [2:0]	tmds_d_p
 );
 
-wire [5:0]	leds;
-assign leds[5] = 1'b0;
-assign leds[4] = |sd_rd;
-assign leds[3] = !rom_done;     
-assign leds_n = ~leds;  
+wire [1:0]	drv_leds;
+// wire floppy and hdd drive leds into a single one
+assign leds[1] =  drv_leds[1] || drv_leds[0];   
 
 // ============================== clock generation ===========================
    
@@ -141,15 +114,6 @@ wire cpu_reset = |reset_cnt;
 wire sdram_ready;
 
 // -------------------------- M0S MCU interface -----------------------
-
-// connect to ws2812 led
-wire [23:0] ws2812_color;
-ws2812 ws2812_inst (
-    .clk(clk_28m),
-	.reset(!pll_lock),
-    .color(ws2812_color),
-    .data(ws2812)
-);
 
 // interface to M0S MCU
 wire       mcu_sys_strobe;        // mcu message byte valid for sysctrl
@@ -309,9 +273,9 @@ sysctrl sysctrl (
         .int_in( { 4'b0000, sdc_int, 1'b0, hid_int, 1'b0 }),
         .int_ack( int_ack ),
 
-        .buttons( {!user_n, !reset_n} ),
+        .buttons( {!user_n, !reset_n } ),
         .leds(),
-        .color(ws2812_color)
+        .color()
 );
    
 // digital 12 bit video
@@ -344,11 +308,6 @@ osd_u8g2 osd_u8g2 (
         .b_out(video_blue)
 );   
 
-// map to internal lcd
-assign lcd_r = video_red;
-assign lcd_g = video_green;
-assign lcd_b = video_blue;  
-   
 /* ---------------------- Minimig chipset ----------------------- */
 
 // two 15 bit audio channels
@@ -402,8 +361,8 @@ nanomig nanomig
  .clk7n_en(clk7n_en),
 
  .pwr_led(leds[0]),
- .fdd_led(leds[1]),
- .hdd_led(leds[2]),
+ .fdd_led(drv_leds[0]),
+ .hdd_led(drv_leds[1]),
  
  .memory_config(memory_config),
  .chipset_config(chipset_config),
@@ -497,8 +456,7 @@ reg [5:0]   flash_cnt;
 
 always @(posedge clk_28m or negedge mem_ready) begin
     if(!mem_ready) begin
-       flash_addr <= 22'h200000;          // 4MB flash offset (word address), with the 8MB offset in the
-	                                      // flash driver this results in the flash address being c00000
+       flash_addr <= 22'h200000;          // 4MB flash offset (word address)
        flash_ram_addr <= { 4'hf, 18'h0 }; // write into 512k sdram segment used for kick rom
        word_count <= 22'h40001;           // 512k bytes ROM data = 256k words
 
@@ -624,80 +582,6 @@ video_analyzer video_analyzer (
     .interlace   ( interlace ),
     .vreset      ( vreset    )
 );
-
-assign lcd_clk = clk_pixel;
-//assign lcd_hs = hs_n;   // no syncs on this lcd
-//assign lcd_vs = vs_n;
-assign lcd_bl = !cpu_reset;   // enable display backlight once cpu is out of reset
-
-reg [9:0] hcnt;   // max 1023
-reg [9:0] vcnt;   // max 626
-
-// generate the 800x480 pixel display enable signal 
-assign lcd_en = (hcnt < 10'd800) && (vcnt < 10'd480);
-
-always @(posedge clk_pixel) begin
-   reg       last_vs_n, last_hs_n;
-
-   last_hs_n <= hs_n;   
-
-   // rising edge/end of hsync
-   if(hs_n && !last_hs_n) begin
-      hcnt <= 10'd980;
-
-      last_vs_n <= vs_n;   
-      if(vs_n && !last_vs_n) begin
-         vcnt <= 10'd946;                
-      end else
-        vcnt <= vcnt + 10'd1;    
-   end else
-      hcnt <= hcnt + 10'd1;    
-end
-/* ------------------- audio processing --------------- */
-
-// MAX98357A
-   
-// EN is actually the /SD_MODE of the MAX98357A and driving it high selects
-// left channel only. For stereo mixing there would have to be a "large" 
-// resistor as a pullup which isn't there on the TN20k
-
-assign pa_en = !cpu_reset;   // simply enable amplifier with left channel
-
-reg i2s_clk;
-reg [7:0] i2s_clk_cnt;
-always @(posedge clk_28m) begin
-    if(i2s_clk_cnt < 28375160 / (24000*32) / 2 - 1)
-        i2s_clk_cnt <= i2s_clk_cnt + 8'd1;
-    else begin
-        i2s_clk_cnt <= 8'd0;
-        i2s_clk <= ~i2s_clk;
-    end
-end
-
-// sign expand and add both channels
-wire [15:0] audio_mix = { audio_left[14], audio_left} + { audio_right[14], audio_right };
-   
-// shift audio down to reduce amp output volume to a sane range
-localparam AUDIO_SHIFT = 2;   
-wire [15:0] audio_scaled = { { AUDIO_SHIFT+1{audio_mix[15]}}, audio_mix[14:AUDIO_SHIFT] };   
-   
-// count 32 bits, 16 left and 16 right channel. MAX samples
-// on rising edge
-reg [15:0] audio;
-reg [4:0] audio_bit_cnt;
-always @(posedge i2s_clk) begin
-   if(cpu_reset) audio_bit_cnt <= 5'd0;
-   else          audio_bit_cnt <= audio_bit_cnt + 5'd1;
-
-   // latch data so it's stable during transmission
-   if(audio_bit_cnt == 5'd31)
-	 audio <= audio_scaled;   
-end
-
-// generate i2s signals
-assign i2s_bclk = !i2s_clk;
-assign i2s_lrck = cpu_reset?1'b0:audio_bit_cnt[4];
-assign i2s_din = cpu_reset?1'b0:audio[15-audio_bit_cnt[3:0]];
 
 /* -------------------- HDMI video and audio -------------------- */
 

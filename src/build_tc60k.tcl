@@ -1,4 +1,4 @@
-set_device GW2AR-LV18QN88C8/I7 -name GW2AR-18C
+set_device GW5AT-LV60PG484AC1/I0 -name GW5AT-60B
 
 add_file nanomig.v
 add_file minimig-aga/amiga_clk.v
@@ -55,25 +55,34 @@ add_file minimig/Amber.v
 add_file fx68k/fx68k.sv
 add_file fx68k/fx68kAlu.sv
 add_file fx68k/uaddrPla.sv
+add_file hdmi/audio_clock_regeneration_packet.sv
+add_file hdmi/audio_info_frame.sv
+add_file hdmi/audio_sample_packet.sv
+add_file hdmi/auxiliary_video_information_info_frame.sv
+add_file hdmi/hdmi.sv
+add_file hdmi/packet_assembler.sv
+add_file hdmi/packet_picker.sv
+add_file hdmi/serializer.sv
+add_file hdmi/source_product_description_info_frame.sv
+add_file hdmi/tmds_channel.sv
 add_file misc/mcu_spi.v
 add_file misc/sysctrl.v
 add_file misc/hid.v
 add_file misc/osd_u8g2.v
-add_file misc/ws2812.v
 add_file misc/video_analyzer.v
 add_file misc/sd_card.v
 add_file misc/sd_rw.v
 add_file misc/sdcmd_ctrl.v
 add_file misc/amiga_keymap.v
-add_file tang/nano20k/flash_dspi.v
-add_file tang/nano20k/gowin_clkdiv/gowin_clkdiv.v
-add_file tang/nano20k/gowin_rpll/pll_142m.v
-add_file tang/nano20k/gowin_dpb/sector_dpram.v
-add_file tang/nano20k/gowin_dpb/ide_dpram.v
-add_file tang/nano20k/top_lcd.sv
-add_file tang/nano20k/sdram.v
-add_file tang/nano20k/nanomig_lcd.cst
-add_file tang/nano20k/nanomig.sdc
+add_file tang/console60k/flash_dspi.v
+add_file tang/console60k/gowin_clkdiv/gowin_clkdiv.v
+add_file tang/console60k/gowin_pll/pll_142m.v
+add_file tang/console60k/gowin_dpb/sector_dpram.v
+add_file tang/console60k/gowin_dpb/ide_dpram.v
+add_file tang/console60k/top.sv
+add_file tang/console60k/sdram.v
+add_file tang/console60k/nanomig.cst
+add_file tang/console60k/nanomig.sdc
 add_file fx68k/microrom.mem
 add_file fx68k/nanorom.mem
 add_file tg68k/TG68K_Pack.vhd
@@ -83,10 +92,14 @@ add_file tg68k/TG68KdotC_Kernel.vhd
 add_file misc/amiga_xml.hex
 
 set_option -synthesis_tool gowinsynthesis
-set_option -output_base_name nanomig_lcd
+set_option -output_base_name nanomig_tc60k
 set_option -verilog_std sysv2017
 set_option -top_module top
 set_option -use_mspi_as_gpio 1
 set_option -use_sspi_as_gpio 1
+set_option -use_done_as_gpio 1
+set_option -use_i2c_as_gpio 1
+set_option -use_cpu_as_gpio 1
+set_option -use_ready_as_gpio 1
 
 run all

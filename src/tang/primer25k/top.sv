@@ -273,7 +273,7 @@ sysctrl sysctrl (
         .int_in( { 4'b0000, sdc_int, 1'b0, hid_int, 1'b0 }),
         .int_ack( int_ack ),
 
-        .buttons( {reset, user} ),
+        .buttons( {user, reset} ),
         .leds(),
         .color()
 );

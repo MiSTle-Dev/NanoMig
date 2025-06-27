@@ -78,6 +78,7 @@
         <File path="misc/sysctrl.v" type="file.verilog" enable="1"/>
         <File path="misc/video_analyzer.v" type="file.verilog" enable="1"/>
         <File path="misc/ws2812.v" type="file.verilog" enable="1"/>
+	<File path="misc/amiga_keymap.v" type="file.verilog" enable="1"/>
         <File path="nanomig.v" type="file.verilog" enable="1"/>
         <File path="tang/primer25k/flash_dspi.v" type="file.verilog" enable="1"/>
         <File path="tang/primer25k/gowin_clkdiv/gowin_clkdiv.v" type="file.verilog" enable="1"/>
