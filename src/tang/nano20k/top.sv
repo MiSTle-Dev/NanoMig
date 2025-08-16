@@ -56,12 +56,13 @@ module top(
   inout			sd_cmd, // MOSI
   inout [3:0]	sd_dat, // 0: MISO
 	   
-  // SPI connection to ob-board BL616. By default an external
-  // connection is used with a M0S Dock
-  input			spi_sclk, // in... 
-  input			spi_csn, // in (io?)
+  // SPI connection to on-board BL616 for 3921 assemblies 
+  // By default an external connection is used with a M0S Dock
+  input			spi_sclk,// in 
+  input			spi_csn, // in
   output		spi_dir, // out
-  input			spi_dat, // in (io?)
+  input			spi_dat, // in
+  output		spi_irqn,// out
 
   // hdmi/tdms
   output		tmds_clk_n,
@@ -77,7 +78,7 @@ wire [5:0] db9_joy = { !io[5], !io[0], !io[2], !io[1], !io[4], !io[3] };
 wire [4:0] db9_joy2 = { !spare[0], !spare[2], !spare[1], !spare[4], !spare[3] }; 
    
 wire [5:0]	leds;
-assign leds[5] = 1'b0;
+assign leds[5] = spi_ext;
 assign leds[4] = |sd_rd;
 assign leds_n = ~leds;  
 
@@ -141,6 +142,53 @@ wire sdram_ready;
 
 // -------------------------- M0S MCU interface -----------------------
 
+wire clk32;
+wire por; 
+assign clk32 = clk_28m; // map MiSTeryNano 32MHz clock to Nanomig
+assign por = !pll_lock; // map MiSTeryNano power on-reset (! all PLL's locked) to Nanomig
+
+// On the Tang Nano 20k we support two different MCU setups. Once uses the internal
+// BL616 of the Tang Nano 20k and one uses an external M0S Dock. The MCU control signals
+// of the MiSTeryNano have to be connected to both of them. This is simple for signals
+// being sent out of the FPGA as these are simply connected to both MCU ports (even
+// if no M0S may actually be connected at all). But for the input signals coming from
+// the MCUs, the active one needs to be selected. This happens here.
+
+// map output data onto both spi outputs
+wire spi_io_dout;
+wire spi_intn;
+
+// intn and dout are outputs driven by the FPGA to the MCU
+// din, ss and clk are inputs coming from the MCU
+// onboard connection to on-board BL616 only newer 3921 assemblies 
+assign spi_dir = spi_io_dout;
+assign m0s[5:0] = { 1'bz, spi_intn, 3'bzzz, spi_io_dout };
+assign spi_irqn = spi_intn;
+
+// by default the internal SPI is being used. Once there is
+// a select from the external spi, then the connection is
+// being switched
+reg spi_ext;
+always @(posedge clk32) begin
+    if(por)
+        spi_ext = 1'b0;
+    else begin
+        // spi_ext is activated once the m0s pins 2 (ss or csn) is
+        // driven low by the m0s dock. This means that a m0s dock
+        // is connected and the FPGA switches its inputs to the
+        // m0s. Until then the inputs of the internal BL616 are
+        // being used.
+        if(m0s[2] == 1'b0)
+            spi_ext = 1'b1;
+    end
+end
+
+// switch between internal SPI connected to the on-board bl616
+// or to the external one possibly connected to a M0S Dock
+wire spi_io_din = spi_ext?m0s[1]:spi_dat;
+wire spi_io_ss = spi_ext?m0s[2]:spi_csn;
+wire spi_io_clk = spi_ext?m0s[3]:spi_sclk;
+
 // connect to ws2812 led
 wire [23:0] ws2812_color;
 ws2812 ws2812_inst (
@@ -168,11 +216,11 @@ mcu_spi mcu (
 	 .clk(clk_28m),
 	 .reset(!pll_lock),
 
-	 // SPI interface to FPGA Companion
-     .spi_io_ss(m0s[2]),
-     .spi_io_clk(m0s[3]),
-     .spi_io_din(m0s[1]),
-     .spi_io_dout(m0s[0]),
+    // SPI interface to FPGA Companion (internal BL616)
+    .spi_io_ss(spi_io_ss),
+    .spi_io_clk(spi_io_clk),
+    .spi_io_din(spi_io_din),
+    .spi_io_dout(spi_io_dout),
 
 	 // byte wide data in/out to the submodules
      .mcu_sys_strobe(mcu_sys_strobe),
@@ -304,7 +352,7 @@ sysctrl sysctrl (
 		.system_chipmem(osd_chipmem),
 		.system_slowmem(osd_slowmem),
 				 
-        .int_out_n(m0s[4]),
+        .int_out_n(spi_intn),
         .int_in( { 4'b0000, sdc_int, 1'b0, hid_int, 1'b0 }),
         .int_ack( int_ack ),
 

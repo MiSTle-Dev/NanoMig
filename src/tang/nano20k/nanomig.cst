@@ -104,6 +104,8 @@ IO_LOC "spi_dat" 76;
 IO_PORT "spi_dat" PULL_MODE=UP IO_TYPE=LVCMOS33;
 IO_LOC "spi_dir" 75;
 IO_PORT "spi_dir" PULL_MODE=UP IO_TYPE=LVCMOS33;
+IO_LOC "spi_irqn" 69; // UART TX output
+IO_PORT "spi_irqn" PULL_MODE=NONE DRIVE=8 IO_TYPE=LVCMOS33;
 
 // two on-board buttons
 IO_LOC "user" 88;
