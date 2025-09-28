@@ -69,6 +69,7 @@
         <File path="minimig-aga/paula_uart.v" type="file.verilog" enable="1"/>
         <File path="minimig-aga/userio.v" type="file.verilog" enable="1"/>
         <File path="minimig/Amber.v" type="file.verilog" enable="1"/>
+        <File path="misc/amiga_keymap.v" type="file.verilog" enable="1"/>
         <File path="misc/hid.v" type="file.verilog" enable="1"/>
         <File path="misc/mcu_spi.v" type="file.verilog" enable="1"/>
         <File path="misc/osd_u8g2.v" type="file.verilog" enable="1"/>
@@ -78,15 +79,14 @@
         <File path="misc/sysctrl.v" type="file.verilog" enable="1"/>
         <File path="misc/video_analyzer.v" type="file.verilog" enable="1"/>
         <File path="misc/ws2812.v" type="file.verilog" enable="1"/>
-	<File path="misc/amiga_keymap.v" type="file.verilog" enable="1"/>
         <File path="nanomig.v" type="file.verilog" enable="1"/>
-        <File path="tang/console60k/flash_dspi.v" type="file.verilog" enable="1"/>
+        <File path="tang/console138k_bl616/gowin_pll/pll_142m.v" type="file.verilog" enable="1"/>
+        <File path="tang/console138k_bl616/top.sv" type="file.verilog" enable="1"/>
         <File path="tang/console60k/gowin_clkdiv/gowin_clkdiv.v" type="file.verilog" enable="1"/>
         <File path="tang/console60k/gowin_dpb/ide_dpram.v" type="file.verilog" enable="1"/>
         <File path="tang/console60k/gowin_dpb/sector_dpram.v" type="file.verilog" enable="1"/>
-        <File path="tang/console138k_bl616/gowin_pll/pll_142m.v" type="file.verilog" enable="1"/>
         <File path="tang/console60k/sdram.v" type="file.verilog" enable="1"/>
-        <File path="tang/console138k_bl616/top.sv" type="file.verilog" enable="1"/>
+        <File path="tang/mega138k/flash_dspi.v" type="file.verilog" enable="1"/>
         <File path="tg68k/TG68K.vhd" type="file.vhdl" enable="1"/>
         <File path="tg68k/TG68K_ALU.vhd" type="file.vhdl" enable="1"/>
         <File path="tg68k/TG68K_Pack.vhd" type="file.vhdl" enable="1"/>

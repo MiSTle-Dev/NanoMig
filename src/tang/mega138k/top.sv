@@ -491,8 +491,8 @@ reg [5:0]   flash_cnt;
 
 always @(posedge clk_28m or negedge mem_ready) begin
     if(!mem_ready) begin
-       flash_addr <= 22'h200000;          // 4MB flash offset (word address), with the 8MB offset in the
-	                                      // flash driver this results in the flash address being c00000
+       flash_addr <= 22'h300000;          // 6MB flash offset (word address),
+	                                      // flash driver this results in the flash address being 600000
        flash_ram_addr <= { 4'hf, 18'h0 }; // write into 512k sdram segment used for kick rom
        word_count <= 22'h40001;           // 512k bytes ROM data = 256k words
 
@@ -514,7 +514,7 @@ always @(posedge clk_28m or negedge mem_ready) begin
                flash_addr <= flash_addr + 22'd1;
                word_count <= word_count - 22'd1;
 			   
-               if ((flash_addr == 22'h2000aa || flash_addr == 22'h2200aa) && flash_dout == 16'h6678)
+               if ((flash_addr == 22'h3000aa || flash_addr == 22'h3200aa) && flash_dout == 16'h6678)
 				 // transform bne.b to bra.b in Kickstart ROM 1.2/1.3 @ $f80154 (mirror) and $fc0154
 				 // this forces memory detection on every reset
 				 flash_doutD <= flash_dout & 16'hf0ff;

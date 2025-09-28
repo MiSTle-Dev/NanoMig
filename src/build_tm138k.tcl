@@ -1,3 +1,4 @@
+# last sucessful build Gowin 1.9.10.03
 set_device GW5AST-LV138FPG676AES -name GW5AST-138B
 
 add_file src/nanomig.v
@@ -93,7 +94,7 @@ add_file src/tg68k/TG68KdotC_Kernel.vhd
 add_file src/misc/amiga_xml.hex
 
 set_option -synthesis_tool gowinsynthesis
-set_option -output_base_name nanomig_tm138k
+set_option -output_base_name nanomig_tm138kpro
 set_option -verilog_std sysv2017
 set_option -top_module top
 set_option -use_mspi_as_gpio 1
@@ -111,5 +112,8 @@ set_option -cst_warn_to_error 1
 set_option -loading_rate 70.000
 set_option -place_option 1
 set_option -route_option 2
+#set_option -ireg_in_iob 0
+#set_option -oreg_in_iob 0
+#set_option -ioreg_in_iob 0
 
 run all

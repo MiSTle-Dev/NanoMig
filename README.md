@@ -55,7 +55,7 @@ The necessary binaries can be found in the [project releases](https://github.com
   * ```nanomig.fs``` needs to be flashed to the FPGA's flash memory
     * ```openFPGALoader -f nanomig.fs```
     * Currently supported are Tang Nano 20k with HDMI (```nanomig.fs```), Tang Nano 20k with RGB LCD (```nanomig_lcd.fs```), Tang Primer 25k (```nanomig_tp25k.fs```), Tang Mega 138k (```nanomig_tm128k.fs```), and Tang Console 60k (```nanomig_tc60k.fs```)
-  * On Nano 20k, Primer 25k and Console 60K Kickstart 1.3 ```kick13.rom``` needs to be flashed to offset 0x400000 _and_ 0x440000. On Mega 138K use addresses 0xc00000 and 0xc40000 instead.
+  * On Nano 20k, Primer 25k and Console 60K Kickstart 1.3 ```kick13.rom``` needs to be flashed to offset 0x400000 _and_ 0x440000. On Mega 138k Pro and Console 138k use addresses 0x600000 and 0x640000 instead (Note: 512K ROM offset 0x680000).
     * ```openFPGALoader --external-flash -o 0x400000 kick13.rom```
     * ```openFPGALoader --external-flash -o 0x440000 kick13.rom```
     See here for [checksums of known working Kickstart roms.](https://github.com/MiSTle-Dev/NanoMig/blob/main/doc/KICKSTART_ROMS.md)

@@ -6,3 +6,7 @@ src/impl/temp/**
 src/impl/pnr/**
 !src/impl/nanomig_*.json
 *.user
+
+impl/gwsynthesis/**
+impl/temp/**
+impl/pnr/**

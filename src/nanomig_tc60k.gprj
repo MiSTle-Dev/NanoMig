@@ -69,6 +69,7 @@
         <File path="minimig-aga/paula_uart.v" type="file.verilog" enable="1"/>
         <File path="minimig-aga/userio.v" type="file.verilog" enable="1"/>
         <File path="minimig/Amber.v" type="file.verilog" enable="1"/>
+        <File path="misc/amiga_keymap.v" type="file.verilog" enable="1"/>
         <File path="misc/hid.v" type="file.verilog" enable="1"/>
         <File path="misc/mcu_spi.v" type="file.verilog" enable="1"/>
         <File path="misc/osd_u8g2.v" type="file.verilog" enable="1"/>
@@ -78,7 +79,6 @@
         <File path="misc/sysctrl.v" type="file.verilog" enable="1"/>
         <File path="misc/video_analyzer.v" type="file.verilog" enable="1"/>
         <File path="misc/ws2812.v" type="file.verilog" enable="1"/>
-	<File path="misc/amiga_keymap.v" type="file.verilog" enable="1"/>
         <File path="nanomig.v" type="file.verilog" enable="1"/>
         <File path="tang/console60k/flash_dspi.v" type="file.verilog" enable="1"/>
         <File path="tang/console60k/gowin_clkdiv/gowin_clkdiv.v" type="file.verilog" enable="1"/>

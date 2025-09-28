@@ -86,7 +86,7 @@
         <File path="tang/mega138k/gowin_dpb/sector_dpram.v" type="file.verilog" enable="1"/>
         <File path="tang/mega138k/gowin_pll/pll_142m.v" type="file.verilog" enable="1"/>
         <File path="tang/mega138k/sdram.v" type="file.verilog" enable="1"/>
-        <File path="tang/mega138k_bl616/top.sv" type="file.verilog" enable="1"/>
+        <File path="tang/mega138kpro_bl616/top.sv" type="file.verilog" enable="1"/>
         <File path="tg68k/TG68K.vhd" type="file.vhdl" enable="1"/>
         <File path="tg68k/TG68K_ALU.vhd" type="file.vhdl" enable="1"/>
         <File path="tg68k/TG68K_Pack.vhd" type="file.vhdl" enable="1"/>

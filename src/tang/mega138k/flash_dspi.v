@@ -73,7 +73,7 @@ assign ready = (init == 5'd0);
 wire spi_di = (init>1)?1'b1:CMD_RD_DIO[3'd7-state[2:0]];  // the command is sent in spi mode
    
 assign dspi_out = 
-		  (state== 6'd8)?{1'b1,address[21]}:   // MSB 1: Usable area starts at 8MB
+		  (state== 6'd8)?{1'b0,address[21]}:
 		  (state== 6'd9)?address[20:19]:
 		  (state==6'd10)?address[18:17]:
 		  (state==6'd11)?address[16:15]:
