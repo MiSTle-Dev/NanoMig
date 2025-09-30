@@ -54,12 +54,13 @@ The necessary binaries can be found in the [project releases](https://github.com
 
   * ```nanomig.fs``` needs to be flashed to the FPGA's flash memory
     * ```openFPGALoader -f nanomig.fs```
-    * Currently supported are Tang Nano 20k with HDMI (```nanomig.fs```), Tang Nano 20k with RGB LCD (```nanomig_lcd.fs```), Tang Primer 25k (```nanomig_tp25k.fs```), Tang Mega 138k (```nanomig_tm128k.fs```), and Tang Console 60k (```nanomig_tc60k.fs```)
-  * On Nano 20k, Primer 25k and Console 60K Kickstart 1.3 ```kick13.rom``` needs to be flashed to offset 0x400000 _and_ 0x440000. On Mega 138k Pro and Console 138k use addresses 0x600000 and 0x640000 instead (Note: 512K ROM offset 0x680000).
+    * Currently supported are Tang Nano 20k with HDMI (```nanomig.fs```), Tang Nano 20k with RGB LCD (```nanomig_lcd.fs```), Tang Primer 25k (```nanomig_tp25k.fs```), Tang Mega 138k (```nanomig_tm128k.fs```), Tang Console 60k (```nanomig_tc60k.fs```) , and Tang Console 138k (```nanomig_tc128k_bl616.fs```)
+  * On Nano 20k, Primer 25k and Console 60K 256Mbyte Kickstart 1.3 ```kick13.rom``` needs to be flashed to offset 0x400000 _and_ 0x440000 (identical file). On 138k boards use addresses 0x600000 and 0x640000 instead.  
+  Note: 512kB Kickstart 1.3 ROMs at offset 0x400000 respectively 0x600000 (138k).
     * ```openFPGALoader --external-flash -o 0x400000 kick13.rom```
-    * ```openFPGALoader --external-flash -o 0x440000 kick13.rom```
+    * ```openFPGALoader --external-flash -o 0x440000 kick13.rom```  
     See here for [checksums of known working Kickstart roms.](https://github.com/MiSTle-Dev/NanoMig/blob/main/doc/KICKSTART_ROMS.md)
-  * For IDE HDD support Kickstart 3.1 ```kick31.rom``` needs to be flashed at offset 0x400000 (Mega: 0xc00000) only
+  * For IDE HDD support 512kB Kickstart 3.1 ```kick31.rom``` needs to be flashed at offset 0x400000 (138k: 0x600000) only.
     * ```openFPGALoader --external-flash -o 0x400000 kick31.rom```
   * The [latest FPGA Companion firmware](http://github.com/harbaum/FPGA-Companion) needs to be flashed to the support MCU
     * Currenly supported are [M0S Dock (BL616)](https://github.com/harbaum/FPGA-Companion/tree/main/src/bl616), [Raspberry Pi Pico (RP2040)](https://github.com/harbaum/FPGA-Companion/tree/main/src/rp2040), [ESP32-S2/S3](https://github.com/harbaum/FPGA-Companion/tree/main/src/esp32)  

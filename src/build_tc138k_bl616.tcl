@@ -75,7 +75,7 @@ add_file src/misc/sd_card.v
 add_file src/misc/sd_rw.v
 add_file src/misc/sdcmd_ctrl.v
 add_file src/misc/amiga_keymap.v
-add_file src/tang/mega138k/flash_dspi.v
+add_file tang/console60k/flash_dspi.v
 add_file src/tang/console60k/gowin_clkdiv/gowin_clkdiv.v
 add_file src/tang/console138k_bl616/gowin_pll/pll_142m.v
 add_file src/tang/console60k/gowin_dpb/sector_dpram.v

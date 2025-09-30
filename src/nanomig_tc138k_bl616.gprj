@@ -82,11 +82,11 @@
         <File path="nanomig.v" type="file.verilog" enable="1"/>
         <File path="tang/console138k_bl616/gowin_pll/pll_142m.v" type="file.verilog" enable="1"/>
         <File path="tang/console138k_bl616/top.sv" type="file.verilog" enable="1"/>
+        <File path="tang/console60k/flash_dspi.v" type="file.verilog" enable="1"/>
         <File path="tang/console60k/gowin_clkdiv/gowin_clkdiv.v" type="file.verilog" enable="1"/>
         <File path="tang/console60k/gowin_dpb/ide_dpram.v" type="file.verilog" enable="1"/>
         <File path="tang/console60k/gowin_dpb/sector_dpram.v" type="file.verilog" enable="1"/>
         <File path="tang/console60k/sdram.v" type="file.verilog" enable="1"/>
-        <File path="tang/mega138k/flash_dspi.v" type="file.verilog" enable="1"/>
         <File path="tg68k/TG68K.vhd" type="file.vhdl" enable="1"/>
         <File path="tg68k/TG68K_ALU.vhd" type="file.vhdl" enable="1"/>
         <File path="tg68k/TG68K_Pack.vhd" type="file.vhdl" enable="1"/>

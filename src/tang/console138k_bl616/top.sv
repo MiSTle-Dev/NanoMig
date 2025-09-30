@@ -3,10 +3,10 @@
 */ 
 
 /* we need two copies in case of 256k kickroms
-     openFPGALoader --external-flash -o 0x400000 kick13.rom
-     openFPGALoader --external-flash -o 0x440000 kick13.rom
+     openFPGALoader --external-flash -o 0x600000 kick13.rom
+     openFPGALoader --external-flash -o 0x640000 kick13.rom
    or a single copy of e.g. a 512k diag rom
-     openFPGALoader --external-flash -o 0x400000 DiagROM
+     openFPGALoader --external-flash -o 0x600000 DiagROM
 */
  
 module top(
