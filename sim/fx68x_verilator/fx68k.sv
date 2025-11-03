@@ -1346,7 +1346,7 @@ localparam REG_DT = 17;
 		{abhIdle, ablIdle, abdIdle} = '0;
 		{dbhIdle, dblIdle, dbdIdle} = '0;
 
-		unique case( 1'b1)
+		priority case( 1'b1)
 		ryl2Dbd:				dbdMux = regs68L[ actualRy];
 		rxl2Dbd:				dbdMux = regs68L[ actualRx];
 		Nanod2.alue2Dbd:			dbdMux = alue;
@@ -1356,7 +1356,7 @@ localparam REG_DT = 17;
 		default: begin			dbdMux = 'X;	dbdIdle = 1'b1;				end
 		endcase
 
-		unique case( 1'b1)
+		priority case( 1'b1)
 		rxl2Dbl:				dblMux = regs68L[ actualRx];
 		ryl2Dbl:				dblMux = regs68L[ actualRy];
 		Nanod.ftu2Dbl:			dblMux = ftu;
@@ -1366,7 +1366,7 @@ localparam REG_DT = 17;
 		default: begin			dblMux = 'X;	dblIdle = 1'b1;				end
 		endcase
 
-		unique case( 1'b1)
+		priority case( 1'b1)
 		Nanod2.rxh2dbh:			dbhMux = regs68H[ actualRx];
 		Nanod2.ryh2dbh:			dbhMux = regs68H[ actualRy];
 		Nanod.au2Db:			dbhMux = auReg[31:16];
@@ -1375,7 +1375,7 @@ localparam REG_DT = 17;
 		default: begin			dbhMux = 'X;	dbhIdle = 1'b1;				end
 		endcase
 
-		unique case( 1'b1)
+		priority case( 1'b1)
 		ryl2Abd:				abdMux = regs68L[ actualRy];
 		rxl2Abd:				abdMux = regs68L[ actualRx];
 		Nanod.dbin2Abd:			abdMux = dbin;
@@ -1383,7 +1383,7 @@ localparam REG_DT = 17;
 		default: begin			abdMux = 'X;	abdIdle = 1'b1;				end
 		endcase
 
-		unique case( 1'b1)
+		priority case( 1'b1)
 		Pcl2Abl:				ablMux = PcL;
 		rxl2Abl:				ablMux = regs68L[ actualRx];
 		ryl2Abl:				ablMux = regs68L[ actualRy];
@@ -1394,7 +1394,7 @@ localparam REG_DT = 17;
 		default: begin			ablMux = 'X;	ablIdle = 1'b1;				end
 		endcase
 
-		unique case( 1'b1)
+		priority case( 1'b1)
 		Pch2Abh:				abhMux = PcH;
 		Nanod2.rxh2abh:			abhMux = regs68H[ actualRx];
 		Nanod2.ryh2abh:			abhMux = regs68H[ actualRy];
