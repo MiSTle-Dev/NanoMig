@@ -2,7 +2,7 @@
     hid.v
  
     hid (keyboard, mouse etc) interface to the IO MCU
-  */
+*/
 
 module hid (
   input		   clk,
@@ -26,6 +26,9 @@ module hid (
   output reg [1:0] kbd_mouse_type,
   output reg [7:0] kbd_mouse_data,
 
+  // pulse when LCTRL+LAMIGA+RAMIGA combo is pressed
+  output reg       kbd_reset,
+
   output reg [7:0] joystick0,
   output reg [7:0] joystick1
 );
@@ -37,6 +40,13 @@ reg [7:0] device;   // used for joystick
 reg irq_enable;
 reg [5:0] db9_portD;
 reg [5:0] db9_portD2;
+
+// track modifier keys to detect keyboard reset combo
+reg lctrl_down;
+reg lamiga_down;
+reg ramiga_down;
+reg kbd_combo_prev;
+wire kbd_combo_now;
 
 wire [6:0] amiga_keycode;   
 keymap keymap (
@@ -51,6 +61,9 @@ always @(posedge clk) begin
       irq <= 1'b0;
       irq_enable <= 1'b0;
       kbd_mouse_level <= 1'b0;      
+      lctrl_down      <= 1'b0;
+      lamiga_down     <= 1'b0;
+      ramiga_down     <= 1'b0;
    end else begin
       db9_portD <= db9_port;
       db9_portD2 <= db9_portD;
@@ -89,6 +102,11 @@ always @(posedge clk) begin
 		   kbd_mouse_level <= !kbd_mouse_level;
 		   kbd_mouse_type <= 2'd2;
 		   kbd_mouse_data <= { data_in[7], amiga_keycode };
+
+		   // update modifier flags (pressed = 1, released = 0)
+		   if (amiga_keycode == 7'h63) lctrl_down  <= ~data_in[7]; // Left Ctrl
+		   if (amiga_keycode == 7'h66) lamiga_down <= ~data_in[7]; // Left Amiga
+		   if (amiga_keycode == 7'h67) ramiga_down <= ~data_in[7]; // Right Amiga
 		end
             end
 	       
@@ -130,4 +148,21 @@ always @(posedge clk) begin
    end
 end
     
+// ----------------------------------------------------------------------
+// Combo detection: LCTRL + LAMIGA + RAMIGA -> kbd_reset
+// Runs every clock; one-cycle delayed response
+// ----------------------------------------------------------------------
+
+assign kbd_combo_now = lctrl_down & lamiga_down & ramiga_down;
+
+always @(posedge clk) begin
+    if (reset) begin
+        kbd_combo_prev <= 1'b0;
+        kbd_reset      <= 1'b0;
+    end else begin
+        kbd_reset      <= kbd_combo_now & ~kbd_combo_prev;  // one-cycle pulse
+        kbd_combo_prev <= kbd_combo_now;
+    end
+end
+
 endmodule

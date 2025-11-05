@@ -124,7 +124,7 @@ wire [1:0] osd_video_scanlines;
 // generate a reset for some time after rom has been initialized
 reg [15:0] reset_cnt;
 always @(negedge clk_28m) begin
-    if(!pll_lock || !rom_done || reset || osd_reset )
+    if(!pll_lock || !rom_done || reset || osd_reset || kbd_reset)
         reset_cnt <= 16'hffff;
     else if(reset_cnt != 0)
         reset_cnt = reset_cnt - 16'd1;
@@ -199,7 +199,7 @@ wire [31:0] sd_sector;
 wire [8:0]  sd_byte_index;
 wire        sd_rd_byte_strobe;
 wire        sd_busy, sd_done;
-wire [31:0] sd_img_size;
+wire [63:0] sd_img_size;
 wire [7:0]  sd_img_mounted;
 reg         sd_ready;
    
@@ -248,6 +248,7 @@ wire [2:0] mouse_buttons; // mouse buttons
 wire	   kbd_mouse_level;  
 wire [1:0] kbd_mouse_type;  
 wire [7:0] kbd_mouse_data;  
+wire       kbd_reset;      // keyboard reset (Ctrl+LAmiga+RAmiga)
 
 hid hid (
         .clk(clk_28m),
@@ -271,6 +272,7 @@ hid hid (
 		 .kbd_mouse_type(kbd_mouse_type),  
 		 .kbd_mouse_data(kbd_mouse_data),
 		 
+        .kbd_reset(kbd_reset),
         .joystick0(hid_joy0),
         .joystick1(hid_joy1)
          );   
@@ -422,7 +424,7 @@ nanomig nanomig
  .kbd_mouse_level(kbd_mouse_level),  
  .kbd_mouse_type(kbd_mouse_type),  
  .kbd_mouse_data(kbd_mouse_data),
- .joystick(joystick),
+ .joystick0(joystick),
 				 
  // sd card interface for floppy disk emulation
  .sdc_img_size(sd_img_size),
@@ -698,4 +700,3 @@ endmodule
 // Local Variables:
 // tab-width: 4
 // End:
-
