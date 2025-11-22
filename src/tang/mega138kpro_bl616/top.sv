@@ -144,7 +144,7 @@ wire [1:0] osd_video_scanlines;
 // generate a reset for some time after rom has been initialized
 reg [15:0] reset_cnt;
 always @(negedge clk_28m) begin
-    if(!pll_lock || !rom_done || !reset_n || osd_reset )
+    if(!pll_lock || !rom_done || !reset_n || osd_reset || kbd_reset)
         reset_cnt <= 16'hffff;
     else if(reset_cnt != 0)
         reset_cnt = reset_cnt - 16'd1;
@@ -304,6 +304,7 @@ wire [2:0] mouse_buttons; // mouse buttons
 wire	   kbd_mouse_level;  
 wire [1:0] kbd_mouse_type;  
 wire [7:0] kbd_mouse_data;  
+wire       kbd_reset;      // keyboard reset (Ctrl+LAmiga+RAmiga)
 
 hid hid (
         .clk(clk_28m),
@@ -327,6 +328,7 @@ hid hid (
 		 .kbd_mouse_type(kbd_mouse_type),  
 		 .kbd_mouse_data(kbd_mouse_data),
 		 
+        .kbd_reset(kbd_reset),
         .joystick0(hid_joy0),
         .joystick1(hid_joy1)
          );   
@@ -796,4 +798,3 @@ endmodule
 // Local Variables:
 // tab-width: 4
 // End:
-
