@@ -70,8 +70,9 @@ assign _ble  = !lwr | !enable;
 assign address[17:1]  = address_in[17:1];
 assign address[22:18] = bank[6] ? 5'b111_11 : //access f8-fb and !ovl and !halt, map to fc-ff
                        (bank[7] ? {4'b111_1, address_in[18]} : //access to f8-ff or ovl 
-                       (bank[5] ? {2'b0, bank[3]|bank[2], bank[3]|bank[1],address_in[18]} :
-                        address_in[22:18])); //chipram access
+                       (bank[5] ? {2'b00, bank[3]|bank[2], bank[3]|bank[1],address_in[18]} :  //chipram access
+                       (bank[4] ? {2'b11, address_in[20:18]} :  // Slow RAM
+                        address_in[22:18]))); // Other accesses passed through unmodified.
 
 assign data_out[15:0] = (enable && rd) ? ramdata_in[15:0] : 16'b0000000000000000;
 assign data[15:0]     = data_in[15:0];

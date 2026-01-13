@@ -1,8 +1,8 @@
 // onboard BL616 UART connection
 IO_LOC "uart_rx" 70;
-IO_LOC "uart_tx" 8; // JTAG TDO re-use
 IO_PORT "uart_rx" PULL_MODE=UP IO_TYPE=LVCMOS33 BANK_VCCIO=3.3;
-IO_PORT "uart_tx" DRIVE=8 IO_TYPE=LVCMOS33 BANK_VCCIO=3.3;
+//IO_LOC "uart_tx" 8; // JTAG TDO re-use
+//IO_PORT "uart_tx" DRIVE=8 IO_TYPE=LVCMOS33 BANK_VCCIO=3.3;
 
 // BL616 console on hw pin for external USB-UART adapter
 IO_LOC "bl616_mon_tx" 48;

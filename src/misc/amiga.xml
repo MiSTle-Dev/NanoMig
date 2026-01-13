@@ -55,13 +55,14 @@
 	<listentry label="1MB" value="2"/>
 	<listentry label="1.5MB" value="3"/>
       </list>	
+      <list label="Fastmem:" id="Q" default="0" action="reset">
+	<listentry label="None" value="0"/>
+	<listentry label="2MB" value="1"/>
+	<listentry label="4MB" value="2"/>
+      </list>	
       <list label="Video:" id="V" default="0">
 	<listentry label="PAL" value="0"/>
 	<listentry label="NTSC" value="1"/>
-      </list>
-	  <list label="Swap Joyst:" id="J" default="1">
-    <listentry label="Off" value="0"/>
-    <listentry label="On" value="1"/>
       </list>
     </menu>
     <menu label="Storage">
@@ -74,6 +75,10 @@
       <list label="Speed:" id="S" default="1">
 	<listentry label="Normal" value="0"/>
 	<listentry label="Fast" value="1"/>
+      </list>
+      <list label="Write:" id="P" default="1">
+	<listentry label="Enabled" value="0"/>
+	<listentry label="Protected" value="1"/>
       </list>
       <fileselector label="Floppy DF0:" ext="adf" index="0" default="df0.adf"/>
       <fileselector label="Floppy DF1:" ext="adf" index="1" default="df1.adf"/>
@@ -97,6 +102,10 @@
 	<listentry label="Horizontal" value="1"/>
 	<listentry label="Vertical" value="2"/>
 	<listentry label="Hor+Ver" value="3"/>
+      </list>
+      <list label="Video:" id="W" default="0">
+	<listentry label="Normal" value="0"/>
+	<listentry label="Wide" value="1"/>
       </list>
       <button label="Save settings" action="save"/>
     </menu>

@@ -45,6 +45,7 @@ module hdmi
     input logic 		      clk_audio,
 
     input logic                       pal_mode,    // 1 for pal timing
+    input logic                       wide_screen, // 1 for some jailbars
     input logic                       short_frame, // 1 if short frame has been detected
     input logic                       interlace,   // 1 if interlace has been detected
     // synchronous reset back to 0,0
@@ -64,11 +65,14 @@ logic vsync;
 logic [1:0] invert;
 
 // PAL/NTSC               start     frame   screen s_start   s_len
-wire [54:0] htiming0  = { 11'd0,   11'd908, 11'd768, 11'd24, 11'd72 };  
+wire [54:0] htiming0n = { 11'd0,   11'd908, 11'd768, 11'd24, 11'd72 };  
+wire [54:0] htiming0w = { 11'd0,   11'd908, 11'd832, 11'd24, 11'd48 };  
 wire [39:0] vtiming0  = {          10'd626, 10'd576,  10'd5,  10'd5 }; // PAL
 wire [39:0] vtiming1  = {          10'd526, 10'd480,  10'd5,  10'd5 }; // NTSC
 wire [7:0] cea0 = 8'd17; // CEA is HDMI mode in group 1
 wire [7:0] cea1 = 8'd2;
+
+wire [54:0] htiming0 = wide_screen?htiming0w:htiming0n;   
    
 wire [102:0]  timing = pal_mode?{  htiming0, vtiming0, cea0 }:
                                 {  htiming0, vtiming1, cea1 };

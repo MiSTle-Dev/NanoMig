@@ -8,36 +8,39 @@
 */
 
 module sysctrl (
-  input 	    clk,
-  input 	    reset,
+  input		    clk,
+  input		    reset,
 
-  input 	    data_in_strobe,
-  input 	    data_in_start,
-  input [7:0] 	    data_in,
+  input		    data_in_strobe,
+  input		    data_in_start,
+  input [7:0]	    data_in,
   output reg [7:0]  data_out,
 
   // interrupt interface
-  output 	    int_out_n,
-  input [7:0] 	    int_in,
+  output	    int_out_n,
+  input [7:0]	    int_in,
   output reg [7:0]  int_ack,
 
-  input [1:0] 	    buttons, // S0 and S1 buttons on Tang Nano 20k
+  input [1:0]	    buttons, // S0 and S1 buttons on Tang Nano 20k
 
   output reg [1:0]  leds, // two leds can be controlled from the MCU
   output reg [23:0] color, // a 24bit BRG color to e.g. be used to drive the ws2812
 
   // values that can be configured by the user		
-  output reg 	    system_reset,
+  output reg	    system_reset,
   output reg [1:0]  system_floppy_drives,
-  output reg        system_floppy_turbo,
+  output reg	    system_floppy_wrprot,
+  output reg	    system_floppy_turbo,
   output reg [1:0]  system_chipset,
-  output reg        system_video_mode,
-  output reg        system_ide_enable,
+  output reg	    system_video_mode,
+  output reg	    system_video_wide,
+  output reg	    system_ide_enable,
   output reg [1:0]  system_video_filter,
   output reg [1:0]  system_video_scanlines,
   output reg [1:0]  system_chipmem,
   output reg [1:0]  system_slowmem,
-  output reg        system_joy_swap
+  output reg [1:0]  system_fastmem,
+  output reg	    system_joy_swap
 );
 
 reg [3:0] state;
@@ -98,12 +101,15 @@ always @(posedge clk) begin
       // will very likely override these early
       system_floppy_drives <= 2'd0;
       system_floppy_turbo <= 1'b1;      
+      system_floppy_wrprot <= 1'b1;      
       system_chipset <= 2'd2;      
       system_video_mode <= 1'b0;      
+      system_video_wide <= 1'b0;      
       system_video_filter <= 2'd0;      
       system_video_scanlines <= 2'd0;      
       system_chipmem <= 2'd0;      
       system_slowmem <= 2'd1;      
+      system_fastmem <= 2'd0;      
       system_ide_enable <= 1'b0;
       system_joy_swap <= 1'b1;
    end 
@@ -195,18 +201,24 @@ always @(posedge clk) begin
 		   if(id == "D") system_floppy_drives <= data_in[1:0];
 		   // Value "S": normal(0) or turbo(1) floppy
 		   if(id == "S") system_floppy_turbo <= data_in[0];
+		   // Value "P": write enabled(0) or write protected(1) floppy
+		   if(id == "P") system_floppy_wrprot <= data_in[0];
 		   // Value "C": chipset OCS-A500(0), OCS-A1000(1) or ECS(2)
 		   if(id == "C") system_chipset <= data_in[1:0];
 		   // Value "F": video filter none(0), h(1), v(2) or h+v(3)
 		   if(id == "F") system_video_filter <= data_in[1:0];
 		   // Value "V": PAL(0) or NTSC(1) video
 		   if(id == "V") system_video_mode <= data_in[0];
+		   // Value "W": normal(0) or wide screen(1) video
+		   if(id == "W") system_video_wide <= data_in[0];
 		   // Value "L": Scanlines off(0) or on(1)
 		   if(id == "L") system_video_scanlines <= data_in[1:0];
 		   // Value "Y": Chipmem 512k(0), 1M(1), 1.5M(2) or 2M(2)
 		   if(id == "Y") system_chipmem <= data_in[1:0];
 		   // Value "X": Slowmem none(0), 512k(1), 1M(2) or 1.5M(3)
 		   if(id == "X") system_slowmem <= data_in[1:0];
+		   // Value "Q": Fastmem none(0), 2M(1) or 4M(2)
+		   if(id == "Q") system_fastmem <= data_in[1:0];
 		   // Value "I": IDE disabled(0) or enabled(1)
 		   if(id == "I") system_ide_enable <= data_in[0];
 		   // value "J": Swap Joyst off(0) on(1)

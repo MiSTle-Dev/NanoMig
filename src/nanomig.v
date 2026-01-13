@@ -5,6 +5,8 @@
 //   copper and other dma runs on hpos[0] == 1
 //   cpu runs in hpos[0] == 0
 // -> run cpu on unused hpos[0] == 1 for turbo
+// TODO:
+// - check IDE head adressing heads[0] vs heads[drive]
 
 module nanomig (
    input	 clk_sys,
@@ -12,6 +14,8 @@ module nanomig (
 
    output	 clk7_en,
    output	 clk7n_en,
+
+   output	 cpu_nrst_out,
 
    // misc
    output	 pwr_led,
@@ -26,6 +30,7 @@ module nanomig (
    output [3:0]	 b,
 
    input [7:0]	 memory_config,
+   input [2:0]	 fastram_config,
    input [5:0]	 chipset_config,
    input [3:0]	 floppy_config,
    input [3:0]	 video_config,
@@ -69,8 +74,34 @@ module nanomig (
    output	 _ram_bhe, // sram upper byte select
    output	 _ram_ble, // sram lower byte select
    output	 _ram_we, // sram write enable
-   output	 _ram_oe      // sram output enable
+   output        _ram_oe,     // sram output enable
+
+   output reg    fastram_sel,
+   output [22:1] fastram_addr,
+   output        fastram_lds,
+   output        fastram_uds,
+   input  [15:0] fastram_dout,
+   output [15:0] fastram_din,
+   output        fastram_wr,
+   input         fastram_ready
 );
+`default_nettype none
+   
+wire cpu_rst;
+wire [15:0] ram_din;
+wire uart_cts;
+wire uart_rts;
+wire uart_dsr;
+wire uart_dtr;
+wire io_uio;
+wire io_fpga;
+wire io_strobe;
+wire io_wait;
+wire io_din;
+wire fpga_dout;
+wire field1;
+wire lace;
+wire fx;
 
 reg reset_d;
 always @(posedge clk_sys, posedge reset) begin
@@ -164,7 +195,7 @@ end
 `endif
 
 wire  [1:0] cpu_state;
-wire        cpu_nrst_out;
+// wire        cpu_nrst_out;
 wire  [3:0] cpu_cacr;
 wire [31:0] cpu_nmi_addr;
 
@@ -195,9 +226,9 @@ wire [2:0] cachecfg = 3'b000;  // no turbo chip and kick, no caches
 // speeds up kickstart rom access.
    
 wire	   _ram_oe_i;
-assign _ram_oe = ~(~_ram_oe_i || ram_cs);   
+assign _ram_oe = _ram_oe_i; // ~(~_ram_oe_i || ram_cs);   
    
-wire [15:0] ram_dout = ramdata_in;   
+wire [15:0] ram_dout; //  = ramdata_in;   
 wire [28:1] ram_addr;   
 wire	    ram_sel;
 wire	    ram_lds;
@@ -220,12 +251,15 @@ always @(posedge clk_sys)
   ram_cs_triggerD <= ram_cs_trigger;   
    
 // neg/clk7
-always @(negedge clk_sys) begin
-   if( clk7_en )
-     // only generate ready when the chipset is not accessing ram
-     ram_ready <= _ram_oe_i && ram_cs;
-   else
-     ram_ready <= 1'b0;
+reg frr_d=1'b0;
+always @(posedge clk_sys) begin
+   if(!cpu_rst)
+      ram_ready<=1'b0;
+   else if(!ram_sel)
+      ram_ready<=1'b0;
+   else if(fastram_ready!=frr_d)
+      ram_ready<=1'b1;
+   frr_d <= fastram_ready;
 end
    
 cpu_wrapper cpu_wrapper
@@ -258,7 +292,7 @@ cpu_wrapper cpu_wrapper
 
 	.cpucfg       (cpucfg          ),
 	.cachecfg     (cachecfg        ),
-	.fastramcfg   (3'd0            ),
+	.fastramcfg   (fastram_config  ),
 	.bootrom      (1'b0            ),
 
 	.ramsel       (ram_sel         ),
@@ -266,7 +300,7 @@ cpu_wrapper cpu_wrapper
 	.ramlds       (ram_lds         ),
 	.ramuds       (ram_uds         ),
 	.ramdout      (ram_dout        ),
-	.ramdin       (                ),
+	.ramdin       (ram_din         ),
 	.ramready     (ram_ready       ),
 	.ramshared    (                ),
 
@@ -275,6 +309,24 @@ cpu_wrapper cpu_wrapper
 	.cacr         (cpu_cacr        ),
 	.nmi_addr     (cpu_nmi_addr    )
 );
+   
+reg ram_sel_d;
+always @(posedge clk_sys) begin
+   if( cpu_ph2) begin
+		if(!ram_sel_d)
+			fastram_sel <= ram_sel;
+		ram_sel_d <= ram_sel;
+	end
+   if( fastram_ready != frr_d ) fastram_sel <= 1'b0;   
+end
+// assign fastram_sel = ram_sel & !ram_ready;
+assign fastram_addr = ram_addr;
+assign fastram_lds = ram_lds;
+assign fastram_uds = ram_uds;
+assign ram_dout = fastram_dout;
+assign fastram_din = ram_din;
+assign fastram_wr = (cpu_state[1:0]==2'b11) ? 1'b1 : 1'b0;
+//assign ram_ready = fastram_ready;
 
 // ==============================================================================
 // ===================================== IDE ====================================
@@ -389,6 +441,7 @@ always @(posedge clk_sys) begin
 	    // image has just been mounted. Examine it further
 	    // by reading first sector.
 	    if(sdc_img_mounted[4+drv] && (ide_drv_state[drv] == IDE_DRV_STATE_NONE)) begin
+	       $display("HDD%0d: Total sector size: %0d", drv, sdc_img_size[40:9]);	       
 	       total_sectors[drv] <= sdc_img_size[40:9];	 
 	       ide_drv_state[drv] <= IDE_DRV_STATE_MNT;
 	    end
@@ -402,22 +455,32 @@ always @(posedge clk_sys) begin
 	    ide_sdc_rd[drv] <= 1'b1;
 	 end
       end
-   
+
       // check if amiga wants to read a sector
-      if ( !sdc_busy && !ide_sdc_rd && ide_exec == IDE_EXEC_READ_SECTOR ) begin
+      if(!sdc_busy && !ide_sdc_rd && ide_exec == IDE_EXEC_READ_SECTOR ) begin
 	 // this really only works with HW multipliers in the FPGA
 	 ide_sdc_sector <= (ide_cylinder * heads[0] + ide_head) * sectors[0] +
 			   ide_sector - 1;
-      
+	 
+	 $display("IDE%0d RD %0d/%0d/%0d -> %0d", ide_drv, 
+		  ide_cylinder, ide_head, ide_sector, 
+		  (ide_cylinder * heads[0] + ide_head) * sectors[0] +
+		  ide_sector - 1);
+	 
 	 ide_sdc_rd[ide_drv] <= 1'b1;
       end
-      
+
       // check if amiga wants to write
-      if ( !sdc_busy && !ide_sdc_wr && ide_exec == IDE_EXEC_WRITE_SECTOR ) begin
+      if (!sdc_busy && !ide_sdc_wr && ide_exec == IDE_EXEC_WRITE_SECTOR ) begin
 	 // this really only works with HW multipliers in the FPGA
 	 ide_sdc_sector <= (ide_cylinder * heads[0] + ide_head) * sectors[0] +
 			   ide_sector - 1;
-      
+	 
+	 $display("IDE%0d WR %0d/%0d/%0d -> %0d", ide_drv, 
+		  ide_cylinder, ide_head, ide_sector, 
+		  (ide_cylinder * heads[0] + ide_head) * sectors[0] +
+		  ide_sector - 1);
+	 
 	 ide_sdc_wr[ide_drv] <= 1'b1;
       end
       
@@ -459,7 +522,10 @@ always @(posedge clk_sys) begin
 
 	   // TODO: emit "drive changed" signal and make sure ide config
 	   // is being updated
-	   511: ide_drv_state[drv] <= IDE_DRV_STATE_PRESENT;	   
+	   511: begin
+	      ide_drv_state[drv] <= IDE_DRV_STATE_PRESENT;	   
+	      $display("IDE%0d CHS %0d/%0d/%0d", drv, cylinders[drv], heads[drv], sectors[drv]);   
+	   end
 	 endcase
       end
    end
@@ -1043,7 +1109,10 @@ wire [15:0] JOY0 = { 8'h00, joystick0 };
 wire [15:0] JOY1 = { 8'h00, joystick1 };   
 wire [15:0] JOY2 = 16'h0000;
 wire [15:0] JOY3 = 16'h0000;   
-
+wire [15:0] JOYA0 = 16'h0000;
+wire [15:0] JOYA1 = 16'h0000;
+wire [63:0] RTC = 64'h0;
+   
 minimig minimig
 (
 	//m68k pins
@@ -1198,3 +1267,4 @@ Amber AMBER
  );
     
 endmodule
+`default_nettype wire

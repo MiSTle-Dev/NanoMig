@@ -559,6 +559,7 @@ paula PAULA1
 	.sdc_byte_addr(sdc_byte_addr),
 	.sdc_byte_in_data(sdc_byte_in_data),
 
+	.floppy_wrprot(floppy_config[1]),
 	.floppy_drives(floppy_config[3:2])
 );
 

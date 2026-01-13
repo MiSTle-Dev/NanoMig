@@ -29,7 +29,8 @@ assign bank = bank_r;
 reg [7:0] bank_r;
 
 always @(*) begin
-	bank_r[7:4] = { kick,kick256kmirror , chip3 | chip2 | chip1 | chip0,  kick1mb  | slow0 | slow1 | slow2 | cart} ;
+	bank_r[7:4] = { kick,kick256kmirror , chip3 | chip2 | chip1 | chip0,  slow0 | slow1 | slow2 } ;
+//	bank_r[7:4] = { kick,kick256kmirror , chip3 | chip2 | chip1 | chip0,  kick1mb  | slow0 | slow1 | slow2 | cart} ;
 	case (memory_config)
 		0: bank_r[3:0] = {    1'b0,  1'b0,          1'b0, chip3 | chip2 | chip1 | chip0 }; // 0.5M CHIP
 		1: bank_r[3:0] = {    1'b0,  1'b0, chip3 | chip1,                 chip2 | chip0 }; // 1.0M CHIP

@@ -127,17 +127,16 @@ assign ramdat = sel_rtg ? {ramdout[7:0], ramdout[15:8]}  : ramdout;
 // 25-23   0   111  110  0    X     X
 // supported configs: SDR + (Z2, Z3_1, Z3_0+Z3_1)
 
-// This is the mapping to the sram
-// map 00-1f to 00-1f (chipram), a0-ff to 20-7f. All non-fastram goes into the first
-// 8M block(SDRAM). This map should be the same as in minimig_sram_bridge.v 
-// All Zorro RAM goes to DDR3
-assign ramaddr[28]    = sel_zram & ~sel_z3ram0;
-assign ramaddr[27]    = sel_zram & (~sel_z3ram1 | cpu_addr[27]);
-assign ramaddr[26:23] = (sel_z3ram0 | sel_z3ram1) ? cpu_addr[26:23]: (sel_rtg ? 4'b1110 : {4{sel_dd}});
-assign ramaddr[22:19] = {4{sel_dd}} | cpu_addr[22:19];
-assign ramaddr[18]    =    sel_dd   | (sel_kicklower & bootrom) | cpu_addr[18];
-assign ramaddr[17:16] = {2{sel_dd}} | cpu_addr[17:16];
-assign ramaddr[15:1]  = cpu_addr[15:1];
+// Mapping for TangNano 20k
+// Chip RAM, 00-1f => 00-1f
+// Fast RAM, 20-5f => 20-5f;
+// Slow RAM, c0-d7 => 60-77;
+// Kick ROM, f8-ff => 78->7f;
+// ramaddr[21] = cpu_addr[21] | cpu_addr[23]; 
+// All other bits passed through unmodified.
+assign ramaddr[28:23] = 6'b0;
+assign ramaddr[22:21] = {cpu_addr[22],cpu_addr[21]|cpu_addr[23]};
+assign ramaddr[20:1] = cpu_addr[20:1];
 
 assign fastchip_lds = lds_in;
 assign fastchip_uds = uds_in;

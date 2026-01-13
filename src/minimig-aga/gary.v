@@ -97,7 +97,7 @@ module gary
 	output       sel_ide, //select $DAxxxx
 	output       sel_gayle, //select $DExxxx
 	output       sel_toccata, //select $E9xxxx (or whatever's specified by toccata_base)
-	output reg   rom_readonly = 0 //when zero allows to write to $fc-$ff, blocks effect of kick256kmirror.  
+	output reg   rom_readonly //when zero allows to write to $fc-$ff, blocks effect of kick256kmirror.  
 );
 
 wire	[2:0] t_sel_slow;

@@ -75,6 +75,7 @@ add_file misc/sd_card.v
 add_file misc/sd_rw.v
 add_file misc/sdcmd_ctrl.v
 add_file misc/amiga_keymap.v
+add_file tang/nano20k/amigaclks.v
 add_file tang/nano20k/flash_dspi.v
 add_file tang/nano20k/gowin_clkdiv/gowin_clkdiv.v
 add_file tang/nano20k/gowin_rpll/pll_142m.v
@@ -98,9 +99,10 @@ set_option -verilog_std sysv2017
 set_option -top_module top
 set_option -use_mspi_as_gpio 1
 set_option -use_sspi_as_gpio 1
-set_option -use_jtag_as_gpio 1
+set_option -use_jtag_as_gpio 0
 set_option -cst_warn_to_error 1
 set_option -multi_boot 0
 set_option -mspi_jump 0
+set_option -loading_rate 25.000
 
 run all

@@ -121,6 +121,7 @@ module paula
 	output [8:0] rdata_okk, 	//right DAC data (PWM volume)
 	// system configuration
 	input	  [1:0] floppy_drives,	//number of extra floppy drives
+	input	        floppy_wrprot,	//floppies are write protected
 	// fifo / track display
 	output  [7:0] trackdisp,
 	output [13:0] secdisp,
@@ -282,6 +283,7 @@ paula_floppy pf1
 	.IO_DOUT(IO_DOUT),
 	.fdd_led(fdd_led),
 	.floppy_drives(floppy_drives),
+	.floppy_wrprot(floppy_wrprot),
 
         // sd card interface for floppy disk emulation
         .sdc_image_mounted(sdc_image_mounted),
