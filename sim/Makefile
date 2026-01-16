@@ -9,8 +9,8 @@ PRJ=nanomig
 OBJ_DIR=obj_dir
 
 # the original fx68k won't simulate. Thus we use this special version for simulation
-FX68K_DIR=fx68x_verilator
-FX68K_FILES=fx68k.sv fx68kAlu.sv uaddrPla.sv fx68k_MicroRom.v fx68k_NanoRom.v
+FX68K_DIR=./fx68x_verilator
+FX68K_FILES= fx68k.sv fx68kAlu.sv uaddrPla.sv fx68k_MicroRom.v fx68k_NanoRom.v
 
 # Minimig-AGA
 MINIMIG_DIR=../src/minimig-aga
@@ -36,9 +36,6 @@ VERILATOR_FILES=verilated.cpp verilated_vcd_c.cpp verilated_threads.cpp
 HDL_FILES=$(TB).v $(MINIMIG_FILES:%=$(MINIMIG_DIR)/%) $(FX68K_FILES:%=$(FX68K_DIR)/%) TG68KdotC_Kernel.v
 HDL_FILES+=$(MISC_FILES:%=$(MISC_DIR)/%) 
 
-# Include ini_parser.cpp in the list of C++ source files
-CPP_FILES=$(TB).cpp ini_parser.cpp
-
 EXTRA_CFLAGS = `sdl2-config --cflags` -DVIDEO
 EXTRA_LDFLAGS = `sdl2-config --libs` -lSDL2_image
 
@@ -49,22 +46,17 @@ endif
 
 all: $(PRJ)
 
-$(PRJ): ${CPP_FILES} ${HDL_FILES} Makefile
-	verilator -O3 -Wno-fatal --no-timing --trace --threads 1 --trace-underscore  -top-module $(PRJ)_tb $(VERILATOR_FLAGS) -cc ${HDL_FILES} --exe ${CPP_FILES} -o ../$(PRJ) -CFLAGS "${EXTRA_CFLAGS}" -LDFLAGS "${EXTRA_LDFLAGS}"
+$(PRJ): $(TB).cpp ${HDL_FILES} Makefile
+	verilator -O3 -Wno-fatal --no-timing --trace-fst --threads 1 --trace-underscore  -top-module $(PRJ)_tb $(VERILATOR_FLAGS) -cc ${HDL_FILES} --exe $(TB).cpp -o ../$(PRJ) -CFLAGS "${EXTRA_CFLAGS}" -LDFLAGS "${EXTRA_LDFLAGS}"
 	make -j -C ${OBJ_DIR} -f V$(PRJ)_tb.mk
 
-$(PRJ).vcd: $(PRJ)
+$(PRJ).fst: $(PRJ)
 	./$(PRJ)
 
-# Run the simulation with an optional .ini file
 run: $(PRJ)
-	@if [ -z "$(INI)" ]; then \
-		./$(PRJ); \
-	else \
-		./$(PRJ) ini=$(INI) screenshot_dir=$(SCREENSHOT_DIR); \
-	fi
+	./$(PRJ)
 
-wave: $(PRJ).vcd
+wave: $(PRJ).fst
 	gtkwave $(PRJ).gtkw
 
 clean:

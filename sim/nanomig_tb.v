@@ -7,6 +7,7 @@ module nanomig_tb
    output	 clk7_en,
    output	 clk7n_en,
    input	 reset,
+   output	 cpu_reset, 
 
    // serial output, mainly for diagrom
    output	 uart_tx,
@@ -16,9 +17,7 @@ module nanomig_tb
    output	 fdd_led,
    output	 hdd_led,
    input	 trigger, 
-   
-   input [5:0]    chipset_config,
-   
+
    // video
    output	 hs_n,
    output	 vs_n,
@@ -26,8 +25,13 @@ module nanomig_tb
    output [3:0]	 green,
    output [3:0]	 blue,
 
+   input [7:0] memory_config,
+   input [2:0] fastram_config,
+   input [3:0] floppy_config,
+   input [5:0] ide_config,
+   
    input [7:0]	 sdc_img_mounted,
-   input [31:0]	 sdc_img_size,
+   input [63:0]	 sdc_img_size,
 
 `ifdef SD_EMU   
    output	 sdclk,
@@ -37,14 +41,14 @@ module nanomig_tb
    input [3:0]	 sddat_in,
 `else
    output [7:0]	 sdc_rd,
-   output [7:0]  sdc_wr,
+   output [7:0]	 sdc_wr,
    output [31:0] sdc_sector,
    input	 sdc_busy,
    input	 sdc_done,
    input	 sdc_byte_in_strobe,
    input [8:0]	 sdc_byte_addr,
    input [7:0]	 sdc_byte_in_data,
-   output [7:0]  sdc_byte_out_data,
+   output [7:0]	 sdc_byte_out_data,
 `endif // !`ifdef SD_EMU
    
    // external ram/rom interface
@@ -60,7 +64,6 @@ module nanomig_tb
 `ifdef SD_EMU
 // for floppy IO the SD card itself may be included into the simulation or not
 wire [7:0]	 sdc_rd;
-wire [7:0]	 sdc_wr;
 wire [31:0]	 sdc_sector;
 wire		 sdc_busy;
 wire		 sdc_done;
@@ -102,6 +105,7 @@ nanomig nanomig (
 		 // system pins
 		 .clk_sys(clk),   // 28.37516 MHz clock
 		 .reset(reset),
+		 .cpu_nrst_out(cpu_reset),
 		 .clk7_en(clk7_en),
 		 .clk7n_en(clk7n_en),
 
@@ -109,11 +113,11 @@ nanomig nanomig (
 		 .fdd_led(fdd_led),
 		 .hdd_led(hdd_led),
 
-                 .chipset_config(chipset_config),
-                 .memory_config(8'b0_0_00_00_01),
-                 .floppy_config(4'h0),
-                 .ide_config(6'b000111),
-
+		 .memory_config(memory_config),
+		 .fastram_config(fastram_config),
+		 .floppy_config(floppy_config),
+		 .ide_config(ide_config),
+		 
 		 .hs(hs_n),
 		 .vs(vs_n),
 		 .r(red),
@@ -121,8 +125,7 @@ nanomig nanomig (
 		 .b(blue),
 
 		 .joystick0(6'b000000),
- 		 .joystick1(6'b000000),
-
+		 .joystick1(6'b000000),
 		 
 		 // sd card interface for floppy disk emulation
 		 .sdc_img_mounted    ( sdc_img_mounted     ),
@@ -159,5 +162,6 @@ video_analyzer video_analyzer
  .interlace(),
  .vreset()
  );   
-
+   
+   
 endmodule

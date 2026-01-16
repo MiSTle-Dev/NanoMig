@@ -1,5 +1,5 @@
 /*
-  nanomig_tb.cpp 
+  nanomig_aga_tb.cpp 
 
   NanoMig verilator environment. This is being used to test certain
   aspects of NanoMig in verilator. Since Minimig itself is pretty
@@ -11,34 +11,36 @@
   certain things. It's not meant to be nice or clean. But maybe
   someone find this useful anyway.
  */
- 
 
 #ifdef VIDEO
 #include <SDL.h>
 #include <SDL_image.h>
-#include <iostream>
-#include <bitset>
-#include <fstream>
-#include <sstream>
-#include <string>
 // one frame is 20.0326ms
 #endif
 
-#include "ini_parser.h"
 #include "Vnanomig_tb.h"
 #include "verilated.h"
-#include "verilated_vcd_c.h"
+#include "verilated_fst_c.h"
 
-#define KICK "kick31.rom" 
 // #define KICK "kick12.rom" 
+#define KICK "kick13.rom" 
+// #define KICK "kick31.rom" 
 // #define KICK "DiagROM/DiagROM"
+// #define KICK "../src/ram_test/ram_test.bin"
 // #define KICK "test_rom/test_rom.bin"
 
+// fdc test also enables ide
 #define FDC_TEST
 
 #ifdef FDC_TEST
-#define FLOPPY_ADF    "df0.adf"
-#define HARDDISK0_HDF "dh0.hdf"
+#define FLOPPY_ADF  "../disks/fdwrtest.adf"
+// #define FLOPPY_ADF  "../disks/wb13.adf"
+// #define FLOPPY_ADF  "Getaway_A.adf"
+// #define FLOPPY_ADF  "random.adf"
+
+// #define HARDDISK0_HDF   "../disks/AGS_NanoMig.HDF"
+// #define HARDDISK0_HDF   "../disks/dh0.hdf"
+// #define HARDDISK1_HDF   "../disks/dh1.hdf"
 
 // #define FDC_RAM_TEST_VERIFY   // verify track data against minimigs original firmware fdd.c. only works with ram_test rom
 FILE *adf_fd = NULL;
@@ -47,20 +49,49 @@ FILE *hdf_fd[] = { NULL, NULL };
 
 // #define UART_ONLY
 
-static Vnanomig_tb *tb;
-static VerilatedVcdC *trace;
-static double simulation_time;
+// with turbo kick, some vpos test exits with error
 
-uint8_t chipset_config;
-std::string g_rom_path;
-std::string g_adf_path;
+// this can be used to write (Kick) memory access patterns into a file. This can
+// be used to verify the access in a different run to e.g. verify that faster
+// memory access still produces the same access pattern
+#define MEMTRACE  0   // 0 = no tracing, 1 = create, 2 = verify
+
+static Vnanomig_tb *tb;
+static VerilatedFstC *trace;
+static double simulation_time;
 
 #define TICKLEN   (0.5/28375160)
 
 // specfiy simulation runtime and from which point in time a trace should
 // be written
-//#define TRACESTART   0.0 // 4.2
-//#define TRACEEND     (TRACESTART + 0.1)   // 0.1s ~ 1G
+//#define TRACESTART   0
+//#define TRACESTART   0.22
+//#define TRACESTART   0.44
+//#define TRACESTART   0.87
+//#define TRACESTART   2.8
+//#define TRACESTART   5.7    // floppy read
+//#define TRACESTART   3.750
+//#define TRACESTART   3.800
+
+// for ECHO "Hello"
+// #define TRACESTART   8.580
+// #define TRACESTART   8.610
+
+// for COPY Disk.info to Nase.info
+// 8.739 // read Disk.info
+// 8.814 // write Nase.info
+// #define TRACESTART   8.810
+// #define TRACESTART   8.740
+#define TRACESTART   10.9   // FDC write
+
+#ifdef TRACESTART
+#define TRACEEND     (TRACESTART + 0.15)   // 0.1s ~ 1G
+#endif
+
+// #define TRACEEND     (60.0)
+
+// with turbo kick:
+// 1432.701 ms, LED off 
 
 // kick13 events:
 // 80ms -> hardware is out of sysctrl reset
@@ -75,6 +106,10 @@ std::string g_adf_path;
 // 10750ms -> workbench 1.3 draws blue AmigaDOS window
 // 22000ms -> no clock found
 // 54000ms -> workbench opens
+
+// kick31
+// 783ms   -> first ide cs
+// 2773ms  -> first gayle selection
 
 /* =============================== video =================================== */
 
@@ -99,6 +134,7 @@ typedef struct Pixel {  // for SDL texture
     uint8_t r;  // red
 } Pixel;
 
+#define SCALE 1
 Pixel screenbuffer[MAX_H_RES*MAX_V_RES];
 
 void init_video(void) {
@@ -109,7 +145,7 @@ void init_video(void) {
 
   // start with a 454x313 or scandoubed 908x626screen
   sdl_window = SDL_CreateWindow("Nanomig", SDL_WINDOWPOS_CENTERED,
-        SDL_WINDOWPOS_CENTERED, 2*454, 2*313, SDL_WINDOW_RESIZABLE | SDL_WINDOW_SHOWN);
+        SDL_WINDOWPOS_CENTERED, SCALE*454, SCALE*313, SDL_WINDOW_RESIZABLE | SDL_WINDOW_SHOWN);
   if (!sdl_window) {
     printf("Window creation failed: %s\n", SDL_GetError());
     return;
@@ -248,40 +284,21 @@ void capture_video(void) {
 	  SDL_RenderCopy(sdl_renderer, sdl_texture, NULL, NULL);
 	  SDL_RenderPresent(sdl_renderer);
 
-	  //	  SDL_Texture* target = SDL_GetRenderTarget(renderer);
-	  //	  SDL_SetRenderTarget(renderer, texture);
 	  char name[32];
 	  sprintf(name, "screenshots/frame%04d.png", frame);
 	  save_texture(sdl_renderer, sdl_texture, name);
-	  //printf ("simulation_time: %.3f seconds\n", (simulation_time));
-
-	  if (g_vAmigaTS_screenshot_name != "") { // there is a name -> take a screenshot when wait time is reached and then exit
-		if ((simulation_time) > g_vAmigaTS_screenshot_wait_time_seconds + g_vAmigaTS_screenshot_wait_time_seconds_offset) {
-	      std::string full_screenshot_name = g_vAmigaTS_screenshot_dir + "/" +  g_vAmigaTS_screenshot_name + ".png";
-	      save_texture(sdl_renderer, sdl_texture, full_screenshot_name.c_str());
-          exit(0);
-	    }
-	  }
 	}
-  }
+      }
 	
-  // process SDL events
-  SDL_Event event;
-  while( SDL_PollEvent( &event ) ){
+      // process SDL events
+      SDL_Event event;
+      while( SDL_PollEvent( &event ) ){
 	if(event.type == SDL_QUIT)
 	  sdl_cancelled = 1;
 	
 	if(event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE)
 	    sdl_cancelled = 1;
       }
-#if 0    
-      // write frame to disk
-      char name[32];
-      sprintf(name, "screenshots/frame%04d.raw", frame);
-      FILE *f = fopen(name, "wb");
-      fwrite(screenbuffer, sizeof(Pixel), H_RES*V_RES, f);
-      fclose(f);
-#endif
       
 #ifndef UART_ONLY
       printf("%.3fms frame %d is %dx%d\n", simulation_time*1000, frame, frame_line_len, sy);
@@ -327,23 +344,20 @@ static uint64_t GetTickCountMs() {
 
 unsigned short ram[8*512*1024];  // 8 Megabytes
 
-void load_kick(const std::string &path) {
-  std::cout << "Loading kick into last 512k of 8MB ram from " << path << std::endl;
-  FILE *fd = fopen(path.c_str(), "rb");
+void load_kick(void) {
+  printf("Loading kick into last 512k of 8MB ram\n");
+  FILE *fd = fopen(KICK, "rb");
   if(!fd) { perror("load kick"); exit(-1); }
-
+  
   int len = fread(ram+(0x780000/2), 1024, 512, fd);
   if(len != 512) {
     if(len != 256) {
-      std::cerr << "256/512k kick read failed\n";
+      printf("256/512k kick read failed\n");
     } else {
       // just read a second image
       fseek(fd, 0, SEEK_SET);
       len = fread(ram+(0x780000/2)+128*1024, 1024, 256, fd);
-      if(len != 256) {
-        std::cerr << "2nd read failed\n";
-        exit(-1);
-      }
+      if(len != 256) { printf("2nd read failed\n"); exit(-1); }
     }
   }
   fclose(fd);
@@ -526,7 +540,7 @@ void SendSector(unsigned char *pData, unsigned char sector, unsigned char track,
     while (i--)
       SPI(*p++ | 0xAA);
 
-#if 1
+#if 0
     printf("header checksum: %02x/%02x/%02x/%02x\n",
            header_checksum[0] | 0xAA,header_checksum[1] | 0xAA,
            header_checksum[2] | 0xAA,header_checksum[3] | 0xAA);
@@ -556,7 +570,7 @@ void build_track_buffer(int sector, unsigned char *data) {
     SPI(-1);
   }
 
-  printf("Loading sector track %d, sector %d\n", sector/11, sector%11);
+  printf("Loading track %d, side %d, sector %d\n", sector/22, (sector/11)%2, sector%11);
   
   if(!data) {
     fseek(adf_fd, sector*512, SEEK_SET);
@@ -742,10 +756,10 @@ void sd_handle()  {
             {
 	      // check for floppy data request
 	      if(!fd) {
-		fd = fopen(g_adf_path.c_str(), "rb");
+		fd = fopen(FLOPPY_ADF, "rb");
 		if(!fd) { perror("OPEN ERROR"); exit(-1); }
 		fseek(fd, 0, SEEK_END);
-		flen = ftello(fd);
+		flen = ftell(fd);
 		printf("Image size is %lld\n", flen);
 		fseek(fd, 0, SEEK_SET);
 	      }
@@ -803,6 +817,10 @@ void sd_handle()  {
 }      
 #endif
 #endif
+ 
+#if MEMTRACE > 0
+FILE *mem_fd = NULL;
+#endif
 
 #define RDB_U32(a)  (((unsigned long)(sector_buffer[0][4*(a)])<<24) + ((unsigned long)(sector_buffer[0][4*(a)+1])<<16) + ((unsigned long)(sector_buffer[0][4*(a)+2])<<8) + (unsigned long)(sector_buffer[0][4*(a)+3]))
 
@@ -812,11 +830,43 @@ void tick(int c) {
   static int sector_tx = 0;
   static int sector_tx_cnt = 512;
   static int sector_rx_cnt = 512;
-
+#ifndef SD_EMU      
+  static int write_drv;
+  static int write_sector;
+#endif
+  
+#if MEMTRACE > 0
+  if(!mem_fd) {
+#if MEMTRACE == 1
+    printf("Writing memory trace\n");
+    mem_fd = fopen("memtrace.txt", "w");
+    if(!mem_fd) { perror("cannot open 'memtrace.txt' for writing"); exit(-1); }
+#else
+    printf("Verifying memory trace\n");
+    mem_fd = fopen("memtrace.txt", "r");
+    if(!mem_fd) { perror("cannot open 'memtrace.txt' for reading"); exit(-1); }
+#endif
+  }  
+#endif
+  
   tb->clk = c;
 
-  if(c && !tb->reset) {
+  if(c /* && !tb->reset */ ) {
+
+    static int cpu_reset = -1;
+    if (tb->cpu_reset != cpu_reset) {
+      printf("%.3fms <<<<<<<<<<<<<CPU changed reset to %d>>>>>>>>>>>>>\n",
+	     simulation_time*1000, tb->cpu_reset);
+      cpu_reset = tb->cpu_reset;
+    }
     
+    // leave reset after 20 ms of simulation time
+    if ( tb->reset && simulation_time > 0.02 && simulation_time < 0.03) {
+      printf("%.3fms Out of reset\n", simulation_time*1000);
+      tb->reset = 0;
+    }
+    
+#ifndef UART_ONLY
     // check for power led
     static int pwr_led = -1;
     if(tb->pwr_led != pwr_led) {
@@ -830,13 +880,14 @@ void tick(int c) {
       printf("%.3fms FDD LED = %s\n", simulation_time*1000, tb->fdd_led?"ON":"OFF");
       fdd_led = tb->fdd_led;
     }
-
+    
     // check for hdd led
     static int hdd_led = -1;
     if(tb->hdd_led != hdd_led) {
       printf("%.3fms HDD LED = %s\n", simulation_time*1000, tb->hdd_led?"ON":"OFF");
       hdd_led = tb->hdd_led;
     }
+#endif
     
     // ========================== analyze uart output (for diag rom) ===========================
     static int tx_data = tb->uart_tx;
@@ -888,10 +939,10 @@ void tick(int c) {
     // send bytes into sdc buffer
     tb->sdc_byte_in_strobe = 0;
     static int sub_cnt = 0;
+
     if(sub_cnt++ == 8) {
       sub_cnt = 0;
-      
-      // without SD card emulation we drive the floppy's sector io directly
+
       if(tb->sdc_done) {
 	tb->sdc_byte_addr = 0;      
 	tb->sdc_done = 0;
@@ -906,14 +957,39 @@ void tick(int c) {
 	  sector_buffer[0][sector_rx_cnt++] = tb->sdc_byte_out_data;
 	  
 	  if(sector_rx_cnt == 512) {
+	    // dump data that should be written
 	    hexdump(sector_buffer[0], 512);
-	    
+
+	    printf("Writing to %d: %d\n", write_drv, write_sector);
+	    if(write_drv < 4) {
+#if 0
+	      // dump original sector for comparison
+	      fseeko(adf_fd, write_sector*512ll, SEEK_SET);
+	      if(fread(sector_buffer[0], 1, 512, adf_fd) != 512) {
+		perror("adf read error"); return; }
+	      
+	      printf("previous:\n");
+	      hexdump(sector_buffer[0], 512);
+#endif
+
+#if 0
+	      fseeko(adf_fd, write_sector*512ll, SEEK_SET);
+	      if(fwrite(sector_buffer[0], 1, 512, adf_fd) != 512) {
+		perror("adf write error"); return; }
+#endif
+	    } else {	      
+	      /* write data to image */
+	      fseeko(hdf_fd[write_drv-4], write_sector*512ll, SEEK_SET);
+	      if(fwrite(sector_buffer[0], 1, 512, hdf_fd[write_drv-4]) != 512) {
+		perror("hdf write error"); return; }
+	    }
+	      
 	    tb->sdc_done = 1;
 	    tb->sdc_busy = 0;
 	  } else
 	    tb->sdc_byte_addr = sector_rx_cnt;
 	}
-	
+	  
 	if(sector_tx_cnt < 512) {
 	  // printf("Send %d/%d\n", sector_tx, sector_tx_cnt);
 	  
@@ -955,7 +1031,6 @@ void tick(int c) {
 		 adr, adr/SECTOR_SIZE, (adr%SECTOR_SIZE)/2,
 		 tb->ram_data, mm_orig);
 	}
-
       }
 #endif
 
@@ -965,25 +1040,44 @@ void tick(int c) {
 	printf("%.3fms SD: sdc_wr = %d\n", simulation_time*1000, tb->sdc_wr);
 	sdc_wr = tb->sdc_wr;
 
+	if(tb->sdc_wr & 0x0f ) {
+	  int drv = (tb->sdc_wr&0x01)?0:
+	    (tb->sdc_wr&0x02)?1:
+	    (tb->sdc_wr&0x04)?2:
+	    3;
+	    
+	  tb->sdc_busy = 1;
+
+	  printf("%.3fms SD FDC %d write request, sector %d (tr %d, sd %d, sec %d)\n",
+		 simulation_time*1000, drv, tb->sdc_sector, tb->sdc_sector/22,
+		 (tb->sdc_sector/11)&1, tb->sdc_sector%11);
+
+	  write_drv = drv;
+	  write_sector = tb->sdc_sector;
+	  tb->sdc_byte_addr = sector_rx_cnt = 0;
+	}
+	
 	if(tb->sdc_wr & 0x30 ) {
-	  int drv = (tb->sdc_wr&0x10)?0:1;
+	  int drv = (tb->sdc_wr&0x10)?4:5;
 	  tb->sdc_busy = 1;
 
 	  printf("%.3fms SD HDD %d write request, sector %d\n",
 		 simulation_time*1000, drv, tb->sdc_sector);
-	  
+
+	  write_drv = drv;
+	  write_sector = tb->sdc_sector;
 	  tb->sdc_byte_addr = sector_rx_cnt = 0;
 	}
       }
 
       static int sdc_rd = -1;
       if(tb->sdc_rd != sdc_rd && (!tb->sdc_rd || (!tb->sdc_busy && !tb->sdc_done))) {
-	printf("%.3fms sdc_rd %d\n", simulation_time*1000, tb->sdc_rd);
+	printf("%.3fms SD: sdc_rd = %d\n", simulation_time*1000, tb->sdc_rd);
 	sdc_rd = tb->sdc_rd;
 	
 	if(tb->sdc_rd == 1) {
 	  tb->sdc_busy = 1;
-	  printf("%.3fms SD FDC request, sector %d (tr %d, sd %d, sec %d)\n",
+	  printf("%.3fms SD FDC read request, sector %d (tr %d, sd %d, sec %d)\n",
 		 simulation_time*1000, tb->sdc_sector, tb->sdc_sector/22,
 		 (tb->sdc_sector/11)&1, tb->sdc_sector%11);
 	  
@@ -994,7 +1088,7 @@ void tick(int c) {
 	  sector_tx_cnt = 0;
 	  sector_tx = tb->sdc_sector%11;
 	}
-
+	
 	if(tb->sdc_rd & 0x30 && (!tb->sdc_rd || (!tb->sdc_busy && !tb->sdc_done))) {
 	  int drv = (tb->sdc_rd&0x10)?0:1;
 	  
@@ -1010,8 +1104,9 @@ void tick(int c) {
 	  // CSH from RDB: 627/63/4 = 158004
 	  
 	  if(hdf_fd[drv]) {
-	    fseek(hdf_fd[drv], tb->sdc_sector*512, SEEK_SET);
-	    if(fread(sector_buffer[0], 1, 512, hdf_fd[drv]) != 512) {  perror("hdf read error"); return; }
+	    fseeko(hdf_fd[drv], tb->sdc_sector*512ll, SEEK_SET);
+	    if(fread(sector_buffer[0], 1, 512, hdf_fd[drv]) != 512) {
+	      perror("hdf read error"); return; }
 	    hexdump(sector_buffer[0], 512);
 
 	    // dump some info on rdb
@@ -1022,8 +1117,8 @@ void tick(int c) {
 		printf("DRV%d RDB ID ok\n", drv);
 		printf("Blocksize:  %ld\n", RDB_U32(4));
 		printf("Cylinders:  %ld\n", RDB_U32(16));
-		printf("Sectors:    %ld\n", RDB_U32(17));
 		printf("Heads:      %ld\n", RDB_U32(18));
+		printf("Sectors:    %ld\n", RDB_U32(17));
 	      }
 	    }
 	  }
@@ -1040,12 +1135,14 @@ void tick(int c) {
     if(insert_counter < 1000) {
       // check if floppy image can be mounted    
       if(insert_counter == 100) {
-	printf("FLOPPY: Using image '%s'\n", g_adf_path.c_str());
+#ifdef FLOPPY_ADF
+	printf("FLOPPY: Using image '%s'\n", FLOPPY_ADF);
+#endif
 	if(adf_fd) {
 	  fseek(adf_fd, 0, SEEK_END);
-	  tb->sdc_img_size = ftell(adf_fd);
+	  tb->sdc_img_size = ftello(adf_fd);
  
-	  printf("FLOPPY: Mounting df0 image size %d bytes.\n", tb->sdc_img_size);	
+	  printf("FLOPPY: Mounting df0 image size %ld bytes.\n", tb->sdc_img_size);	
 	} else
 	  printf("FLOPPY: Unable to open floppy disk image. Not mounting disk.\n");
       }
@@ -1065,9 +1162,9 @@ void tick(int c) {
 	
 	if(hdf_fd[drv]) {
 	  fseek(hdf_fd[drv], 0, SEEK_END);
-	  tb->sdc_img_size = ftell(hdf_fd[drv]);
+	  tb->sdc_img_size = ftello(hdf_fd[drv]);
 	  
-	  printf("HDD%d: Mounting image size %d bytes.\n", drv, tb->sdc_img_size);	
+	  printf("HDD%d: Mounting image size %ld bytes.\n", drv, tb->sdc_img_size);	
 	} else
 	  printf("HDD%d: Unable to open harddisk image. Not mounting disk.\n", drv);
       }
@@ -1091,13 +1188,99 @@ void tick(int c) {
     
     /* ----------------- simulate ram/kick ---------------- */
 
-    // ram works on falling 7mhz edge
-    if(tb->clk7n_en) {
+    // counter within 7 Mhz cycle
+    static unsigned char ram_delay = 0;
+    if(tb->clk7n_en) ram_delay = 0;
+    else             ram_delay++;
+    
+    // ram works on/after falling 7mhz edge
+    if(ram_delay == 1) {
       unsigned char *ram_b = (unsigned char*)(ram+tb->ram_address);
 	
       if(!tb->_ram_oe) {
 	// big edian read
 	tb->ramdata_in = 256*ram_b[0] + ram_b[1];
+
+	// ===== check for kick 1.3 fatal error routine being executed =====
+	// these blink the power led
+	static int fatal = 0;
+	if(tb->ram_address == (0x7c05b8 >> 1) && !fatal) {
+	  printf("%.3fms Kick 1.3 fatal error #1\n", simulation_time*1000);
+	  fatal = 1;
+	}
+
+	// fast kick triggers this at 1432.701 ms
+	if(tb->ram_address == (0x7c30b6 >> 1) && !fatal) {
+	  printf("%.3fms Kick 1.3 fatal error #2\n", simulation_time*1000);
+	  fatal = 1;
+	}	
+	
+#if MEMTRACE == 1
+	if(tb->ram_address >= 0x3e0000) {	
+	  // write kick access to trace file
+	  fprintf(mem_fd, "K %08x %04x\n", tb->ram_address, tb->ramdata_in);
+	}
+#elif MEMTRACE == 2
+	if(tb->ram_address >= 0x3e0000) {	
+	  static int err_cnt = 0;
+
+	  if(err_cnt < 30) {
+	    static int skip_to_addr = 0;
+	    static int skipped = 0;
+
+	    if(skip_to_addr && tb->ram_address != skip_to_addr) {
+	      // printf("skipping %08x\n", tb->ram_address);
+	      skipped++;
+	    } else if(skip_to_addr) {
+	      printf("%.3fms skipped %d in simulation\n", simulation_time*1000, skipped);
+	      skip_to_addr = 0;
+	    } else {
+	      
+	      // read trace file and compare to kick access
+	      char m_c;
+	      int m_a, m_d; 
+	      int x = fscanf(mem_fd, "%c %x %x\n", &m_c, &m_a, &m_d);
+	      if(x != 3) { printf("======> End of trace <==========\n"); err_cnt = 100; }
+	      else {
+		
+		static int last_addr = 0;
+		
+		// we need to skip certain code when running the CPU at different speeds
+		// as kickstart will wait for certain hardware events and will wait a different
+		// time of CPU speed varies.
+		
+		// VPOS subroutine at kick 1.3 $fcb00c
+		// if the previous address was the one beforehand, then this is not
+		// actually the call to this routine but only the prefetching of the code before
+		if( tb->ram_address == (0x7cb00c>>1) && last_addr != (0x7cb00a>>1)) {		
+		  printf("Entered vpos routine from %08x\n", last_addr<<1);
+		  
+		  // the last address is read again when the execution returns to the caller
+		  int skip = 0;
+		  do {
+		    x = fscanf(mem_fd, "%c %x %x\n", &m_c, &m_a, &m_d);
+		    skip++;
+		  } while(x == 3 && m_a != last_addr);
+		  
+		  printf("Skipping %d reads in trace\n", skip);
+		  skip_to_addr = last_addr;
+		  skipped = 0;
+		} else {
+		
+		  last_addr = tb->ram_address;
+		
+		  if(m_c != 'K' || m_a != tb->ram_address || m_d != tb->ramdata_in) {
+		    // stop complaining after 20 errors
+		    printf("%.3fms Kick read verify failed: %c is %08x/%04x, expected %08x/%04x\n",
+			   simulation_time*1000, m_c, tb->ram_address<<1, tb->ramdata_in, m_a<<1, m_d);
+		    err_cnt++;
+		  }
+		}
+	      }
+	    }
+	  }
+	}
+#endif
 	
 	// printf("%.3fms MEM RD ADDR %08x = %04x\n", simulation_time*1000, tb->ram_address << 1, tb->ramdata_in);
       }
@@ -1106,18 +1289,13 @@ void tick(int c) {
 	// exit(-1);
 	// ram[tb->ram_address] = tb->ram_data;
 
-
-	// TODO: check for corrent ble/bhe
-	
 	// big edian write
 	if(!tb->_ram_bhe) ram_b[0] = tb->ram_data>>8;
 	if(!tb->_ram_ble) ram_b[1] = tb->ram_data&0xff;
       }
     }
-
   }
   
-
   tb->eval();
 
 #ifdef VIDEO
@@ -1142,40 +1320,16 @@ void tick(int c) {
 }
 
 int main(int argc, char **argv) {
-  chipset_config = 0; // default chipset configuration = OCS
-  g_rom_path = KICK;
-  g_adf_path = FLOPPY_ADF;
-  //parse_command_line_args(argc, argv); // from ini_parser.h
-  vAmigaTSConfig config = parse_command_line_args(argc, argv); // from ini_parser.h
-  if (config.config_file_name != "") {
-    g_rom_path = config.rom_path;
-    g_adf_path = config.adf_path;
-    g_vAmigaTS_screenshot_wait_time_seconds = config.screenshot_wait_time_seconds;
-    g_vAmigaTS_screenshot_wait_time_seconds_offset = config.screenshot_wait_time_seconds_offset;
-    g_vAmigaTS_screenshot_name = config.screenshot_name;
-    g_vAmigaTS_screenshot_dir = config.screenshot_dir;
-
-    // Determine the chipset configuration
-    if (config.chipset == "OCS") {
-      chipset_config = 0b000000; // Set OCS configuration
-    } else if (config.chipset == "ECS") {
-      chipset_config = 0b001000; // Set ECS configuration
-    }
-    std::cout << "chipset: " << config.chipset << "\n";
-    std::cout << "chipset_config: " << std::bitset<6>(chipset_config) << "\n";
-    std::cout << "cpu_revision" << config.cpu_revision << "\n";
-  }
-    
   // Initialize Verilators variables
   Verilated::commandArgs(argc, argv);
   // Verilated::debug(1);
   Verilated::traceEverOn(true);
-  trace = new VerilatedVcdC;
+  trace = new VerilatedFstC;
   trace->spTrace()->set_time_unit("1ns");
   trace->spTrace()->set_time_resolution("1ps");
   simulation_time = 0;
   
-  load_kick(g_rom_path);
+  load_kick();
 
 #ifdef VIDEO
   init_video();
@@ -1184,20 +1338,20 @@ int main(int argc, char **argv) {
   // Create an instance of our module under test
   tb = new Vnanomig_tb;
   tb->trace(trace, 99);
-  trace->open("nanomig.vcd");
-  
-  // Assign the chipset_config to the Verilog module's input
-  tb->chipset_config = chipset_config;
-
+  trace->open("nanomig.fst");
   
 #ifdef FDC_TEST
-  // check for af image size and insert it
-  adf_fd = fopen(g_adf_path.c_str(), "rb");
-  if(!adf_fd) { perror("open file"); }
-
+#ifdef FLOPPY_ADF
+  // try to open adf floppy image
+  adf_fd = fopen(FLOPPY_ADF, "r+b");
+  if(!adf_fd) { perror("open adf file"); }
+#else
+  printf("No floppy adf specified\n");
+#endif
+  
 #ifdef HARDDISK0_HDF
   // try to open hdf harddisk image
-  hdf_fd[0] = fopen(HARDDISK0_HDF, "rb");
+  hdf_fd[0] = fopen(HARDDISK0_HDF, "r+b");
   if(!hdf_fd[0]) { perror("DRV0: open hdf file"); }
 #else
   printf("DRV0: No harddisk hdf specified\n");
@@ -1211,15 +1365,13 @@ int main(int argc, char **argv) {
   printf("DRV1: No harddisk hdf specified\n");
 #endif
 #endif
-  
-  tb->reset = 1;
-  for(int i=0;i<10;i++) {
-    tick(1);
-    tick(0);
-  }
-  
-  tb->reset = 0;
 
+  tb->reset = 1;
+  tb->memory_config = 0x00; // 0x00=512k, 0x01=1M, 0x0f=3.5M
+  tb->fastram_config = 0x2; // 0=none, 1=2MB, 2=4MB
+  tb->floppy_config = 0x1;  // 1 = one fast drive
+  tb->ide_config = 0x7;     // 7=two drives
+  
   /* run for a while */
   while(
 #ifdef TRACEEND
@@ -1240,6 +1392,18 @@ int main(int argc, char **argv) {
       last_perc = percentage;
     }
 #endif
+
+    // apply reset after 6 seconds for 1ms
+    if(simulation_time < 0.1) {      
+      static int x_reset = -1;
+      tb->reset = (int)(simulation_time * 1000) == 6000;
+      if(tb->reset != x_reset){
+	if(x_reset != -1) printf("%.3fms RESET changed to %d\n",
+				 1000*simulation_time, tb->reset);
+      }
+      x_reset = tb->reset;
+    }
+	
     tick(1);
     tick(0);
   }
@@ -1248,9 +1412,15 @@ int main(int argc, char **argv) {
   
   trace->close();
 
+  // hexdump(ram+(0x97f0/2), 512);
+  
 #ifdef FDC_TEST
   if(adf_fd) fclose(adf_fd);
   if(hdf_fd[0]) fclose(hdf_fd[0]);
   if(hdf_fd[1]) fclose(hdf_fd[1]);
+#endif
+
+#if MEMTRACE > 0
+  if(mem_fd) fclose(mem_fd);
 #endif
 }
