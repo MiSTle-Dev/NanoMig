@@ -101,19 +101,15 @@ module paula
         input   [3:0] sdc_image_mounted,
         input   [31:0] sdc_image_size,                  // length of image file
         output  [3:0] sdc_rd,
+        output  [3:0] sdc_wr,
         output  [31:0] sdc_sector,
         input   sdc_busy,
         input   sdc_done,
 	input	sdc_byte_in_strobe,
 	input   [8:0] sdc_byte_addr,
 	input   [7:0] sdc_byte_in_data,
+	output  [7:0] sdc_byte_out_data,
 
-	//flash drive host controller interface	(SPI)
-	input         IO_ENA,
-	input         IO_STROBE,
-	output        IO_WAIT,
-	input  [15:0] IO_DIN,
-	output [15:0] IO_DOUT,
 	//audio outputs
 	output [14:0] ldata,			//left DAC data
 	output [14:0] rdata, 		//right DAC data
@@ -276,11 +272,6 @@ paula_floppy pf1
 	.blckint(blckint),
 	.syncint(syncint),
 	.wordsync(adkcon[10]),
-	.IO_ENA(IO_ENA),
-	.IO_STROBE(IO_STROBE),
-	.IO_WAIT(IO_WAIT),
-	.IO_DIN(IO_DIN),
-	.IO_DOUT(IO_DOUT),
 	.fdd_led(fdd_led),
 	.floppy_drives(floppy_drives),
 	.floppy_wrprot(floppy_wrprot),
@@ -289,12 +280,14 @@ paula_floppy pf1
         .sdc_image_mounted(sdc_image_mounted),
         .sdc_image_size(sdc_image_size),           // length of image file
         .sdc_rd(sdc_rd),
+        .sdc_wr(sdc_wr),
         .sdc_sector(sdc_sector),
         .sdc_busy(sdc_busy),
         .sdc_done(sdc_done),
 	.sdc_byte_in_strobe(sdc_byte_in_strobe),
 	.sdc_byte_addr(sdc_byte_addr),
 	.sdc_byte_in_data(sdc_byte_in_data),
+        .sdc_byte_out_data(sdc_byte_out_data),
 
 	// fifo / track display
 	.trackdisp(trackdisp),

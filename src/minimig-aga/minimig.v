@@ -217,25 +217,19 @@ module minimig
 	input [3:0]   floppy_config,
 	input [5:0]   ide_config,
 
-	//host controller interface (SPI)
-	input	      IO_UIO,
-	input	      IO_FPGA,
-	input	      IO_STROBE,
-	output	      IO_WAIT,
-	input [15:0]  IO_DIN,
-	output [15:0] IO_DOUT,
-
         // Interface MiSTeryNano sd card interface. This very simple connection allows the core
         // to request sectors from within a OSD selected image file
 	input [3:0]   sdc_img_mounted,
 	input [31:0]  sdc_img_size,
         output [3:0]  sdc_rd,
+        output [3:0]  sdc_wr,
         output [31:0] sdc_sector,
         input	      sdc_busy,
         input	      sdc_done,
 	input	      sdc_byte_in_strobe,
 	input [8:0]   sdc_byte_addr,
-	input [7:0]   sdc_byte_in_data, 
+	input [7:0]   sdc_byte_in_data,
+ 	output [7:0]  sdc_byte_out_data, 
  
 	//video
 	output	      _hsync, // horizontal sync
@@ -270,13 +264,8 @@ module minimig
 `endif
  
 	//user i/o
-`ifndef ENABLE_USERIO_SPI   
 	input [1:0]   cpucfg,
 	input [2:0]   cachecfg,
-`else
-	output [1:0]  cpucfg,
-	output [2:0]  cachecfg,
-`endif
 	output [6:0]  memcfg,
 	output	      bootrom, // enable bootrom magic in gary.v
 	output	      ide_ena,
@@ -391,12 +380,6 @@ wire        _wprot;				//disk is write-protected
 wire  [1:0] blver;
 wire        hbl, hde;
 assign      hblank = blver ? ~hde : hbl;
-
-wire        IO_WAIT_PAULA, IO_WAIT_OSD;
-wire [15:0] IO_DOUT_PAULA;
-
-assign      IO_DOUT = IO_DOUT_PAULA;
-assign      IO_WAIT = IO_WAIT_PAULA | IO_WAIT_OSD;
 
 //--------------------------------------------------------------------------------------
 
@@ -538,11 +521,6 @@ paula PAULA1
 	._wprot(_wprot),
 	.index(index),
 	.fdd_led(fdd_led),
-	.IO_ENA(IO_FPGA),
-	.IO_STROBE(IO_STROBE),
-	.IO_WAIT(IO_WAIT_PAULA),
-	.IO_DIN(IO_DIN),
-	.IO_DOUT(IO_DOUT_PAULA),
 	.ldata(ldata),
 	.rdata(rdata),
 	.ldata_okk(ldata_okk),
@@ -552,12 +530,14 @@ paula PAULA1
         .sdc_image_mounted(sdc_img_mounted),
         .sdc_image_size(sdc_img_size),           // length of image file
         .sdc_rd(sdc_rd),
+        .sdc_wr(sdc_wr),
         .sdc_sector(sdc_sector),
         .sdc_busy(sdc_busy),
         .sdc_done(sdc_done),
 	.sdc_byte_in_strobe(sdc_byte_in_strobe),
 	.sdc_byte_addr(sdc_byte_addr),
 	.sdc_byte_in_data(sdc_byte_in_data),
+	.sdc_byte_out_data(sdc_byte_out_data),
 
 	.floppy_wrprot(floppy_config[1]),
 	.floppy_drives(floppy_config[3:2])
@@ -586,34 +566,6 @@ userio USERIO1
 	.kbd_mouse_type(kbd_mouse_type),
 	.kms_level(kms_level),
 	.kbd_mouse_data(kbd_mouse_data)
-`ifdef ENABLE_USERIO_SPI
-        ,
-	.aud_mix(aud_mix),
-	.IO_ENA(IO_UIO),
-	.IO_STROBE(IO_STROBE),
-	.IO_WAIT(IO_WAIT_OSD),
-	.IO_DIN(IO_DIN),
-	.memory_config(memory_config),
-	.chipset_config(chipset_config),
-	.floppy_config(floppy_config),
-	.scanline(scanline),
-	.ar(ar),
-	.blver(blver),
-	.ide_config(ide_config),
-	.cpu_config(cpucfg),
-	.cache_config(cachecfg_pre),
-	.usrrst(usrrst),
-	.cpurst(cpurst),
-	.cpuhlt(cpuhlt),
-	.bootrom(bootrom),
-	.host_cs(host_cs),
-	.host_adr(host_adr),
-	.host_we(host_we),
-	.host_bs(host_bs),
-	.host_wdat(host_wdat),
-	.host_rdat(host_rdat),
-	.host_ack(host_ack)
-`endif
 );
    
 wire shres;

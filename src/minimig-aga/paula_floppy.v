@@ -67,65 +67,59 @@
 module paula_floppy
 (
 	// system bus interface
-	input         clk,		    	// bus clock
-	input         clk7_en,
-	input         clk7n_en,
-	input         reset,			   // reset 
-	input         ntsc,         	// ntsc mode
-	input         sof,          	// start of frame
-	input	        enable,			// dma enable
-	input   [8:1] reg_address_in,	// register address inputs
-	input  [15:0] data_in,			// bus data in
-	output [15:0] data_out,			// bus data out
-	output        dmal,				// dma request output
-	output        dmas,				// dma special output
+	input		  clk, // bus clock
+	input		  clk7_en,
+	input		  clk7n_en,
+	input		  reset, // reset 
+	input		  ntsc, // ntsc mode
+	input		  sof, // start of frame
+	input		  enable, // dma enable
+	input [8:1]	  reg_address_in, // register address inputs
+	input [15:0]	  data_in, // bus data in
+	output [15:0]	  data_out, // bus data out
+	output		  dmal, // dma request output
+	output		  dmas, // dma special output
 
 	//disk control signals from cia and user
-	input	        _step,				// step heads of disk
-	input	        direc,				// step heads direction
-	input   [3:0] _sel,				// disk select 	
-	input	        side,				// upper/lower disk head
-	input	        _motor,			// disk motor control
-	output        _track0,			// track zero detect
-	output        _change,			// disk has been removed from drive
-	output        _ready,			// disk is ready
-	output        _wprot,			// disk is write-protected
-	output        index,          // disk index pulse
+	input		  _step, // step heads of disk
+	input		  direc, // step heads direction
+	input [3:0]	  _sel, // disk select 	
+	input		  side, // upper/lower disk head
+	input		  _motor, // disk motor control
+	output		  _track0, // track zero detect
+	output		  _change, // disk has been removed from drive
+	output		  _ready, // disk is ready
+	output		  _wprot, // disk is write-protected
+	output		  index, // disk index pulse
 
 	//interrupt request and misc. control
-	output reg    blckint,			// disk dma has finished interrupt
-	output        syncint,			// disk syncword found
-	input         wordsync,			// wordsync enable
+	output reg	  blckint, // disk dma has finished interrupt
+	output		  syncint, // disk syncword found
+	input		  wordsync, // wordsync enable
 
-	//HPS I/O interface, TODO: Remove this entirely
-	input         IO_ENA,
-	input         IO_STROBE,
-	output reg    IO_WAIT,
-	input  [15:0] IO_DIN,
-	output reg [15:0] IO_DOUT,
-
-	output        fdd_led,			//disk activity LED, active when DMA is on
-	input	[1:0]   floppy_drives,	//floppy drive number
-	input	        floppy_wrprot,
+	output		  fdd_led, //disk activity LED, active when DMA is on
+	input [1:0]	  floppy_drives, //floppy drive number
+	input		  floppy_wrprot,
 
         // MiSTeryNano SD card interface. This very simple connection allows the core
         // to request sectors from within a OSD selected image file
-        input   [3:0] sdc_image_mounted,
-        input   [31:0] sdc_image_size,          // length of image file
-        output  reg [3:0] sdc_rd,               // request to read a sector for drive 0..3
-        output  reg [3:0] sdc_wr,               // request to write a sector for drive 0..3
-        output  reg [31:0] sdc_sector,          // sector to read or write
-        input   sdc_busy,                       // sd card has accepted request and is now processing it
-        input   sdc_done,                       // sector transfer is done. Actually not used ...
-	input	sdc_byte_in_strobe,             // byte from sd card is ready
-	input   [8:0] sdc_byte_addr,            // index of sd card data byte within sector
-	input   [7:0] sdc_byte_in_data,         // sd card data byte
+        input [3:0]	  sdc_image_mounted,
+        input [31:0]	  sdc_image_size, // length of image file
+        output reg [3:0]  sdc_rd, // request to read a sector for drive 0..3
+        output reg [3:0]  sdc_wr, // request to write a sector for drive 0..3
+        output reg [31:0] sdc_sector, // sector to read or write
+        input		  sdc_busy, // sd card has accepted request and is now processing it
+        input		  sdc_done, // sector transfer is done. Actually not used ...
+	input		  sdc_byte_in_strobe, // byte from sd card is ready
+	input [8:0]	  sdc_byte_addr, // index of sd card data byte within sector
+	input [7:0]	  sdc_byte_in_data, // sd card to cpu data byte
+	output reg [7:0]  sdc_byte_out_data, // cpu to sd card data byte
 
 	// fifo / track display
-	output  [7:0] trackdisp,
-	output [13:0] secdisp,
-	output        floppy_fwr,
-	output        floppy_frd
+	output [7:0]	  trackdisp,
+	output [13:0]	  secdisp,
+	output		  floppy_fwr,
+	output		  floppy_frd
 );
 
 //register names and addresses
@@ -161,7 +155,6 @@ reg         fifo_wr_del;	//fifo write enable delayed
 wire        fifo_rd;			//fifo read enable
 wire        fifo_empty;		//fifo is empty
 wire        fifo_full;		//fifo is full
-wire [11:0] fifo_cnt;   // TODO: remove me
 
 wire [15:0] dskbytr;			
 wire [15:0] dskdatr;
@@ -197,75 +190,6 @@ assign     secdisp = dsklen[13:0];
 assign     floppy_fwr = fifo_wr;
 assign     floppy_frd = fifo_rd;
 
-reg  [1:0] cmd_cnt;
-
-reg stb7;
-always @(posedge clk or negedge IO_ENA) begin
-	if(~IO_ENA) {IO_WAIT,stb7} <= 0;
-	else begin
-		if(IO_STROBE) begin
-			IO_WAIT <= 1;
-		end
-		if(clk7_en & IO_WAIT) begin
-			if(~stb7) begin
-				rx_data <=IO_DIN;
-				stb7    <=1;
-			end
-			if(stb7) begin
-				stb7    <=0;
-				IO_WAIT <=0;
-				IO_DOUT <=tx_data;
-			end
-		end
-	end
-end
-
-reg [15:0] rx_data;	//received data from HPS
-reg [15:0] tx_data;	//data to be send to HPS
-
-always @(posedge clk or negedge IO_ENA) begin
-	if (~IO_ENA) cmd_cnt <= 0;
-	else if (clk7_en & stb7 & ~&cmd_cnt) cmd_cnt <= cmd_cnt + 1'd1;
-end
-
-//---------------------------------------------------------------------------------------------------------------------
-
-always @(posedge clk) begin
-	if (clk7_en) begin
-		if (reset | ~IO_ENA)       cmd_fdd <= 0;
-		else if (stb7 && !cmd_cnt) cmd_fdd <= (rx_data[15:13]==3'b000 );
-	end
-end
-
-
-//transmit data multiplexer
-always @(*) begin
-	casex ({cmd_cnt, cmd_fdd, trackrd, trackwr})
-		
-		// fdd request status
-		'b00xxx: tx_data = {sel[1:0],drives[1:0],2'b00,trackwr,trackrd&~fifo_cnt[10],track[7:0]};
-
-		// fdd data
-		'b01xxx: tx_data = dsksync[15:0];
-		'b10x1x: tx_data = {dmaen,dsklen[14:0]};
-		'b10x01: tx_data = wr_fifo_status;
-		'b1111x: tx_data = {dmaen,dsklen[14:0]};
-		'b11101: tx_data = fifo_out;
-		
-		// no data
-		 default: tx_data = 0;
-	endcase
-end
-
-//floppy disk write fifo status is latched when transmision of the previous word begins 
-//it guarantees that when latching the status data into transmit register setup and hold times are met
-always @(posedge clk) begin
-  if (clk7_en) begin
-  	if (stb7)
-  		wr_fifo_status <= {dmaen&dsklen[14],3'b000,fifo_cnt[11:0]};
-  end
-end
-
 //-----------------------------------------------------------------------------------------------//
 
 // new internal state machine to fill fifo on disk read   
@@ -279,23 +203,46 @@ end
 reg [7:0]  fd_dma_buf_even[255:0];
 reg [7:0]  fd_dma_buf_odd[255:0];   
 reg [7:0]  fd_dma_csum[3:0];
+reg [8:0]  fd_dma_wr_ptr;
    
 reg [3:0]  fd_dma_buf_wr_state;
 reg [15:0] fd_dma_buf_out;
 reg [3:0]  fd_dma_wr_sec;
 reg	   fd_dma_sector_ready;  
-   
-wire [7:0] fd_dma_rd_ptr = fifo_word_counter - 10'd31;  
+reg	   fd_dma_buffer_trigger_wr;	      
+reg	   fd_dma_is_writing;
 
+// read data from fifo
 always @(posedge clk) begin
-   if(clk7_en && fifo_wr)
-     // permanently read 16 bits from the sector buffer
-     // to be written to the FIFO
-     fd_dma_buf_out <= { 
-			 fd_dma_buf_even[fd_dma_rd_ptr],
-			 fd_dma_buf_odd[fd_dma_rd_ptr]
-			 };
+   if(!fd_dma_is_writing) begin
+      if(clk7_en && fifo_wr) begin
+	 logic [7:0] fd_dma_rd_ptr = fifo_word_counter - 10'd31;  
+
+	 // permanently read 16 bits from the sector buffer
+	 // to be written to the FIFO
+	 fd_dma_buf_out <= { fd_dma_buf_even[fd_dma_rd_ptr],
+			     fd_dma_buf_odd[fd_dma_rd_ptr] };
+      end
+   end  else begin
+      // The Amiga stores odd and even bits seperated on floppy disk.
+      // Here they are recombined to be able to write them to sd card
+      // as regular bytes.
+      sdc_byte_out_data <= sdc_byte_addr[0]?
+			   { fd_dma_buf_odd[sdc_byte_addr[8:1]][3],fd_dma_buf_even[sdc_byte_addr[8:1]][3],
+			     fd_dma_buf_odd[sdc_byte_addr[8:1]][2],fd_dma_buf_even[sdc_byte_addr[8:1]][2],
+			     fd_dma_buf_odd[sdc_byte_addr[8:1]][1],fd_dma_buf_even[sdc_byte_addr[8:1]][1],
+			     fd_dma_buf_odd[sdc_byte_addr[8:1]][0],fd_dma_buf_even[sdc_byte_addr[8:1]][0]}:
+			   { fd_dma_buf_odd[sdc_byte_addr[8:1]][7],fd_dma_buf_even[sdc_byte_addr[8:1]][7],
+			     fd_dma_buf_odd[sdc_byte_addr[8:1]][6],fd_dma_buf_even[sdc_byte_addr[8:1]][6],
+			     fd_dma_buf_odd[sdc_byte_addr[8:1]][5],fd_dma_buf_even[sdc_byte_addr[8:1]][5],
+			     fd_dma_buf_odd[sdc_byte_addr[8:1]][4],fd_dma_buf_even[sdc_byte_addr[8:1]][4]};      
+   end
 end
+   
+// registers needed to process outgoing fifo data
+reg [3:0] cpu_wr_state;
+reg [8:0] cpu_wr_cnt;
+reg [31:0] wr_sector_header_word;   
    
 // dma is active if it's globally enabled, if the transfer length is != zero and if
 // the dsklen top bit has two times been written '1'
@@ -305,6 +252,8 @@ wire [3:0] fd_dma_wr_sec_next =  (fd_dma_wr_sec < 4'd10)?(fd_dma_wr_sec+4'd1):4'
 // state machine reading data received from sd card into the two sector buffers.
 // This buffer is split into an even and odd half
 always @(posedge clk) begin
+   reg fd_dma_buffer_trigger_wrD;
+   
    if(reset) begin
       fd_dma_buf_wr_state <= 4'h0;
       sdc_rd <= 4'b0000;
@@ -313,37 +262,50 @@ always @(posedge clk) begin
       fd_dma_wr_sec <= 4'd10;           // next/first sector is first sector of track
    end else begin
       case(fd_dma_buf_wr_state)
-	4'd0:
-	  if(dma_active && !sdc_busy) begin
-	     if(!lenzero && !dsklen[14]) begin	     
-		$display("--------> DMA read access for FDC, lenzero = %d, dsklen = %d/%d/%d", lenzero, dsklen[15], dsklen[14], dsklen[13:0]);
+	4'd0: begin
+	   // DMA read detected, read data from SD card into buffer
+	   if(dma_active && !sdc_busy && !lenzero && !dsklen[14]) begin	     
+	      $display("paula_floppy.v: DMA read, lenzero = %0d, dsklen = %0d/%0d/%0d", 
+		       lenzero, dsklen[15], dsklen[14], dsklen[13:0]);
+	      
+	      fd_dma_is_writing <= 1'b0;
 
-		// start state machine in rising edge of dmaen (when CPU has
-		// written dmalen a second time)
-		fd_dma_csum[0] <= 8'd0;      
-		fd_dma_csum[1] <= 8'd0;      
-		fd_dma_csum[2] <= 8'd0;      
-		fd_dma_csum[3] <= 8'd0;
-		fd_dma_sector_ready <= 1'b0;	 // no data available for fifo, yet
-		
-		// request first sector of track from MCU
-		// This needs to be synchronized with the sector id at read
-		fd_dma_wr_sec <= fd_dma_wr_sec_next;
-		sdc_sector <= track * 11 + fd_dma_wr_sec_next;
-		
-		sdc_rd <= ~_sel;                    // request data sector for selected drive
+	      // start state machine in rising edge of dmaen (when CPU has
+	      // written dmalen a second time)
+	      fd_dma_csum[0] <= 8'd0;
+	      fd_dma_csum[1] <= 8'd0;
+	      fd_dma_csum[2] <= 8'd0;
+	      fd_dma_csum[3] <= 8'd0;
+	      fd_dma_sector_ready <= 1'b0;	 // no data available for fifo, yet
 	     
-		fd_dma_buf_wr_state <= 4'h1;
-	     end
-	     
-	  end // if (dma_active && !sdc_busy)
-	
+	      // request first sector of track from MCU
+	      // This needs to be synchronized with the sector id at read
+	      fd_dma_wr_sec <= fd_dma_wr_sec_next;
+	      sdc_sector <= track * 11 + fd_dma_wr_sec_next;
+	      
+	      sdc_rd <= ~_sel;                    // request data sector for selected drive
+	      
+	      fd_dma_buf_wr_state <= 4'd1;
+	   end // if (dma_active && !sdc_busy && !lenzero && !dsklen[14])	
+	   
+	   // for a write the data has to be received from the CPU first
+	   if(dma_active && dsklen[14]) begin	     
+	      $display("paula_floppy.v: DMA write, lenzero = %0d, dsklen = %0d/%0d/%0d", 
+		       lenzero, dsklen[15], dsklen[14], dsklen[13:0]);
+
+	      fd_dma_is_writing <= 1'b1;	      
+	      fd_dma_buf_wr_state <= 4'd5;
+	      fd_dma_wr_ptr <= 9'd0;
+	      fd_dma_buffer_trigger_wrD <= fd_dma_buffer_trigger_wr;	      
+	   end
+	end
+	   
 	4'd1: begin
 	   // wait for MCU ack (sdc_busy goes high)
 	   if(sdc_busy) begin
 	      sdc_rd <= 4'b0000;
 	      sdc_wr <= 4'b0000;
-	      fd_dma_buf_wr_state <= 4'h2;
+	      fd_dma_buf_wr_state <= 4'd2;
 	   end
 	end
 	
@@ -405,6 +367,65 @@ always @(posedge clk) begin
 	      end
 	   end
 	end
+
+	4'd5: begin
+	   // wait for data to arrive from CPU and SD card not being busy
+	   if(cpu_wr_state != 4'd0 && !sdc_busy)
+	     fd_dma_buf_wr_state <= 4'd6;
+	end
+	
+	4'd6: begin
+	   // transfer data from FIFO into buffer odd/even sector buffer
+	   if(fd_dma_buffer_trigger_wr != fd_dma_buffer_trigger_wrD) begin
+	      // write byte to the buffer
+	      logic [7:0] dbyte = { fifo_out[14], fifo_out[12], fifo_out[10], fifo_out[8],
+			            fifo_out[6],  fifo_out[4],  fifo_out[2], fifo_out[0] };
+	      if(fd_dma_wr_ptr[8])  fd_dma_buf_even[fd_dma_wr_ptr[7:0]] <= dbyte;
+	      else                  fd_dma_buf_odd[fd_dma_wr_ptr[7:0]] <= dbyte;
+
+	      fd_dma_wr_ptr <= fd_dma_wr_ptr + 9'd1;	      
+	      fd_dma_buffer_trigger_wrD <= fd_dma_buffer_trigger_wr;
+	   end
+
+	   // sector or entire track done?
+	   if((cpu_wr_state == 4'd5)||(cpu_wr_state == 4'd0)) begin
+	      $display("paula_floppy.v: tr %0d, sd %0d, sec %0d write data complete", 
+		       wr_sector_header_word[23:17], wr_sector_header_word[16],
+		       wr_sector_header_word[15:8]);
+	      
+	      // data is now complete. We now need to trigger the sdc write
+	      sdc_sector <=  wr_sector_header_word[23:16] * 11 + wr_sector_header_word[15:8];
+	      
+	      // now wait for sd card to become ready
+	      fd_dma_buf_wr_state <= 4'd7;
+	   end
+	end
+   
+	4'd7: begin
+	   // wait for sd card to become available for writing. It may be busy from a
+	   // previous sector to be written
+	   if(!sdc_busy) begin
+	      sdc_wr <= ~_sel;
+	      fd_dma_buf_wr_state <= 4'd8;
+	   end
+	end
+	   
+	4'd8: begin
+	   // wait for sd card to a acknowledge write request
+	   if(sdc_busy) begin
+	      $display("paula_floppy.v: sd write request acknowledged");
+	      sdc_wr <= 4'b0000;
+	      fd_dma_buf_wr_state <= 4'd9;
+	   end
+	end
+	   
+	4'd9: begin
+	   // we may still be in cpu_wr_state 5 for some time. But this will eventually
+	   // change to cpu_wr_state 0 as well	   
+	   if(cpu_wr_state == 4'd0)
+	     fd_dma_buf_wr_state <= 4'd0;
+	end
+	
       endcase
    end // else: !if(reset)
 end // always @ (posedge clk)
@@ -415,9 +436,6 @@ wire [31:0] sector_header_word = { 8'hff, track, sector, 8'd11 - sector };
 
 // Encode 16 bits into MFM. Clock bits are always zero just like minimig
 // firmware did.
-// TODO: - Send correct clock bits as some software may expect it
-//       - Send sector data also through the encoder
-//       - Clean this mess up ...
 wire [15:0] mfm_encoder_in = 
     (fifo_word_counter==10'd4)?sector_header_word[31:16]:  // word 4,5: 32 bit sector header odd bits
     (fifo_word_counter==10'd5)?sector_header_word[15:0]:
@@ -471,14 +489,14 @@ wire [15:0] floppy_sector_data =
 		                                          // word 24,25 header checksum (aaaa)
     (fifo_word_counter[9:1]==9'd13)?mfm_encoder_checksum: // word 26,27 header checksum
 		                                          // word 28,29 data checksum (aaaa)
-    (fifo_word_counter==10'd30)?{fd_dma_csum[0],fd_dma_csum[1]}: // w 30
-    (fifo_word_counter==10'd31)?{fd_dma_csum[2],fd_dma_csum[3]}: // w 31
+    (fifo_word_counter==10'd30)?{fd_dma_csum[0],fd_dma_csum[1]}: // word 30 data checksum
+    (fifo_word_counter==10'd31)?{fd_dma_csum[2],fd_dma_csum[3]}: // word 31 data checksum
     (fifo_word_counter>=10'd32  && fifo_word_counter<10'd288)?data_odd:   // word 32-287 data odd bits
     (fifo_word_counter>=10'd288 && fifo_word_counter<10'd544)?data_even:  // word 288-544 data even bits
 		    
     16'haaaa;
    
-// =========== state machine that copies data from the two sector buffers into the fifo =============   
+// ======== state machine that copies data from the two sector buffers into the fifo ===========  
 reg [3:0] fifo_sector_counter;   // sector being written into fifo
 reg [9:0] fifo_word_counter;     // sector word being written into fifo
 reg 	  fifo_reading_sector;      
@@ -725,9 +743,9 @@ assign lenzero = (dsklen[13:0]==0);
 
 //--------------------------------------------------------------------------------------
 //disk data read path
-wire	busrd;				//bus read
-wire	buswr;				//bus write
-reg		trackrdok;			//track read enable
+wire	busrd;				// bus read
+wire	buswr;				// bus write
+reg	trackrdok;			// track read enable
 
 //disk buffer bus read address decode
 assign busrd = (reg_address_in[8:1]==DSKDATR[8:1]);
@@ -736,26 +754,20 @@ assign busrd = (reg_address_in[8:1]==DSKDATR[8:1]);
 assign buswr = (reg_address_in[8:1]==DSKDAT[8:1]);
 
 //fifo data input multiplexer
-//TODO assign fifo_in[15:0] = trackrd ? rx_data[15:0] : data_in[15:0];
 assign fifo_in[15:0] = trackrd ? floppy_data : data_in;
 
-//data word transfer strobe
-//TODO wire stbdat = cmd_fdd && stb7 && &cmd_cnt;
-wire stbdat = trackwr & !fifo_empty; 
- 
+// data word transfer strobe. In state 6, the data is written from fifo into the buffer. This
+// must not happen if the sd card is (still) busy from a previous write. It may actually
+// be busy due to the MCU accessing it. But it does not hurt to wait for that as well.
+wire	stbdat = trackwr & !fifo_empty && (fd_dma_buf_wr_state != 6 || !sdc_busy);    
+
 //fifo write control
-// TODO: for write assign fifo_wr = (trackrdok & stbdat & ~lenzero) | (buswr & dmaon);
 assign fifo_wr = (trackrdok && fifo_reading_sector & !fifo_full & ~lenzero) | (buswr & dmaon);
 
-// process outgoing fifo data
-
-reg [3:0] rd_state;  // TODO: integrate into dskstate
-reg [8:0] rd_cnt;  // 
-   
-reg [31:0] wr_sector_header_word;   
 reg [15:0] wr_sector_csum;   
-// wire [15:0] wr_checksum = (mfm_encoder_odd ^ mfm_encoder_even) | 16'haaaa;   
 
+// this state machine receives floppy data written by the CPU from the fifo and parses
+// it, verifies the checksum etc.
 always @(posedge clk) begin
    // data is ready the cycle after stbdat
    reg stbdatD;  
@@ -763,111 +775,118 @@ always @(posedge clk) begin
       stbdatD <= stbdat;
       
       if(!trackwr)
-	rd_state <= 4'd0;
+	cpu_wr_state <= 4'd0;
       
       else if(stbdatD) begin
-	 // seperate data and clock bits
+	 // seperate data and ignore clock bits
 	 logic [7:0] dbyte = { fifo_out[14], fifo_out[12], fifo_out[10], fifo_out[8],
 			        fifo_out[6],  fifo_out[4],  fifo_out[2], fifo_out[0] };
-	 logic [7:0] dclk  = { fifo_out[15], fifo_out[13], fifo_out[11], fifo_out[9],
-			        fifo_out[7],  fifo_out[5],  fifo_out[3], fifo_out[1] };	 
 	 
-	 case(rd_state)
+	 case(cpu_wr_state)
 	   4'd0:
 	     // state 0 -> wait for sync marker
 	     if(fifo_out == dsksync[15:0]) begin
-		rd_state <= 4'd1;
-		rd_cnt <= 9'd0;
+		cpu_wr_state <= 4'd1;
+		cpu_wr_cnt <= 9'd0;
 		wr_sector_csum <= 16'h0000;		
 	     end
 	   
 	   4'd1: begin
 	      // state 1 -> decode sector header, skip any further sync marker
-	      if(((rd_cnt == 0) && (fifo_out != dsksync[15:0])) || (rd_cnt != 0)) begin
-		 rd_cnt <= rd_cnt + 9'd1;
+	      if(((cpu_wr_cnt == 0) && (fifo_out != dsksync[15:0])) || (cpu_wr_cnt != 0)) begin
+		 cpu_wr_cnt <= cpu_wr_cnt + 9'd1;
 		 
-		 if(rd_cnt < 4) begin
-		    // demux MFM bits into 32 bit value, TODO: use fifo_out directly
+		 if(cpu_wr_cnt < 4) begin
+		    // demux MFM bits into 32 bit value
 		    integer i;
 		    for(i = 0; i < 8; i = i + 1)
-		      wr_sector_header_word[{ ~rd_cnt[0], i[2:0], ~rd_cnt[1] }] <= fifo_out[2*i];
+		      wr_sector_header_word[{ ~cpu_wr_cnt[0], i[2:0], ~cpu_wr_cnt[1] }] <= fifo_out[2*i];
 		 end
 		 
 		 // create header checksum from words 0..21
-		 if(rd_cnt <= 21) begin
-		    if(rd_cnt[0]) wr_sector_csum[15:8] <= wr_sector_csum[15:8] ^ dbyte;
-		    else          wr_sector_csum[7:0] <= wr_sector_csum[7:0] ^ dbyte;
+		 if(cpu_wr_cnt <= 21) begin
+		    if(cpu_wr_cnt[0]) wr_sector_csum[15:8] <= wr_sector_csum[15:8] ^ dbyte;
+		    else              wr_sector_csum[7:0] <= wr_sector_csum[7:0] ^ dbyte;
 		 end
 
-		 // header checksum is in header words 22/23
 		 // verify header checksum
-		 if((rd_cnt == 22) && (dbyte != wr_sector_csum[7:0]))
-		   rd_state <= 4'd0;  // error, return to idle state		   
+		 // header checksum is in header words 22/23
+		 if((cpu_wr_cnt == 22) && (dbyte != wr_sector_csum[7:0]))
+		   cpu_wr_state <= 4'd0;  // error, return to idle state		   
 		    
-		 if(rd_cnt == 23) begin
+		 if(cpu_wr_cnt == 23) begin
 		    // check if header checksum is valid
 		    if(dbyte != wr_sector_csum[15:8])
-		      rd_state <= 4'd0;  // error, return to idle state		   
+		      cpu_wr_state <= 4'd0;  // error, return to idle state		   
 		    else begin
-		       // header ok,
-
-		       // TODO: verify track!
-		       
-		       // process payload
-		       rd_state <= 4'd2;
-		       rd_cnt <= 9'd0;
+		       // header ok, verify track number
+		       if(track != wr_sector_header_word[23:16])
+			 cpu_wr_state <= 4'd0;  // error, return to idle state
+		       else begin
+			  // process payload
+			  cpu_wr_state <= 4'd2;
+			  cpu_wr_cnt <= 9'd0;
+		       end
 		    end
-		 end // if (rd_cnt == 23)
-		 
+		 end // if (cpu_wr_cnt == 23)		 
 	      end
 	   end
 	   
 	   4'd2: begin
 	      // read payload checksum
-	      rd_cnt <= rd_cnt + 9'd1;
+	      cpu_wr_cnt <= cpu_wr_cnt + 9'd1;
 
-	      // rd_cnt 0/1:
-	      // skip two zero bytes before checksum
+	      // cpu_wr_cnt 0/1:
+	      // the first two bytes of the checksum field are unused
 	      
-	      if(rd_cnt == 2)
+	      if(cpu_wr_cnt == 2)
 		wr_sector_csum[7:0] <= dbyte;
 	      
-	      if(rd_cnt == 3) begin
+	      if(cpu_wr_cnt == 3) begin
 		 wr_sector_csum[15:8] <= dbyte;
-		 rd_state <= 4'd3;
-		 rd_cnt <= 9'd0;
+		 cpu_wr_state <= 4'd3;
+		 cpu_wr_cnt <= 9'd0;
 	      end
 	   end
 	   
 	   4'd3: begin
-	      rd_cnt <= rd_cnt + 9'd1;
+	      cpu_wr_cnt <= cpu_wr_cnt + 9'd1;
+
+	      // update the checksum while reading the payload
+	      if(cpu_wr_cnt[0]) wr_sector_csum[15:8] <= wr_sector_csum[15:8] ^ dbyte;
+	      else              wr_sector_csum[7:0]  <= wr_sector_csum[7:0]  ^ dbyte;
+
+	      // trigger dma buffer write
+	      fd_dma_buffer_trigger_wr <= !fd_dma_buffer_trigger_wr;	      
 	      
-	      if(rd_cnt[0]) wr_sector_csum[15:8] <= wr_sector_csum[15:8] ^ dbyte;
-	      else          wr_sector_csum[7:0]  <= wr_sector_csum[7:0]  ^ dbyte;
-	      
-	      if(rd_cnt == 9'd511) begin		 
-		 rd_state <= 4'd4;
-		 rd_cnt <= 9'd0;		 
+	      if(cpu_wr_cnt == 9'd511) begin		 
+	         cpu_wr_state <= 4'd4;
+		 cpu_wr_cnt <= 9'd0;		 
 	      end
 	   end
 
 	   4'd4: begin
-	      rd_cnt <= rd_cnt + 9'd1;
+	      cpu_wr_cnt <= cpu_wr_cnt + 9'd1;
 	      
-	      // expect two 00 bytes and verify checksum
-
 	      // since the checksum calculation was peloaded with the final checksum, it should
 	      // now be zero
-	      
-	      if(rd_cnt == 9'd1) begin
-		 rd_state <= 4'd0;
-	      end
+	      if(wr_sector_csum)
+		cpu_wr_state <= 4'd0;
+
+	      if(cpu_wr_cnt == 9'd1)
+		cpu_wr_state <= 4'd5;
+	   end
+
+	   4'd5: begin
+	     // successfully received an entire sector
+	     $display("paula_floppy.v: sector successfully received from fifo");
+	     cpu_wr_state <= 4'd0;
 	   end
 
 	   default: begin
 	   end
 	   
-	 endcase // case (rd_state)
+	 endcase // case (cpu_wr_state)
       end
    end
 end
@@ -884,7 +903,6 @@ assign fifo_rd = (busrd & dmaon) | stbdat;
 
 //DSKSYNC interrupt
 wire sync_match;
-//TODO assign sync_match = dsksync[15:0]==rx_data[15:0] && stbdat && trackrd;
 assign sync_match = dsksync[15:0]==floppy_data && fifo_reading_sector && trackrd;
 
 assign syncint = sync_match | ~dmaen & |(~_sel & motor_on & disk_present) & sof;
@@ -944,12 +962,12 @@ always @(posedge clk) begin
      if (sdc_image_mounted[i])
 	disk_present[i] <= |sdc_image_size;
 end
-  
+
+// for now, either all or none of the floppy drives is write protected  
 assign disk_writable = floppy_wrprot?4'b0000:4'b1111;   
  
 //disk activity LED
 assign fdd_led = (dskstate!=DISKDMA_IDLE);
-//assign disk_led = |motor_on;
 
 //main disk state machine
 always @(posedge clk) begin
@@ -958,13 +976,13 @@ always @(posedge clk) begin
   		dskstate <= DISKDMA_IDLE;		
   	else begin
 	        if(dskstate != DISKDMA_ACTIVE && nextstate == DISKDMA_ACTIVE)
-		  $display("-------> floppy DMA getting active, RD:%0d WR:%0d", ~lenzero & ~dsklen[14], dsklen[14]);
+		  $display("paula_floppy.v: DMA getting active, RD:%0d WR:%0d", ~lenzero & ~dsklen[14], dsklen[14]);
 	   
 	        if(dskstate != DISKDMA_INT && nextstate == DISKDMA_INT)
-		  $display("-------> floppy DMA generating irq");
+		  $display("paula_floppy.v: DMA generating irq");
 		  
 	        if(dskstate != DISKDMA_IDLE && nextstate == DISKDMA_IDLE)
-		  $display("-------> floppy DMA becoming idle");
+		  $display("paula_floppy.v: DMA becoming idle");
 		  
   		dskstate <= nextstate;
 	end
@@ -979,7 +997,7 @@ always @(*) begin
 			trackwr = 0;
 			dmaon = 0;
 			blckint = 0;
-			if (dma_active) //TH if (cmd_fdd && stb7 && cmd_cnt==1 && dmaen && !lenzero && enable)//dsklen>0 and dma enabled, do disk dma operation
+			if (dma_active) //dsklen>0 and dma enabled, do disk dma operation
 				nextstate = DISKDMA_ACTIVE;
 			else
 				nextstate = DISKDMA_IDLE;			

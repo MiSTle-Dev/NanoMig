@@ -93,12 +93,6 @@ wire uart_cts;
 wire uart_rts;
 wire uart_dsr;
 wire uart_dtr;
-wire io_uio;
-wire io_fpga;
-wire io_strobe;
-wire io_wait;
-wire io_din;
-wire fpga_dout;
 wire field1;
 wire lace;
 wire fx;
@@ -225,10 +219,7 @@ wire [2:0] cachecfg = 3'b000;  // no turbo chip and kick, no caches
 // the system significantly. Since Kickstart is also stored in ram, this also
 // speeds up kickstart rom access.
    
-wire	   _ram_oe_i;
-assign _ram_oe = _ram_oe_i; // ~(~_ram_oe_i || ram_cs);   
-   
-wire [15:0] ram_dout; //  = ramdata_in;   
+wire [15:0] ram_dout;
 wire [28:1] ram_addr;   
 wire	    ram_sel;
 wire	    ram_lds;
@@ -319,14 +310,13 @@ always @(posedge clk_sys) begin
 	end
    if( fastram_ready != frr_d ) fastram_sel <= 1'b0;   
 end
-// assign fastram_sel = ram_sel & !ram_ready;
+
 assign fastram_addr = ram_addr;
 assign fastram_lds = ram_lds;
 assign fastram_uds = ram_uds;
 assign ram_dout = fastram_dout;
 assign fastram_din = ram_din;
 assign fastram_wr = (cpu_state[1:0]==2'b11) ? 1'b1 : 1'b0;
-//assign ram_ready = fastram_ready;
 
 // ==============================================================================
 // ===================================== IDE ====================================
@@ -339,10 +329,6 @@ assign fastram_wr = (cpu_state[1:0]==2'b11) ? 1'b1 : 1'b0;
 // FPGA. This includes the entire IDE handling.
 
 // https://wiki.osdev.org/ATA_PIO_Mode
-
-// TODO:
-// - clear IDE1 registers in startup
-// - use dpram
 
 // state of individual drives   
 reg [1:0] ide_drv_state [2];
@@ -365,8 +351,7 @@ localparam IDE_EXEC_SEND_IDENTIFY  = 4'd4;
 localparam IDE_EXEC_READ_SECTOR    = 4'd5;
 localparam IDE_EXEC_SEND_PAYLOAD   = 4'd6;
 localparam IDE_EXEC_WRITE_SECTOR   = 4'd7;
-// localparam IDE_EXEC_START_PAYLOAD  = 4'd8;
-localparam IDE_EXEC_RECV_PAYLOAD   = 4'd9;
+localparam IDE_EXEC_RECV_PAYLOAD   = 4'd8;
 
 reg [8:0] ide_exec_cnt;
       
@@ -408,10 +393,10 @@ reg [31:0] ide_sdc_sector;
    
 reg [1:0] ide_reported;   
    
-wire [31:0] sdc_sector_int;  // from inside minimig/floppy
-assign sdc_sector = (ide_sdc_rd||ide_sdc_wr)?ide_sdc_sector:sdc_sector_int;      
+wire [31:0] sdc_sector_fdc;  // from inside minimig/floppy
+assign sdc_sector = (ide_sdc_rd||ide_sdc_wr)?ide_sdc_sector:sdc_sector_fdc;      
 assign sdc_rd[7:4] = { 2'b00, ide_sdc_rd }; 
-assign sdc_wr = { 2'b00, ide_sdc_wr, 4'b0000 }; 
+assign sdc_wr[7:4] = { 2'b00, ide_sdc_wr }; 
    
 localparam DRIVES = 2;
    
@@ -695,14 +680,6 @@ always @(posedge clk_sys) begin
 	   end
 	end
 
-//	IDE_EXEC_START_PAYLOAD: begin
-//	   // start payload waits for the sdc_byte_addr to reach 1,
-//	   // to suppress gernerating an ide_write signal for
-//	   // the first word to be read
-//	   if( sdc_byte_addr == 9'd1 )
-//	     ide_exec <= IDE_EXEC_RECV_PAYLOAD;
-//	end
-	   
 	IDE_EXEC_RECV_PAYLOAD: begin
 	   // acknowwledge by IRQ once sd card has received the full sector
 	   if ( sdc_done ) begin
@@ -1011,7 +988,6 @@ wire [4:0] ide_address = { 1'b0,                                // only support 
 	   (ide_exec == IDE_EXEC_SEND_PAYLOAD)?4'd15:           // -"-
 	   (ide_exec == IDE_EXEC_WRITE_SECTOR)?4'd15:           // -"-
 	   (ide_exec == IDE_EXEC_RECV_PAYLOAD)?4'd15:           // -"-
-//	   (ide_exec == IDE_EXEC_START_PAYLOAD)?4'd15:          // -"-
 	   4'd0 };   
 
 // data for "set register"
@@ -1059,9 +1035,19 @@ assign ide_writedata =
 wire ide_read = !ide_exec_cnt[0] &&
      (ide_exec == IDE_EXEC_GET_REGS); 
 
+// signal to toggle between ide and fdc
+reg ide_active = 0;
+always @(posedge clk_sys) begin
+   if( |{sdc_rd[5:4],sdc_wr[5:4]} ) ide_active <= 1'b1;
+   if( |{sdc_rd[3:0],sdc_wr[3:0]} ) ide_active <= 1'b0;
+end   
+   
 // IDE payload is being received in 16 bit words from but is being sent
 // as bytes to the SD card
-assign sdc_byte_out_data = sdc_byte_addr[0]?ide_readdata[15:8]:ide_readdata[7:0];   
+wire [7:0] sdc_byte_out_data_fdc;   
+assign sdc_byte_out_data = ide_active?
+			   (sdc_byte_addr[0]?ide_readdata[15:8]:ide_readdata[7:0]):
+			   sdc_byte_out_data_fdc;   
 
 // The sd card just requests addresses and minimig returns matching data. The ide uses ide_write
 // as a trigger signal to advance to the next (word) address. We thus generate a trigger
@@ -1141,7 +1127,7 @@ minimig minimig
 	._ram_bhe     (_ram_bhe         ), // SRAM upper byte select
 	._ram_ble     (_ram_ble         ), // SRAM lower byte select
 	._ram_we      (_ram_we          ), // SRAM write enable
-	._ram_oe      (_ram_oe_i        ), // SRAM output enable
+	._ram_oe      (_ram_oe          ), // SRAM output enable
 	.chip48       (chip48           ), // big chipram read
 	.refresh      (refresh          ), // current bus cycle is refresh
 
@@ -1183,14 +1169,6 @@ minimig minimig
 	.hdd_led      (hdd_led          ),
 	.rtc          (RTC              ),
 
-	//host controller interface (SPI)
-	.IO_UIO       (io_uio           ),
-	.IO_FPGA      (io_fpga          ),
-	.IO_STROBE    (io_strobe        ),
-	.IO_WAIT      (io_wait          ),
-	.IO_DIN       (io_din           ),
-	.IO_DOUT      (fpga_dout        ),
-
 	//video
 	._hsync       (hs_in            ), // horizontal sync
 	._vsync       (vs_in            ), // vertical sync
@@ -1222,16 +1200,17 @@ minimig minimig
 	.bootrom      ( ), // bootrom mode. Needed here to tell tg68k to also mirror the 256k Kickstart 
 
         // sd card interface for floppy disk emulation
-        .sdc_img_mounted    ( sdc_img_mounted[3:0]),
-        .sdc_img_size       ( sdc_img_size[31:0]  ),  // length of image file
-        .sdc_rd             ( sdc_rd[3:0]         ),
-//        .sdc_wr             ( sdc_wr[3:0]         ),
-        .sdc_sector         ( sdc_sector_int      ),
-        .sdc_busy           ( sdc_busy            ),
-        .sdc_done           ( sdc_done            ),
-	.sdc_byte_in_strobe ( sdc_byte_in_strobe  ),
-	.sdc_byte_addr      ( sdc_byte_addr       ),
-	.sdc_byte_in_data   ( sdc_byte_in_data    ),
+        .sdc_img_mounted    ( sdc_img_mounted[3:0]  ),
+        .sdc_img_size       ( sdc_img_size[31:0]    ),  // length of image file
+        .sdc_rd             ( sdc_rd[3:0]           ),
+        .sdc_wr             ( sdc_wr[3:0]           ),
+        .sdc_sector         ( sdc_sector_fdc        ),
+        .sdc_busy           ( sdc_busy              ),
+        .sdc_done           ( sdc_done              ),
+	.sdc_byte_in_strobe ( sdc_byte_in_strobe    ),
+	.sdc_byte_addr      ( sdc_byte_addr         ),
+	.sdc_byte_in_data   ( sdc_byte_in_data      ),
+ 	.sdc_byte_out_data  ( sdc_byte_out_data_fdc ),
  
 	.ide_fast     (                 ),
 	.ide_ext_irq  ( 1'b0            ),
