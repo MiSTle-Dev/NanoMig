@@ -66,3 +66,16 @@ The necessary binaries can be found in the [project releases](https://github.com
     and TN20k, Console 60k/138k, Primer25k, Mega138k Pro integrated [onboard BL616](https://en.bouffalolab.com/) MPU
   * A default ADF disk image named ```df0.adf``` should be placed on SD card (e.g. workbench 1.3)
   * For the SD card to work [all components incl. the support MCU](https://github.com/harbaum/NanoMig/issues/5) have to work properly
+
+## LED UI
+
+| LED | function    | TN20K | TP25K |TM60K|TM138K Pro|Console60K/138k|
+| --- |           - | -     | -     | -   |-         |-|
+| 0 | POWER         | x     | x     | x   |x         |x|
+| 1 | F.DISK        | x     | x     | x   |x         |x|
+| 2 | H.DISK 1      | x     | -     |   - |x         |-|
+| 3 | H.DISK 2      | x     | -     |   - |x         |-|
+| 4 | SD-CARD       | x     | -     |   - |x         |-|
+| 5 |               | x     | -     |   - |x         |-|
+
+
