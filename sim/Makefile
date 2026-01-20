@@ -9,7 +9,7 @@ PRJ=nanomig
 OBJ_DIR=obj_dir
 
 # the original fx68k won't simulate. Thus we use this special version for simulation
-FX68K_DIR=./fx68x_verilator
+FX68K_DIR=../../atarist/sim/fx68x_verilator
 FX68K_FILES= fx68k.sv fx68kAlu.sv uaddrPla.sv fx68k_MicroRom.v fx68k_NanoRom.v
 
 # Minimig-AGA

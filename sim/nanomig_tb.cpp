@@ -335,6 +335,63 @@ void hexdump(void *data, int size) {
   }
 }
 
+// disable colorization for easier handling in editors 
+#if 1
+#define RED      "\033[0;31m"
+#define GREEN    "\033[0;32m"
+#define YELLOW   "\033[1;33m"
+#define END      "\033[0m"
+#else
+#define RED
+#define GREEN
+#define YELLOW
+#define END
+#endif
+
+static void hexdiff(void *data, void *cmp, int size) {
+  int i, b2c;
+  int n=0;
+  char *ptr = (char*)data;
+  char *cptr = (char*)cmp;
+
+  if(!size) return;
+
+  // check if there's a difference at all
+  if(memcmp(data, cmp, size) == 0) {
+    hexdump(data, size);
+    return;
+  }
+   
+  while(size>0) {
+    printf("%04x: ", n);
+
+    b2c = (size>16)?16:size;
+    for(i=0;i<b2c;i++) {
+      if(cptr[i] == ptr[i])      
+        printf(" %02x  ", 0xff&ptr[i]);
+      else
+        printf(RED "%02x" GREEN "%02x" END " ",
+	       0xff&ptr[i], 0xff&cptr[i]);
+    }
+      
+    printf("  ");
+    for(i=0;i<(16-b2c);i++) printf("   ");
+    for(i=0;i<b2c;i++) {
+      if(cptr[i] == ptr[i])      
+	printf("%c ", isprint(ptr[i])?ptr[i]:'.');
+      else
+	printf(RED "%c" GREEN "%c" END,
+	       isprint(ptr[i])?ptr[i]:'.', isprint(cptr[i])?cptr[i]:'.');	
+    }
+    printf("\n");
+
+    ptr  += b2c;
+    cptr  += b2c;
+    size -= b2c;
+    n    += b2c;
+  }
+}
+
 static uint64_t GetTickCountMs() {
   struct timespec ts;
   
@@ -829,10 +886,11 @@ void tick(int c) {
   static uint64_t ticks = 0;
   static int sector_tx = 0;
   static int sector_tx_cnt = 512;
-  static int sector_rx_cnt = 512;
+  static int sector_rx_cnt = 512;  
 #ifndef SD_EMU      
   static int write_drv;
   static int write_sector;
+  static int write_ack_delay = 0;
 #endif
   
 #if MEMTRACE > 0
@@ -950,6 +1008,14 @@ void tick(int c) {
 	
       // push requested sector data into core
       if(tb->sdc_busy) {
+	if(write_ack_delay) {
+	  write_ack_delay--;
+	  if(!write_ack_delay) {
+	    tb->sdc_done = 1;
+	    tb->sdc_busy = 0;
+	  }
+	}
+
 	if(sector_rx_cnt < 512) {
 
 	  // the address has been put out already. Now read data and
@@ -958,20 +1024,17 @@ void tick(int c) {
 	  
 	  if(sector_rx_cnt == 512) {
 	    // dump data that should be written
-	    hexdump(sector_buffer[0], 512);
+	    // hexdump(sector_buffer[0], 512);
 
-	    printf("Writing to %d: %d\n", write_drv, write_sector);
+	    printf("Writing to drive %d, sector %d\n", write_drv, write_sector);
 	    if(write_drv < 4) {
-#if 0
-	      // dump original sector for comparison
+	      // read original sector for comparison
+	      char ref[512];	      
 	      fseeko(adf_fd, write_sector*512ll, SEEK_SET);
-	      if(fread(sector_buffer[0], 1, 512, adf_fd) != 512) {
+	      if(fread(ref, 1, 512, adf_fd) != 512) {
 		perror("adf read error"); return; }
-	      
-	      printf("previous:\n");
-	      hexdump(sector_buffer[0], 512);
-#endif
 
+	      hexdiff(ref, sector_buffer[0], 512);
 #if 0
 	      fseeko(adf_fd, write_sector*512ll, SEEK_SET);
 	      if(fwrite(sector_buffer[0], 1, 512, adf_fd) != 512) {
@@ -983,9 +1046,14 @@ void tick(int c) {
 	      if(fwrite(sector_buffer[0], 1, 512, hdf_fd[write_drv-4]) != 512) {
 		perror("hdf write error"); return; }
 	    }
-	      
+#if 0
+	    write_ack_delay = 50000;  // wait some time before clearing busy
+	    // 5000 gives some delay which needs paula to cope with this
+	    // 50000 causes the fifo to run full and throttles the amiga
+#else
 	    tb->sdc_done = 1;
 	    tb->sdc_busy = 0;
+#endif
 	  } else
 	    tb->sdc_byte_addr = sector_rx_cnt;
 	}
@@ -1046,7 +1114,7 @@ void tick(int c) {
 	    (tb->sdc_wr&0x04)?2:
 	    3;
 	    
-	  tb->sdc_busy = 1;
+	  tb->sdc_busy = 1;  // acknowledge reception of command
 
 	  printf("%.3fms SD FDC %d write request, sector %d (tr %d, sd %d, sec %d)\n",
 		 simulation_time*1000, drv, tb->sdc_sector, tb->sdc_sector/22,

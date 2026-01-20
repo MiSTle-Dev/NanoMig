@@ -1,105 +1,134 @@
 [*]
 [*] GTKWave Analyzer v3.3.116 (w)1999-2023 BSI
-[*] Fri Jul 12 08:05:42 2024
+[*] Tue Jan 20 11:50:39 2026
 [*]
-[dumpfile] "nanomig.vcd"
-[dumpfile_mtime] "Fri Jul 12 08:05:10 2024"
-[dumpfile_size] 2160783806
-[savefile] "nanomig.gtkw"
-[timestart] 3300000011530
-[size] 1490 1000
-[pos] 74 51
-*-23.540529 3300004998286 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[dumpfile] "/home/tharbaum/tmp/private_stuff/mistlite/nanomig/sim/nanomig.fst"
+[dumpfile_mtime] "Tue Jan 20 11:49:08 2026"
+[dumpfile_size] 17825080
+[savefile] "/home/tharbaum/tmp/private_stuff/mistlite/nanomig/sim/nanomig.gtkw"
+[timestart] 10926627600000
+[size] 1962 1124
+[pos] 166 65
+*-26.105511 10926901808398 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] TOP.
-[treeopen] TOP.nanomig.
-[treeopen] TOP.nanomig.MINIMIG1.
-[treeopen] TOP.nanomig.MINIMIG1.AGNUS1.
-[treeopen] TOP.nanomig.MINIMIG1.AGNUS1.bl1.
-[sst_width] 209
-[signals_width] 256
+[treeopen] TOP.nanomig_tb.
+[treeopen] TOP.nanomig_tb.nanomig.
+[treeopen] TOP.nanomig_tb.nanomig.cpu_wrapper.
+[treeopen] TOP.nanomig_tb.nanomig.minimig.
+[treeopen] TOP.nanomig_tb.nanomig.minimig.AGNUS1.
+[treeopen] TOP.nanomig_tb.nanomig.minimig.GAYLE1.
+[treeopen] TOP.nanomig_tb.nanomig.minimig.GAYLE1.ide1.
+[treeopen] TOP.nanomig_tb.nanomig.minimig.PAULA1.
+[treeopen] TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.
+[treeopen] TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.unnamedblk1.
+[treeopen] TOP.nanomig_tb.nanomig.minimig.USERIO1.
+[sst_width] 267
+[signals_width] 336
 [sst_expanded] 1
-[sst_vpaned_height] 565
+[sst_vpaned_height] 778
 @28
-TOP.nanomig.clk
-TOP.nanomig.MINIMIG1.AGNUS1.clk
-TOP.nanomig.phi1
-@100028
-TOP.nanomig.phi2
-@28
-TOP.nanomig.reset
-TOP.nanomig.MINIMIG1.n_ram_bhe
-TOP.nanomig.MINIMIG1.n_ram_ble
-TOP.nanomig.MINIMIG1.BMAP1.chip0
-TOP.nanomig.MINIMIG1.BMAP1.kick
+TOP.nanomig_tb.nanomig.amiga_clk.clk_28
+TOP.nanomig_tb.nanomig.reset
 @100022
-TOP.nanomig.cpu_a[23:1]
+TOP.nanomig_tb.nanomig.cpu_wrapper.chip_addr[23:1]
 @22
-TOP.nanomig.MINIMIG1.ram_data[15:0]
-@d00022
-TOP.nanomig.MINIMIG1.ram_address_out[18:1]
+TOP.nanomig_tb.nanomig.cpu_wrapper.cpu_addr[31:0]
 @28
-(0)TOP.nanomig.MINIMIG1.ram_address_out[18:1]
-(1)TOP.nanomig.MINIMIG1.ram_address_out[18:1]
-(2)TOP.nanomig.MINIMIG1.ram_address_out[18:1]
-(3)TOP.nanomig.MINIMIG1.ram_address_out[18:1]
-(4)TOP.nanomig.MINIMIG1.ram_address_out[18:1]
-(5)TOP.nanomig.MINIMIG1.ram_address_out[18:1]
-(6)TOP.nanomig.MINIMIG1.ram_address_out[18:1]
-(7)TOP.nanomig.MINIMIG1.ram_address_out[18:1]
-(8)TOP.nanomig.MINIMIG1.ram_address_out[18:1]
-(9)TOP.nanomig.MINIMIG1.ram_address_out[18:1]
-(10)TOP.nanomig.MINIMIG1.ram_address_out[18:1]
-(11)TOP.nanomig.MINIMIG1.ram_address_out[18:1]
-(12)TOP.nanomig.MINIMIG1.ram_address_out[18:1]
-(13)TOP.nanomig.MINIMIG1.ram_address_out[18:1]
-(14)TOP.nanomig.MINIMIG1.ram_address_out[18:1]
-(15)TOP.nanomig.MINIMIG1.ram_address_out[18:1]
-(16)TOP.nanomig.MINIMIG1.ram_address_out[18:1]
-(17)TOP.nanomig.MINIMIG1.ram_address_out[18:1]
-@1401200
--group_end
+TOP.nanomig_tb.nanomig.minimig.sel_kick
 @22
-TOP.nanomig.MINIMIG1.ram_data_in[15:0]
-TOP.nanomig.MINIMIG1.ramdata_in[15:0]
-TOP.nanomig.cpu_din[15:0]
-TOP.nanomig.ram_din[15:0]
+[color] 1
+TOP.nanomig_tb.nanomig.cpu_wrapper.cpu_din[15:0]
+TOP.nanomig_tb.nanomig.cpu_wrapper.cpu_dout[15:0]
 @28
-TOP.nanomig.MINIMIG1.n_hsync
-TOP.nanomig.MINIMIG1.AGNUS1.bl1.start
-TOP.nanomig.MINIMIG1.AGNUS1.blit_busy
-@23
-TOP.nanomig.MINIMIG1.AGNUS1.bl1.width[10:0]
-@28
-TOP.nanomig.MINIMIG1.AGNUS1.bl1.done
-TOP.nanomig.MINIMIG1.AGNUS1.bl1.we
-TOP.nanomig.MINIMIG1.AGNUS1.bl1.reqdma
-TOP.nanomig.MINIMIG1.AGNUS1.bl1.ackdma
-TOP.nanomig.MINIMIG1.AGNUS1.bl1.int3
-@100022
-TOP.nanomig.MINIMIG1.AGNUS1.bl1.address_out[20:1]
+TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.dma_active
+TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.dsklen_dma
+TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.dsklen_wr
+@24
+TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.dsklen_len[13:0]
 @22
-TOP.nanomig.MINIMIG1.AGNUS1.bl1.blt_state[4:0]
-[color] 2
-TOP.nanomig.MINIMIG1.AGNUS1.bl1.bltcon0[15:0]
-TOP.nanomig.MINIMIG1.AGNUS1.bl1.bltmt1.ain[15:0]
-TOP.nanomig.MINIMIG1.AGNUS1.bl1.bltmt1.bin[15:0]
-TOP.nanomig.MINIMIG1.AGNUS1.bl1.bltmt1.cin[15:0]
+TOP.nanomig_tb.nanomig.sdc_img_mounted[7:0]
+@28
+TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.trackwr
+TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.dmas
+TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.dskstate[1:0]
 @c00022
-TOP.nanomig.MINIMIG1.AGNUS1.bl1.bltmt1.lf[7:0]
+TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.track[7:0]
 @28
-(0)TOP.nanomig.MINIMIG1.AGNUS1.bl1.bltmt1.lf[7:0]
-(1)TOP.nanomig.MINIMIG1.AGNUS1.bl1.bltmt1.lf[7:0]
-(2)TOP.nanomig.MINIMIG1.AGNUS1.bl1.bltmt1.lf[7:0]
-(3)TOP.nanomig.MINIMIG1.AGNUS1.bl1.bltmt1.lf[7:0]
-(4)TOP.nanomig.MINIMIG1.AGNUS1.bl1.bltmt1.lf[7:0]
-(5)TOP.nanomig.MINIMIG1.AGNUS1.bl1.bltmt1.lf[7:0]
-(6)TOP.nanomig.MINIMIG1.AGNUS1.bl1.bltmt1.lf[7:0]
-(7)TOP.nanomig.MINIMIG1.AGNUS1.bl1.bltmt1.lf[7:0]
+(0)TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.track[7:0]
+(1)TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.track[7:0]
+(2)TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.track[7:0]
+(3)TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.track[7:0]
+(4)TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.track[7:0]
+(5)TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.track[7:0]
+(6)TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.track[7:0]
+(7)TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.track[7:0]
 @1401200
 -group_end
 @22
-TOP.nanomig.MINIMIG1.AGNUS1.bl1.bltmt1.out[15:0]
-@100028
-TOP.nanomig.MINIMIG1.AGNUS1.bl1.chsel[1:0]
+TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.sector_header_word[31:0]
+TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.wr_sector_header_word[31:0]
+@28
+TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.lenzero
+TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.dmaon
+@22
+TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.fifo_in[15:0]
+@28
+TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.fifo_empty
+TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.fifo_full
+TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.buswr
+@24
+TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.fifo_wr
+@28
+TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.db1.clk7_en
+@24
+TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.db1.in_ptr[11:0]
+TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.db1.out_ptr[11:0]
+@28
+TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.stbdat
+@22
+TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.cpu_wr_state[3:0]
+@25
+[color] 3
+TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.cpu_wr_cnt[8:0]
+@22
+[color] 6
+TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.fd_dma_buf_wr_state[3:0]
+@24
+TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.fd_dma_wr_ptr[8:0]
+@c00022
+TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.fifo_out[15:0]
+@28
+(0)TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.fifo_out[15:0]
+(1)TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.fifo_out[15:0]
+(2)TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.fifo_out[15:0]
+(3)TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.fifo_out[15:0]
+(4)TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.fifo_out[15:0]
+(5)TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.fifo_out[15:0]
+(6)TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.fifo_out[15:0]
+(7)TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.fifo_out[15:0]
+(8)TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.fifo_out[15:0]
+(9)TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.fifo_out[15:0]
+(10)TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.fifo_out[15:0]
+(11)TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.fifo_out[15:0]
+(12)TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.fifo_out[15:0]
+(13)TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.fifo_out[15:0]
+(14)TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.fifo_out[15:0]
+(15)TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.fifo_out[15:0]
+@1401200
+-group_end
+@22
+[color] 2
+TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.wr_sector_csum[15:0]
+@24
+TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.sdc_sector[31:0]
+@22
+TOP.nanomig_tb.nanomig.sdc_rd[7:0]
+TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.sdc_wr[3:0]
+@28
+TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.sdc_busy
+TOP.nanomig_tb.nanomig.sdc_done
+TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.fd_dma_buffer_trigger_wr
+@22
+TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.fd_dma_buffer_data_wr[7:0]
 [pattern_trace] 1
 [pattern_trace] 0

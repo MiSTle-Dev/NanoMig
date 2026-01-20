@@ -117,12 +117,7 @@ module paula
 	output [8:0] rdata_okk, 	//right DAC data (PWM volume)
 	// system configuration
 	input	  [1:0] floppy_drives,	//number of extra floppy drives
-	input	        floppy_wrprot,	//floppies are write protected
-	// fifo / track display
-	output  [7:0] trackdisp,
-	output [13:0] secdisp,
-	output        floppy_fwr,
-	output        floppy_frd
+	input	        floppy_wrprot	//floppies are write protected
 );
 //--------------------------------------------------------------------------------------
 
@@ -287,13 +282,7 @@ paula_floppy pf1
 	.sdc_byte_in_strobe(sdc_byte_in_strobe),
 	.sdc_byte_addr(sdc_byte_addr),
 	.sdc_byte_in_data(sdc_byte_in_data),
-        .sdc_byte_out_data(sdc_byte_out_data),
-
-	// fifo / track display
-	.trackdisp(trackdisp),
-	.secdisp(secdisp),
-	.floppy_fwr (floppy_fwr),
-	.floppy_frd (floppy_frd)
+        .sdc_byte_out_data(sdc_byte_out_data)
 );
 
 //instantiate audio controller

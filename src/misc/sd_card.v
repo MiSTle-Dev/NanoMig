@@ -202,13 +202,17 @@ always @(posedge clk) begin
 		 end else begin
 			// SDC CMD 1: STATUS
 			if(command == 8'd1) begin
-               // request status byte, for the MCU it doesn't matter whether
+               // request status information, for the MCU it doesn't matter whether
 			   // the core wants to write or to read
 			   if(byte_cnt == 4'd0) data_out <= rstart | wstart;
 			   if(byte_cnt == 4'd1) data_out <= rsector[31:24];
 			   if(byte_cnt == 4'd2) data_out <= rsector[23:16];
 			   if(byte_cnt == 4'd3) data_out <= rsector[15: 8];
 			   if(byte_cnt == 4'd4) data_out <= rsector[ 7: 0];
+
+			   // this command can optionally send additional (debug) data
+			   if(byte_cnt == 4'd5) data_out <= { ~rsector[7], 7'd0 };   // indicate that more data is valid
+			   if(byte_cnt == 4'd6) data_out <= { 7'b0000000, |wstart};  // optional data to indicate writes
 			end
 			
 			// SDC CMD 2: CORE_RW, CMD 3: MCU_READ

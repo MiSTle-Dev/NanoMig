@@ -14,7 +14,7 @@ module paula_floppy_fifo
 	output reg [15:0] out, // data out
 	input		  rd, // read from fifo
 	input		  wr, // write to fifo
-	output		  empty, // fifo is empty
+	output reg	  empty, // fifo is empty
 	output		  full  // fifo is full
 );
 
@@ -22,37 +22,30 @@ module paula_floppy_fifo
 reg 	[15:0] mem [2047:0];	// 2048 words by 16 bit wide fifo memory (for 2 MFM-encoded sectors)
 reg	[11:0] in_ptr;		// fifo input pointer
 reg	[11:0] out_ptr;		// fifo output pointer
-wire	equal;			// lower 11 bits of in_ptr and out_ptr are equal
-
-//fifo write pointer control
-always @(posedge clk) begin
-  if (clk7_en) begin
-  	if (reset)
-  		in_ptr[11:0] <= 0;
-  	else if(wr) begin
-  		mem[in_ptr[10:0]] <= in;
-  		in_ptr[11:0] <= in_ptr[11:0] + 12'd1;
-	end
-  end
-end
-
-// fifo read pointer control
-always @(posedge clk) begin
-  if (clk7_en) begin
-  	if (reset)
-  		out_ptr[11:0] <= 0;
-  	else if (rd) begin
-  	        out <= mem[out_ptr[10:0]];
-  		out_ptr[11:0] <= out_ptr[11:0] + 12'd1;
-	end
-  end
-end
 
 // check lower 11 bits of pointer to generate equal signal
-assign equal = (in_ptr[10:0]==out_ptr[10:0]) ? 1'b1 : 1'b0;
+wire   equal = (in_ptr[10:0]==out_ptr[10:0]);
+assign empty = (equal && (in_ptr[11] == out_ptr[11]));
+assign full =  (equal && (in_ptr[11] != out_ptr[11]));
 
-assign empty = (equal && (in_ptr[11]==out_ptr[11])) ? 1'b1 : 1'b0;   		
-assign full = (equal && (in_ptr[11]!=out_ptr[11])) ? 1'b1 : 1'b0;	
+always @(posedge clk) begin
+  if (clk7_en) begin
+  	if (reset) begin
+  		in_ptr <= 12'd0;
+  		out_ptr <= 12'd0;
+  	end else begin
+	   if(wr && !full) begin
+  		mem[in_ptr[10:0]] <= in;
+  		in_ptr <= in_ptr + 12'd1;
+	        if(empty) out <= in;	      
+	   end
+  	   if(rd && !empty) begin
+	        out <= mem[out_ptr[10:0] + 11'd1];
+  		out_ptr <= out_ptr + 12'd1;
+	   end
+	end
+  end
+end
 
 endmodule
 
