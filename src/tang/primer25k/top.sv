@@ -8,7 +8,17 @@
    or a single copy of e.g. a 512k diag rom
      openFPGALoader --external-flash -o 0x400000 DiagROM
 */
- 
+
+// Allowing the use of the onboard BL616 as the FPGA Companion
+// requires to disable the JTAG interface which in turn makes
+// future programming/flashing attempts m ore difficult
+// `define USE_BL616
+
+// When USE_BL616 is enabled, the following line in build_tp25k.tcl
+// can be set to 1 and spi_XX pins in primer25k/nanomig.cst can
+// be uncommented
+// set_option -use_jtag_as_gpio 0
+   
 module top(
   input			clk, // 50 MHz in
 
@@ -51,14 +61,16 @@ module top(
   inout			sd_cmd, // MOSI
   inout [3:0]	sd_dat, // 0: MISO
 
+`ifdef USE_BL616
   // SPI connection to on-board BL616. By default an external
-  // connection is used with a M0S Dock / PiPico
+  // connection is used with a M0S Dock / PiPico		   
   input			spi_sclk,
   input			spi_csn,
   output		spi_dir,
   input			spi_dat,
   output		spi_irqn,
-
+`endif
+		   
   // hdmi/tdms
   output		tmds_clk_n,
   output		tmds_clk_p,
@@ -75,26 +87,32 @@ wire [1:0]	drv_leds;
 assign leds[1] =  drv_leds[1] || drv_leds[0];   
 
 // ============================== clock generation ===========================
+
+// Tang Primer 25 clocks are derived from 50Mhz
+// HDMI clock:  142 MHz
+// Pixel clock: 28.4 MHz (HDMI/5)
+// SDRAM and flash clock: 88.75 MHz, as close as possible to 85Mhz
+// Amiga clock: 7.1 (Pixel/4)
    
-// HDMI clock:  141.8758 MHz
-// Pixel clock: 28.37516 MHz (HDMI/5)
-// SDRAM clock: 70.9379 MHz (HDMI/2)
-// Amiga clock: 7.09379 (Pixel/4)
-   
-`define PIXEL_CLOCK 28375160
+// -> The resulting effective Amiga clock is in between the NTSC's 7.15909 and the
+// PAL's 7.09379 Mhz
+
+`define PIXEL_CLOCK 28400000
 
 wire clk_pixel_x5;   
+wire clk_85m;   
+wire clk_85m_shifted;   
 wire pll_lock;   
 pll_142m pll_hdmi (
     .clkout0(clk_pixel_x5),
+    .clkout1(clk_85m),
+    .clkout2(clk_85m_shifted),   // 270deg phase shifted
+    .mdclk(clk),
     .lock(pll_lock),
     .clkin(clk)
 );
 
-reg clk_71m;
-always @(posedge clk_pixel_x5)
-  if(!pll_lock) clk_71m <= 1'b0;
-  else          clk_71m <= !clk_71m;
+assign O_sdram_clk = clk_85m_shifted;
 
 wire clk_pixel;
 Gowin_CLKDIV clk_div_5 (
@@ -111,13 +129,17 @@ wire	clk7n_en;
 wire 	   osd_reset;   
 wire [1:0] osd_chipmem;         // 0=512k, 1=1M, 2=1.5M, 3=2M
 wire [1:0] osd_slowmem;         // 0=None, 1=512k, 2=1M, 3=1.5M
+wire [1:0] osd_fastmem;         // 0=None, 1=2M, 2=4M
 wire [1:0] osd_floppy_drives;
 wire       osd_floppy_turbo;
+wire       osd_floppy_wrprot;
 wire       osd_ide_enable;
 wire [1:0] osd_chipset;         // 0=OCS-A500, 1=OCS-A1000, 2=ECS
 wire       osd_video_mode;      // PAL (0=PAL, 1=NTSC)
+wire       osd_video_wide;      // 0=normal, 1=wide screen (jailbars)
 wire [1:0] osd_video_filter;
 wire [1:0] osd_video_scanlines;
+wire       osd_joy_swap;        // 0=off, 1=on
 
 // generate a reset for some time after rom has been initialized
 reg [15:0] reset_cnt;
@@ -137,9 +159,11 @@ wire sdram_ready;
 // din, ss and clk are inputs coming from the MCU
 // onboard connection to on-board BL616
 
+`ifdef USE_BL616
 assign spi_dir = spi_io_dout;
-assign m0s[4:0] = { spi_intn, 3'bzzz, spi_io_dout };
 assign spi_irqn = spi_intn;
+`endif
+assign m0s[4:0] = { spi_intn, 3'bzzz, spi_io_dout };
 
 // by default the internal SPI is being used. Once there is
 // a select from the external spi, then the connection is
@@ -161,10 +185,16 @@ end
 
 // switch between internal SPI connected to the on-board bl616
 // or to the external one possibly connected to a M0S Dock
+`ifdef USE_BL616
 wire spi_io_din = spi_ext?m0s[1]:spi_dat;
 wire spi_io_ss = spi_ext?m0s[2]:spi_csn;
 wire spi_io_clk = spi_ext?m0s[3]:spi_sclk;
-
+`else
+wire spi_io_din = m0s[1];
+wire spi_io_ss = m0s[2];
+wire spi_io_clk = m0s[3];
+`endif
+   
 // interface to M0S MCU
 wire       mcu_sys_strobe;        // mcu message byte valid for sysctrl
 wire       mcu_hid_strobe;        // -"- hid
@@ -313,13 +343,17 @@ sysctrl sysctrl (
 		.system_reset(osd_reset),
 		.system_floppy_drives(osd_floppy_drives),
 		.system_floppy_turbo(osd_floppy_turbo),
+		.system_floppy_wrprot(osd_floppy_wrprot),
 		.system_ide_enable(osd_ide_enable),
 	    .system_chipset(osd_chipset),
 		.system_video_mode(osd_video_mode),
+		.system_video_wide(osd_video_wide),
 		.system_video_filter(osd_video_filter),
 		.system_video_scanlines(osd_video_scanlines),
 		.system_chipmem(osd_chipmem),
 		.system_slowmem(osd_slowmem),
+		.system_fastmem(osd_fastmem),
+        .system_joy_swap(osd_joy_swap),
 				 
         .int_out_n(spi_intn),
         .int_in( { 4'b0000, sdc_int, 1'b0, hid_int, 1'b0 }),
@@ -368,9 +402,9 @@ wire [14:0] audio_right;
 
 // map first HID/USB joystick into second amiga joystick port
 // wire in db9 joystick
-wire [7:0] joystick1 = hid_joy0;
-wire [7:0] joystick0 = hid_joy1;
- 
+wire [7:0] joystick0 = osd_joy_swap ? hid_joy0 : hid_joy1;
+wire [7:0] joystick1 = osd_joy_swap ? hid_joy1 : hid_joy0;
+
 wire [23:1] cpu_a;
 wire cpu_as_n, cpu_lds_n, cpu_uds_n;
 wire cpu_rw, cpu_dtack_n;
@@ -386,6 +420,17 @@ wire [1:0]  ram_be;
 wire 	    ram_oe_n;
 wire		ram_refresh;   
    
+wire fastram_sel;
+wire [22:1] fastram_addr;
+wire fastram_lds;
+wire fastram_uds;
+wire [15:0] fastram_dout;
+wire [15:0] fastram_din;
+wire [1:0] fastram_be;
+wire fastram_wr;
+wire fastram_ready;
+assign fastram_be = {fastram_uds,fastram_lds};
+
 wire [15:0] sdram_dout;
 
 assign ram_din = sdram_dout;
@@ -393,7 +438,8 @@ assign ram_din = sdram_dout;
 // pack config values into minimig config
 wire [5:0] chipset_config = { 1'b0,osd_chipset,osd_video_mode,1'b0 };
 wire [7:0] memory_config = { 4'b0_000, osd_slowmem, osd_chipmem };   
-wire [3:0] floppy_config = { osd_floppy_drives, 1'b0, osd_floppy_turbo };
+wire [2:0] fastram_config = { 1'b0, osd_fastmem };   
+wire [3:0] floppy_config = { osd_floppy_drives, osd_floppy_wrprot, osd_floppy_turbo };
 wire [3:0] video_config = { osd_video_filter, osd_video_scanlines };   
 wire [5:0] ide_config = { 5'b00000, osd_ide_enable };   
    
@@ -410,6 +456,7 @@ nanomig nanomig
  .hdd_led(drv_leds[1]),
  
  .memory_config(memory_config),
+ .fastram_config(fastram_config),
  .chipset_config(chipset_config),
  .floppy_config(floppy_config),
  .video_config(video_config),
@@ -459,7 +506,16 @@ nanomig nanomig
  ._ram_we(ram_we_n),        // sram write enable
  ._ram_oe(ram_oe_n),        // sram output enable
  .chip48(48'd0),
- .refresh(ram_refresh)
+ .refresh(ram_refresh),
+ 
+ .fastram_sel(fastram_sel),
+ .fastram_addr(fastram_addr),
+ .fastram_lds(fastram_lds),
+ .fastram_uds(fastram_uds),
+ .fastram_dout(fastram_dout),
+ .fastram_din(fastram_din),
+ .fastram_wr(fastram_wr),
+ .fastram_ready(fastram_ready)
 );
 
 wire           flash_ready;  
@@ -489,7 +545,7 @@ wire [15:0] flash_dout;
 reg [15:0]  flash_doutD;
 reg		    flash_cs;  
 reg [31:0]  word_count;
-reg [2:0]   state;
+reg [4:0]   state;
 wire        flash_data_strobe;
 wire        flash_busy;   
 
@@ -500,7 +556,7 @@ reg [21:0]  flash_ram_addr;
 reg         flash_ram_write;
 reg [5:0]   flash_cnt;  
 
-always @(posedge clk_28m or negedge mem_ready) begin
+always @(posedge clk_85m or negedge mem_ready) begin
     if(!mem_ready) begin
        flash_addr <= 22'h200000;          // 4MB flash offset (word address), with the 8MB offset in the
 	                                      // flash driver this results in the flash address being c00000
@@ -512,9 +568,9 @@ always @(posedge clk_28m or negedge mem_ready) begin
        flash_cs <= 1'b0;        
        flash_cnt <= 6'd0;
     end else begin
-        if((start_rom_copy || state == 7) && (word_count != 0)) begin
+        if((start_rom_copy || state == 23) && (word_count != 0)) begin
             flash_cs <= 1'b1;
-            flash_cnt <= 6'd15; // >= 30 @ 32MHz
+            flash_cnt <= 6'd45; // >= 45 @ 85MHz
         end else begin
             if(flash_cnt != 0) flash_cnt <= flash_cnt - 6'd1;
             if(flash_busy)     flash_cs <= 1'b0;
@@ -539,9 +595,9 @@ always @(posedge clk_28m or negedge mem_ready) begin
 
         // advance ram write state
         if(state != 0)  state <= state + 3'd1;
-        if(state == 1)  flash_ram_write <= 1'b1;
-        if(state == 6)  flash_ram_write <= 1'b0;
-        if(state == 7)  flash_ram_addr <= flash_ram_addr + 22'd1;
+        if(state == 3)  flash_ram_write <= 1'b1;
+        if(state == 18)  flash_ram_write <= 1'b0;
+        if(state == 21)  flash_ram_addr <= flash_ram_addr + 22'd1;
     end
 end
 
@@ -571,7 +627,7 @@ wire [1:0]  sdram_be      = rom_done?ram_be:2'b00;
 wire		sdram_we      = rom_done?sdram_rw:flash_ram_write; 
 
 sdram sdram (
-  	.sd_clk     ( O_sdram_clk   ), // sd clock
+  	.sd_clk     ( /* O_sdram_clk */  ), // sd clock
 	.sd_cke     ( O_sdram_cke   ), // clock enable
 	.sd_data    ( IO_sdram_dq   ), // 32 bit bidirectional data bus
 	.sd_addr    ( O_sdram_addr  ), // 11 bit multiplexed address bus
@@ -583,7 +639,7 @@ sdram sdram (
 	.sd_cas     ( O_sdram_cas_n ), // columns address select
 
 	// cpu/chipset interface
-	.clk        ( clk_71m       ), // sdram is accessed at 71MHz
+	.clk        ( clk_85m       ), // sdram is accessed at 71MHz
 	.reset_n    ( pll_lock      ), // init signal after FPGA config to initialize RAM
 
 	.ready      ( sdram_ready   ), // ram is ready and has been initialized
@@ -594,14 +650,22 @@ sdram sdram (
 	.addr       ( sdram_addr    ), // 22 bit word address
 	.ds         ( sdram_be      ), // upper/lower data strobe
 	.cs         ( sdram_cs      ), // cpu/chipset requests read/wrie
-	.we         ( sdram_we      )  // cpu/chipset requests write
+	.we         ( sdram_we      ), // cpu/chipset requests write
+
+	.p2_din        ( fastram_din     ), // data input from chipset/cpu
+	.p2_dout       ( fastram_dout    ),
+	.p2_addr       ( fastram_addr    ), // 22 bit word address
+	.p2_ds         ( fastram_be      ), // upper/lower data strobe
+	.p2_cs         ( fastram_sel     ), // cpu/chipset requests read/wrie
+	.p2_we         ( fastram_wr      ),  // cpu/chipset requests write
+	.p2_ack        ( fastram_ready   )
 );
 
-// run the flash a 71MHz. This is only used at power-up to copy kickstart
+// run the flash a 85MHz. This is only used at power-up to copy kickstart
 // from flash to sdram
-assign mspi_clk = ~clk_71m;   
+assign mspi_clk = clk_85m_shifted;   
 flash flash (
-    .clk       ( clk_71m     ),
+    .clk       ( clk_85m     ),
     .resetn    ( pll_lock    ),
     .ready     ( flash_ready ),
 
@@ -626,6 +690,7 @@ video_analyzer video_analyzer (
     .vs          ( vs_n      ),
     .pal         ( vpal      ),
     .short_frame ( short_frame ),
+    .wide_screen ( osd_video_wide ),
     .interlace   ( interlace ),
     .vreset      ( vreset    )
 );
@@ -666,6 +731,7 @@ hdmi #(
 
   .pal_mode(vpal),
   .short_frame ( short_frame ),
+  .wide_screen ( osd_video_wide ),
   .interlace(interlace),
   .reset(vreset),    // signal to synchronize HDMI
 

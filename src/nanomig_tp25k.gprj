@@ -85,6 +85,8 @@
         <File path="tang/primer25k/gowin_dpb/ide_dpram.v" type="file.verilog" enable="1"/>
         <File path="tang/primer25k/gowin_dpb/sector_dpram.v" type="file.verilog" enable="1"/>
         <File path="tang/primer25k/gowin_pll/pll_142m.v" type="file.verilog" enable="1"/>
+        <File path="tang/primer25k/gowin_pll/pll_142m_mod.v" type="file.verilog" enable="1"/>
+        <File path="tang/primer25k/gowin_pll/pll_init.v" type="file.verilog" enable="1"/>
         <File path="tang/primer25k/sdram.v" type="file.verilog" enable="1"/>
         <File path="tang/primer25k/top.sv" type="file.verilog" enable="1"/>
         <File path="tg68k/TG68K.vhd" type="file.vhdl" enable="1"/>

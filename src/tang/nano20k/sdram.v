@@ -20,8 +20,6 @@
 //
 
 module sdram (
-
-	output		  sd_clk, // sd clock
 	output		  sd_cke, // clock enable
 	inout reg [31:0]  sd_data, // 32 bit bidirectional data bus
 	output reg [10:0] sd_addr, // 11 bit multiplexed address bus
@@ -59,7 +57,6 @@ module sdram (
 // 28Mhz main clock. This means there are ~10 cycles per 7Mhz
 // Amiga clock cycle
    
-assign sd_clk = ~clk;
 assign sd_cke = 1'b1;  
    
 localparam RASCAS_DELAY   = 3'd2;   // tRCD=15ns -> 2 cycle@85MHz

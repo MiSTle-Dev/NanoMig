@@ -90,7 +90,7 @@ wire [5:0] db9_joy = { !io[5], !io[0], !io[2], !io[1], !io[4], !io[3] };
 wire [5:0] db9_joy2 = { !spare[5], !spare[0], !spare[2], !spare[1], !spare[4], !spare[3] }; 
    
 wire [5:0]	leds;
-assign leds[5] = 1'b0;
+assign leds[5] = |sd_wr;
 assign leds[4] = |sd_rd;
 assign leds_n = ~leds;  
 
@@ -98,7 +98,7 @@ assign leds_n = ~leds;
    
 // HDMI clock:  141.8758 MHz
 // Pixel clock: 28.37516 MHz (HDMI/5)
-// SDRAM clock: 70.9379 MHz (HDMI/2)
+// SDRAM and flash clock: 85 MHz
 // Amiga clock: 7.09379 (Pixel/4)
    
 `define PIXEL_CLOCK 28375160
@@ -107,21 +107,25 @@ wire clk_pixel_x5;
 wire pll_lock;   
 wire clk_7;
 wire clk_28m;
-wire clk_71m;
+wire clk_85m;
+wire clk_85m_shifted;
 wire clk_pixel;
 
 amigaclks amigaclks (
 	.clk_in(clk),
 	.clk_7m(clk_7), // Unused
 	.clk_28m(clk_28m),
-	.clk_85m(clk_71m),
-	.clk_sdram(O_sdram_clk),
+	.clk_85m(clk_85m),
+	.clk_sdram(clk_85m_shifted),
 	.locked(pll_lock),
 	.vidmode(1'b1),
 	.clk_tmds(clk_pixel_x5),
 	.clk_pixel(clk_pixel),
 	.video_locked()
 );
+
+assign O_sdram_clk = clk_85m_shifted;   
+assign mspi_clk = clk_85m_shifted;   
 
 wire	clk7_en;   
 wire	clk7n_en;   
@@ -559,7 +563,7 @@ reg            start_rom_copy;
 reg            mem_ready_D;
 
 // generate a start_rom_copy signal once flash and SDRAM are initialized
-always @(posedge clk_71m or negedge pll_lock) begin
+always @(posedge clk_85m or negedge pll_lock) begin
    if(!pll_lock) begin
       start_rom_copy <= 1'b0;
       mem_ready_D <= 1'b0;
@@ -592,7 +596,7 @@ reg [21:0]  flash_ram_addr;
 reg         flash_ram_write;
 reg [5:0]   flash_cnt;  
 
-always @(posedge clk_71m or negedge mem_ready) begin
+always @(posedge clk_85m or negedge mem_ready) begin
     if(!mem_ready) begin
        flash_addr <= 22'h200000;          // 4MB flash offset (word address)
        flash_ram_addr <= { 4'hf, 18'h0 }; // write into 512k sdram segment used for kick rom
@@ -662,7 +666,6 @@ wire [1:0]  sdram_be      = rom_done?ram_be:2'b00;
 wire		sdram_we      = rom_done?sdram_rw:flash_ram_write; 
    
 sdram sdram (
-//  	.sd_clk     ( O_sdram_clk   ), // sd clock
 	.sd_cke     ( O_sdram_cke   ), // clock enable
 	.sd_data    ( IO_sdram_dq   ), // 32 bit bidirectional data bus
 	.sd_addr    ( O_sdram_addr  ), // 11 bit multiplexed address bus
@@ -674,7 +677,7 @@ sdram sdram (
 	.sd_cas     ( O_sdram_cas_n ), // columns address select
 
 	// cpu/chipset interface
-	.clk        ( clk_71m       ), // sdram is accessed at 71MHz
+	.clk        ( clk_85m       ), // sdram is accessed at 71MHz
 	.reset_n    ( pll_lock      ), // init signal after FPGA config to initialize RAM
 
 	.ready      ( sdram_ready   ), // ram is ready and has been initialized
@@ -688,7 +691,6 @@ sdram sdram (
 	.cs         ( sdram_cs      ), // cpu/chipset requests read/wrie
 	.we         ( sdram_we      ),  // cpu/chipset requests write
 
-    // TODO: p2_cs breaks it ...
 	.p2_din        ( fastram_din     ), // data input from chipset/cpu
 	.p2_dout       ( fastram_dout    ),
 	.p2_addr       ( fastram_addr    ), // 22 bit word address
@@ -700,9 +702,8 @@ sdram sdram (
 
 // run the flash a 71MHz. This is only used at power-up to copy kickstart
 // from flash to sdram
-assign mspi_clk = ~clk_71m;   
 flash flash (
-    .clk       ( clk_71m     ),
+    .clk       ( clk_85m     ),
     .resetn    ( pll_lock    ),
     .ready     ( flash_ready ),
 

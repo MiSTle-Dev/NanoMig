@@ -77,6 +77,8 @@ add_file misc/amiga_keymap.v
 add_file tang/primer25k/flash_dspi.v
 add_file tang/primer25k/gowin_clkdiv/gowin_clkdiv.v
 add_file tang/primer25k/gowin_pll/pll_142m.v
+add_file tang/primer25k/gowin_pll/pll_142m_mod.v
+add_file tang/primer25k/gowin_pll/pll_init.v
 add_file tang/primer25k/gowin_dpb/sector_dpram.v
 add_file tang/primer25k/gowin_dpb/ide_dpram.v
 add_file tang/primer25k/top.sv
@@ -101,7 +103,7 @@ set_option -use_done_as_gpio 1
 set_option -use_cpu_as_gpio 1
 set_option -use_i2c_as_gpio 1
 set_option -use_ready_as_gpio 1
-set_option -use_jtag_as_gpio 1
+set_option -use_jtag_as_gpio 0
 set_option -cst_warn_to_error 1
 set_option -multi_boot 0
 set_option -mspi_jump 0
