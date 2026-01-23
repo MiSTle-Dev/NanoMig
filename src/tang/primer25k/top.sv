@@ -426,10 +426,9 @@ wire fastram_lds;
 wire fastram_uds;
 wire [15:0] fastram_dout;
 wire [15:0] fastram_din;
-wire [1:0] fastram_be;
+wire [1:0] fastram_be = {fastram_uds,fastram_lds};
 wire fastram_wr;
 wire fastram_ready;
-assign fastram_be = {fastram_uds,fastram_lds};
 
 wire [15:0] sdram_dout;
 
@@ -473,8 +472,8 @@ nanomig nanomig
  .audio_right(audio_right),
 
  // uart interface 
- .uart_rx(midi_in),
- .uart_tx(midi_out),
+ .uart_rx(),
+ .uart_tx(),
  
  // keyboard & mouse				 
  .mouse_buttons(mouse_buttons), // mouse buttons
@@ -563,7 +562,7 @@ always @(posedge clk_85m or negedge mem_ready) begin
        flash_ram_addr <= { 4'hf, 18'h0 }; // write into 512k sdram segment used for kick rom
        word_count <= 22'h40001;           // 512k bytes ROM data = 256k words
 
-       state <= 3'h0;
+       state <= 5'h0;
        flash_ram_write <= 1'b0;
        flash_cs <= 1'b0;        
        flash_cnt <= 6'd0;
@@ -594,7 +593,7 @@ always @(posedge clk_85m or negedge mem_ready) begin
         end
 
         // advance ram write state
-        if(state != 0)  state <= state + 3'd1;
+        if(state != 0)  state <= state + 5'd1;
         if(state == 3)  flash_ram_write <= 1'b1;
         if(state == 18)  flash_ram_write <= 1'b0;
         if(state == 21)  flash_ram_addr <= flash_ram_addr + 22'd1;
@@ -627,8 +626,6 @@ wire [1:0]  sdram_be      = rom_done?ram_be:2'b00;
 wire		sdram_we      = rom_done?sdram_rw:flash_ram_write; 
 
 sdram sdram (
-  	.sd_clk     ( /* O_sdram_clk */  ), // sd clock
-	.sd_cke     ( O_sdram_cke   ), // clock enable
 	.sd_data    ( IO_sdram_dq   ), // 32 bit bidirectional data bus
 	.sd_addr    ( O_sdram_addr  ), // 11 bit multiplexed address bus
 	.sd_dqm     ( O_sdram_dqm   ), // two byte masks
@@ -639,7 +636,7 @@ sdram sdram (
 	.sd_cas     ( O_sdram_cas_n ), // columns address select
 
 	// cpu/chipset interface
-	.clk        ( clk_85m       ), // sdram is accessed at 71MHz
+	.clk        ( clk_85m       ), // sdram is accessed at 85MHz
 	.reset_n    ( pll_lock      ), // init signal after FPGA config to initialize RAM
 
 	.ready      ( sdram_ready   ), // ram is ready and has been initialized

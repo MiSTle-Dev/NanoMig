@@ -41,7 +41,7 @@ module top(
   inout [7:0]	m0s,
 
   // two dual shock controllers on left PMOD, only P1 is used
-  // by MiSTeryNano for joystick
+  // by MiSTeryNano for joystick, currently unused on NanoMig
   output		ds1_csn,
   output		ds1_sclk,
   output		ds1_mosi,
@@ -75,34 +75,32 @@ module top(
   output [2:0]	tmds_d_n,
   output [2:0]	tmds_d_p
 );
+`default_nettype none
 
 wire [5:0]	leds;
-assign leds[5] = 1'b0;
+assign leds[5] = |sd_wr;
 assign leds[4] = |sd_rd;
 assign leds[3] = !rom_done;     
 assign leds_n = ~leds;  
 
 // ============================== clock generation ===========================
    
-// HDMI clock:  141.8758 MHz
-// Pixel clock: 28.37516 MHz (HDMI/5)
-// SDRAM clock: 70.9379 MHz (HDMI/2)
-// Amiga clock: 7.09379 (Pixel/4)
-   
 `define PIXEL_CLOCK 28375160
 
 wire clk_pixel_x5;   
+wire clk_85m;   
+wire clk_85m_shifted;   
 wire pll_lock;   
 pll_142m pll_hdmi (
     .clkout0(clk_pixel_x5),
+    .clkout1(clk_85m),
+    .clkout2(clk_85m_shifted),   // 270deg phase shifted
+    .init_clk(clk),
     .lock(pll_lock),
     .clkin(clk)
 );
 
-reg clk_71m;
-always @(posedge clk_pixel_x5)
-  if(!pll_lock) clk_71m <= 1'b0;
-  else          clk_71m <= !clk_71m;
+assign O_sdram_clk = clk_85m_shifted;
 
 wire clk_pixel;
 Gowin_CLKDIV clk_div_5 (
@@ -119,13 +117,17 @@ wire	clk7n_en;
 wire 	   osd_reset;   
 wire [1:0] osd_chipmem;         // 0=512k, 1=1M, 2=1.5M, 3=2M
 wire [1:0] osd_slowmem;         // 0=None, 1=512k, 2=1M, 3=1.5M
+wire [1:0] osd_fastmem;         // 0=None, 1=2M, 2=4M
 wire [1:0] osd_floppy_drives;
+wire       osd_floppy_wrprot;
 wire       osd_floppy_turbo;
 wire       osd_ide_enable;
 wire [1:0] osd_chipset;         // 0=OCS-A500, 1=OCS-A1000, 2=ECS
 wire       osd_video_mode;      // PAL (0=PAL, 1=NTSC)
+wire       osd_video_wide;      // 0=normal, 1=wide screen (jailbars)
 wire [1:0] osd_video_filter;
 wire [1:0] osd_video_scanlines;
+wire       osd_joy_swap;        // 0=off, 1=on
 
 // generate a reset for some time after rom has been initialized
 reg [15:0] reset_cnt;
@@ -299,13 +301,17 @@ sysctrl sysctrl (
 		.system_reset(osd_reset),
 		.system_floppy_drives(osd_floppy_drives),
 		.system_floppy_turbo(osd_floppy_turbo),
+		.system_floppy_wrprot(osd_floppy_wrprot),
 		.system_ide_enable(osd_ide_enable),
 	    .system_chipset(osd_chipset),
 		.system_video_mode(osd_video_mode),
+		.system_video_wide(osd_video_wide),
 		.system_video_filter(osd_video_filter),
 		.system_video_scanlines(osd_video_scanlines),
 		.system_chipmem(osd_chipmem),
 		.system_slowmem(osd_slowmem),
+		.system_fastmem(osd_fastmem),
+        .system_joy_swap(osd_joy_swap),
 				 
         .int_out_n(m0s[4]),
         .int_in( { 4'b0000, sdc_int, 1'b0, hid_int, 1'b0 }),
@@ -377,6 +383,16 @@ wire [1:0]  ram_be;
 wire 	    ram_oe_n;
 wire		ram_refresh;   
    
+wire fastram_sel;
+wire [22:1] fastram_addr;
+wire fastram_lds;
+wire fastram_uds;
+wire [15:0] fastram_dout;
+wire [15:0] fastram_din;
+wire [1:0] fastram_be = {fastram_uds,fastram_lds};
+wire fastram_wr;
+wire fastram_ready;
+
 wire [15:0] sdram_dout;
 
 assign ram_din = sdram_dout;
@@ -384,7 +400,8 @@ assign ram_din = sdram_dout;
 // pack config values into minimig config
 wire [5:0] chipset_config = { 1'b0,osd_chipset,osd_video_mode,1'b0 };
 wire [7:0] memory_config = { 4'b0_000, osd_slowmem, osd_chipmem };   
-wire [3:0] floppy_config = { osd_floppy_drives, 1'b0, osd_floppy_turbo };
+wire [2:0] fastram_config = { 1'b0, osd_fastmem };   
+wire [3:0] floppy_config = { osd_floppy_drives, osd_floppy_wrprot, osd_floppy_turbo };
 wire [3:0] video_config = { osd_video_filter, osd_video_scanlines };   
 wire [5:0] ide_config = { 5'b00000, osd_ide_enable };   
    
@@ -401,6 +418,7 @@ nanomig nanomig
  .hdd_led(leds[2]),
  
  .memory_config(memory_config),
+ .fastram_config(fastram_config),
  .chipset_config(chipset_config),
  .floppy_config(floppy_config),
  .video_config(video_config),
@@ -417,8 +435,8 @@ nanomig nanomig
  .audio_right(audio_right),
 
  // uart interface 
- .uart_rx(midi_in),
- .uart_tx(midi_out),
+ .uart_rx(),
+ .uart_tx(),
  
  // keyboard & mouse				 
  .mouse_buttons(mouse_buttons), // mouse buttons
@@ -450,7 +468,16 @@ nanomig nanomig
  ._ram_we(ram_we_n),        // sram write enable
  ._ram_oe(ram_oe_n),        // sram output enable
  .chip48(48'd0),
- .refresh(ram_refresh)
+ .refresh(ram_refresh),
+
+ .fastram_sel(fastram_sel),
+ .fastram_addr(fastram_addr),
+ .fastram_lds(fastram_lds),
+ .fastram_uds(fastram_uds),
+ .fastram_dout(fastram_dout),
+ .fastram_din(fastram_din),
+ .fastram_wr(fastram_wr),
+ .fastram_ready(fastram_ready)
 );
 
 wire           flash_ready;  
@@ -562,8 +589,6 @@ wire [1:0]  sdram_be      = rom_done?ram_be:2'b00;
 wire		sdram_we      = rom_done?sdram_rw:flash_ram_write; 
 
 sdram sdram (
-  	.sd_clk     ( O_sdram_clk   ), // sd clock
-	.sd_cke     ( O_sdram_cke   ), // clock enable
 	.sd_data    ( IO_sdram_dq   ), // 32 bit bidirectional data bus
 	.sd_addr    ( O_sdram_addr  ), // 11 bit multiplexed address bus
 	.sd_dqm     ( O_sdram_dqm   ), // two byte masks
@@ -574,7 +599,7 @@ sdram sdram (
 	.sd_cas     ( O_sdram_cas_n ), // columns address select
 
 	// cpu/chipset interface
-	.clk        ( clk_71m       ), // sdram is accessed at 71MHz
+	.clk        ( clk_85m       ), // sdram is accessed at 85MHz
 	.reset_n    ( pll_lock      ), // init signal after FPGA config to initialize RAM
 
 	.ready      ( sdram_ready   ), // ram is ready and has been initialized
@@ -585,14 +610,22 @@ sdram sdram (
 	.addr       ( sdram_addr    ), // 22 bit word address
 	.ds         ( sdram_be      ), // upper/lower data strobe
 	.cs         ( sdram_cs      ), // cpu/chipset requests read/wrie
-	.we         ( sdram_we      )  // cpu/chipset requests write
+	.we         ( sdram_we      ), // cpu/chipset requests write
+
+	.p2_din        ( fastram_din     ), // data input from chipset/cpu
+	.p2_dout       ( fastram_dout    ),
+	.p2_addr       ( fastram_addr    ), // 22 bit word address
+	.p2_ds         ( fastram_be      ), // upper/lower data strobe
+	.p2_cs         ( fastram_sel     ), // cpu/chipset requests read/wrie
+	.p2_we         ( fastram_wr      ),  // cpu/chipset requests write
+	.p2_ack        ( fastram_ready   )
 );
 
-// run the flash a 71MHz. This is only used at power-up to copy kickstart
+// run the flash a 85MHz. This is only used at power-up to copy kickstart
 // from flash to sdram
-assign mspi_clk = ~clk_71m;   
+assign mspi_clk = clk_85m_shifted;   
 flash flash (
-    .clk       ( clk_71m     ),
+    .clk       ( clk_85m     ),
     .resetn    ( pll_lock    ),
     .ready     ( flash_ready ),
 
@@ -617,6 +650,7 @@ video_analyzer video_analyzer (
     .vs          ( vs_n      ),
     .pal         ( vpal      ),
     .short_frame ( short_frame ),
+    .wide_screen ( osd_video_wide ),
     .interlace   ( interlace ),
     .vreset      ( vreset    )
 );
@@ -731,6 +765,7 @@ hdmi #(
 
   .pal_mode(vpal),
   .short_frame ( short_frame ),
+  .wide_screen ( osd_video_wide ),
   .interlace(interlace),
   .reset(vreset),    // signal to synchronize HDMI
 
@@ -750,3 +785,4 @@ endmodule
 // Local Variables:
 // tab-width: 4
 // End:
+`default_nettype wire

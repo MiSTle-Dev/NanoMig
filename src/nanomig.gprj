@@ -82,10 +82,8 @@
         <File path="nanomig.v" type="file.verilog" enable="1"/>
         <File path="tang/nano20k/amigaclks.v" type="file.verilog" enable="1"/>
         <File path="tang/nano20k/flash_dspi.v" type="file.verilog" enable="1"/>
-        <File path="tang/nano20k/gowin_clkdiv/gowin_clkdiv.v" type="file.verilog" enable="1"/>
         <File path="tang/nano20k/gowin_dpb/ide_dpram.v" type="file.verilog" enable="1"/>
         <File path="tang/nano20k/gowin_dpb/sector_dpram.v" type="file.verilog" enable="1"/>
-        <File path="tang/nano20k/gowin_rpll/pll_142m.v" type="file.verilog" enable="1"/>
         <File path="tang/nano20k/sdram.v" type="file.verilog" enable="1"/>
         <File path="tang/nano20k/top.sv" type="file.verilog" enable="1"/>
         <File path="tg68k/TG68K.vhd" type="file.vhdl" enable="1"/>

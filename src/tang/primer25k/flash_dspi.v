@@ -1,5 +1,5 @@
 //
-// flash_dspi.v - reading XT25F64, 64MBit spi flash
+// flash_dspi.v - reading W25Q64FV, 64MBit spi flash
 //
 // This module runs a SPI flash in DSPI/IO mode. In this mode the
 // flash uses 2 bit IO for address and data. A full random 16 bit
@@ -15,6 +15,8 @@
 // earlier. It's not quite clear if this is due to an effect in the
 // different FPGA or in the different flash chip which is a
 // XTX XT25F64 instead of the Winbond one on the TN20K
+//
+
 
 module flash
 (
@@ -33,6 +35,10 @@ module flash
  inout		   mspi_hold,
  inout		   mspi_wp,
  inout		   mspi_do, // data out from flash chip
+ 
+`ifdef VERILATOR		
+ input [1:0]	   mspi_din, 
+`endif
  
  output reg	   busy
 );
@@ -92,7 +98,11 @@ assign dspi_out =
 		  (state==6'd23)?M[1:0]:
 		  2'bzz;   
    
+`ifdef VERILATOR
+wire [1:0] dspi_in = mspi_din;  
+`else
 wire [1:0] dspi_in = { mspi_do, mspi_di };  
+`endif
    
 always @(posedge clk or negedge resetn) begin
    reg csD, csD2;
@@ -117,9 +127,7 @@ always @(posedge clk or negedge resetn) begin
             init <= init - 5'd1;
       end
 	 
-      // wait for rising edge of cs or end of init phase. The first read at the end of the
-      // init phase will use some random address and return anything. But the important part
-      // is that this leaves the flash in dspi mode
+      // wait for rising edge of cs or end of init phase
       if((csD && !csD2 && !busy)||(init == 5'd2)) begin
         mspi_cs <= 1'b0;	  // select flash chip	 
         busy <= 1'b1;
@@ -137,9 +145,9 @@ always @(posedge clk or negedge resetn) begin
         if(state == 6'd7)
             dspi_mode <= 1'b1;
 
-        // latch output and shift into 16 bit register
+	// latch output and shift into 16 bit register
 	if(state >= 6'd24 && state <= 6'd31)
-	  dout <= { dout[13:0], dspi_in};
+            dout <= { dout[13:0], dspi_in};
 
         // signal that the transfer is done
         if(state == 6'd31) begin

@@ -1,7 +1,7 @@
 //
 // sdram.v
 //
-// sdram controller implementation for the Tang Primer 25k / MiSTer SDRAM
+// sdram controller implementation for the MiSTer SDRAM
 // 
 // Copyright (c) 2024 Till Harbaum <till@harbaum.org> 
 // 
@@ -20,8 +20,6 @@
 //
 
 module sdram (
-	output		  sd_clk, // sd clock
-	output		  sd_cke, // clock enable
 	inout reg [15:0]  sd_data, // 16 bit bidirectional data bus
 	output reg [12:0] sd_addr, // up to 13 bit multiplexed address bus
 	output reg [1:0]  sd_dqm, // two byte masks
@@ -53,10 +51,8 @@ module sdram (
 	input		  p2_we,          // cpu/chipset requests write
 	output reg    p2_ack
 );
+`default_nettype none
 
-assign sd_clk = ~clk;
-assign sd_cke = 1'b1;  
-   
 localparam RASCAS_DELAY   = 3'd1;   // tRCD=15ns -> 1 cycle@32MHz
 localparam BURST_LENGTH   = 3'b000; // 000=1, 001=2, 010=4, 011=8
 localparam ACCESS_TYPE    = 1'b0;   // 0=sequential, 1=interleaved
@@ -260,3 +256,4 @@ always @(posedge clk) begin
 end
    
 endmodule
+`default_nettype wire

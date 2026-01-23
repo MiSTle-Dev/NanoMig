@@ -18,13 +18,6 @@ module top(
   output [5:0]	leds_n,
   output		ws2812,
 
-  // interface to Tang onboard BL616 UART
-  input			uart_rx,
-//  output		uart_tx,
-  // onboard Bl616 monitor console port interface
-  output		bl616_mon_tx,
-  input			bl616_mon_rx,
-
   // spi flash interface
   output		mspi_cs,
   output		mspi_clk,
@@ -46,10 +39,10 @@ module top(
   output [3:0]	O_sdram_dqm, // 32/4
 
   // generic IO, used for mouse & joystick
-  input [5:0]	io,
+  input [5:0]	js0,
 
   // spare IO, used for 2nd joystick
-  input [5:0]   spare,
+  input [5:0]   js1,
 
   // interface to external BL616/M0S
   inout [4:0]	m0s,
@@ -79,15 +72,9 @@ module top(
 );
 `default_nettype none
   
-// connect onboard BL616 console to hw pins for an USB-UART adapter
-// assign uart_tx = bl616_mon_rx;
-assign bl616_mon_tx = uart_rx;
-
-// physcial dsub9 joystick & mouse port 1 
-wire [5:0] db9_joy = { !io[5], !io[0], !io[2], !io[1], !io[4], !io[3] };   
-
-// physcial dsub9 joystick port 2  
-wire [5:0] db9_joy2 = { !spare[5], !spare[0], !spare[2], !spare[1], !spare[4], !spare[3] }; 
+// physcial dsub9 joystick & mouse port 1 and 2
+wire [5:0] db9_joy0 = { !js0[5], !js0[0], !js0[2], !js0[1], !js0[4], !js0[3] };   
+wire [5:0] db9_joy1 = { !js1[5], !js1[0], !js1[2], !js1[1], !js1[4], !js1[3] }; 
    
 wire [5:0]	leds;
 assign leds[5] = |sd_wr;
@@ -125,7 +112,6 @@ amigaclks amigaclks (
 );
 
 assign O_sdram_clk = clk_85m_shifted;   
-assign mspi_clk = clk_85m_shifted;   
 
 wire	clk7_en;   
 wire	clk7n_en;   
@@ -323,7 +309,7 @@ hid hid (
 
         // input local db9 port events to be sent to MCU. Changes also trigger
         // an interrupt, so the MCU doesn't have to poll for joystick events
-        .db9_port( db9_joy ),
+        .db9_port( db9_joy0 ),
         .irq( hid_int ),
         .iack( hid_iack ),
 
@@ -416,24 +402,24 @@ wire [14:0] audio_right;
 wire [7:0] physical_port_1 = { 
                hid_joy0[7], 
                hid_joy0[6], 
-              (hid_joy0[5] | db9_joy[5]), 
-              (hid_joy0[4] | db9_joy[4]),
-              (hid_joy0[3] | db9_joy[3]), 
-              (hid_joy0[2] | db9_joy[2]),
-              (hid_joy0[1] | db9_joy[1]),
-              (hid_joy0[0] | db9_joy[0]) };   
+              (hid_joy0[5] | db9_joy0[5]), 
+              (hid_joy0[4] | db9_joy0[4]),
+              (hid_joy0[3] | db9_joy0[3]), 
+              (hid_joy0[2] | db9_joy0[2]),
+              (hid_joy0[1] | db9_joy0[1]),
+              (hid_joy0[0] | db9_joy0[0]) };   
 
             // map second HID/USB joystick into second amiga joystick port
             // wire in db9 joystick
 wire [7:0] physical_port_2 = { 
                hid_joy1[7], 
                hid_joy1[6], 
-			  (hid_joy1[5] | db9_joy2[5]),
-              (hid_joy1[4] | db9_joy2[4]),
-              (hid_joy1[3] | db9_joy2[3]), 
-              (hid_joy1[2] | db9_joy2[2]),
-              (hid_joy1[1] | db9_joy2[1]),
-              (hid_joy1[0] | db9_joy2[0]) }; 
+			  (hid_joy1[5] | db9_joy1[5]),
+              (hid_joy1[4] | db9_joy1[4]),
+              (hid_joy1[3] | db9_joy1[3]), 
+              (hid_joy1[2] | db9_joy1[2]),
+              (hid_joy1[1] | db9_joy1[1]),
+              (hid_joy1[0] | db9_joy1[0]) }; 
               
 wire [7:0] joystick0;
 wire [7:0] joystick1;
@@ -464,10 +450,9 @@ wire fastram_lds;
 wire fastram_uds;
 wire [15:0] fastram_dout;
 wire [15:0] fastram_din;
-wire [1:0] fastram_be;
+wire [1:0] fastram_be = {fastram_uds,fastram_lds};  
 wire fastram_wr;
 wire fastram_ready;
-assign fastram_be = {fastram_uds,fastram_lds};
    
 wire [15:0] sdram_dout;
 
@@ -677,7 +662,7 @@ sdram sdram (
 	.sd_cas     ( O_sdram_cas_n ), // columns address select
 
 	// cpu/chipset interface
-	.clk        ( clk_85m       ), // sdram is accessed at 71MHz
+	.clk        ( clk_85m       ), // sdram is accessed at 85MHz
 	.reset_n    ( pll_lock      ), // init signal after FPGA config to initialize RAM
 
 	.ready      ( sdram_ready   ), // ram is ready and has been initialized
@@ -700,8 +685,9 @@ sdram sdram (
 	.p2_ack        ( fastram_ready   )
 );
 
-// run the flash a 71MHz. This is only used at power-up to copy kickstart
+// run the flash a 85MHz. This is only used at power-up to copy kickstart
 // from flash to sdram
+assign mspi_clk = clk_85m_shifted;   
 flash flash (
     .clk       ( clk_85m     ),
     .resetn    ( pll_lock    ),

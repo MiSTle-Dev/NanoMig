@@ -65,46 +65,38 @@ module top(
 
 wire [5:0]	leds;
    
-assign leds[5] = 1'b0;
+assign leds[5] = |sd_wr;
 assign leds[4] = |sd_rd;
 assign leds_n = ~leds;  
 
 // ============================== clock generation ===========================
    
-// HDMI clock:  141.8758 MHz
-// Pixel clock: 28.37516 MHz (HDMI/5)
-// SDRAM clock: 70.9379 MHz (HDMI/2)
-// Amiga clock: 7.09379 (Pixel/4)
-   
 `define PIXEL_CLOCK 28375160
 
 wire clk_pixel_x5;   
 wire pll_lock;   
-pll_142m pll_hdmi (
-    .clkout(clk_pixel_x5),
-    .lock(pll_lock),
-    .clkin(clk)
-);
-
-reg clk_71m;
-always @(posedge clk_pixel_x5)
-  if(!pll_lock) clk_71m <= 1'b0;
-  else          clk_71m <= !clk_71m;
-
+wire clk_7;
+wire clk_28m;
+wire clk_85m;
+wire clk_85m_shifted;
 wire clk_pixel;
-Gowin_CLKDIV clk_div_5 (
-    .hclkin(clk_pixel_x5), // input hclkin
-    .resetn(pll_lock),     // input resetn
-    .clkout(clk_pixel)     // output clkout
+
+amigaclks amigaclks (
+	.clk_in(clk),
+	.clk_7m(clk_7), // Unused
+	.clk_28m(clk_28m),
+	.clk_85m(clk_85m),
+	.clk_sdram(clk_85m_shifted),
+	.locked(pll_lock),
+	.vidmode(1'b1),
+	.clk_tmds(clk_pixel_x5),
+	.clk_pixel(clk_pixel),
+	.video_locked()
 );
 
 wire	clk_28m = clk_pixel;
 
-// generate 7 Mhz from 28Mhz
-//reg [1:0] clk_cnt;
-//always @(posedge clk_28m)
-//  clk_cnt <= clk_cnt + 2'd1; 
-//wire	  clk_7m = clk_cnt[1];
+assign O_sdram_clk = clk_85m_shifted;   
 
 wire	clk7_en;   
 wire	clk7n_en;   
@@ -113,14 +105,18 @@ wire	clk7n_en;
 wire 	   osd_reset;   
 wire [1:0] osd_chipmem;         // 0=512k, 1=1M, 2=1.5M, 3=2M
 wire [1:0] osd_slowmem;         // 0=None, 1=512k, 2=1M, 3=1.5M
+wire [1:0] osd_fastmem;         // 0=None, 1=2M, 2=4M
 wire [1:0] osd_floppy_drives;
 wire       osd_floppy_turbo;
+wire       osd_floppy_wrprot;
 wire       osd_ide_enable;
 wire [1:0] osd_chipset;         // 0=OCS-A500, 1=OCS-A1000, 2=ECS
 wire       osd_video_mode;      // PAL (0=PAL, 1=NTSC)
+wire       osd_video_wide;      // 0=normal, 1=wide screen (jailbars)
 wire [1:0] osd_video_filter;
 wire [1:0] osd_video_scanlines;
-   
+wire       osd_joy_swap;        // 0=off, 1=on
+
 // generate a reset for some time after rom has been initialized
 reg [15:0] reset_cnt;
 always @(negedge clk_28m) begin
@@ -291,13 +287,16 @@ sysctrl sysctrl (
 		.system_reset(osd_reset),
 		.system_floppy_drives(osd_floppy_drives),
 		.system_floppy_turbo(osd_floppy_turbo),
+		.system_floppy_wrprot(osd_floppy_wrprot),
 		.system_ide_enable(osd_ide_enable),
 	    .system_chipset(osd_chipset),
 		.system_video_mode(osd_video_mode),
 		.system_video_filter(osd_video_filter),
 		.system_video_scanlines(osd_video_scanlines),
 		.system_chipmem(osd_chipmem),
+		.system_fastmem(osd_fastmem),
 		.system_slowmem(osd_slowmem),
+        .system_joy_swap(osd_joy_swap),
 				 
         .int_out_n(m0s[4]),
         .int_in( { 4'b0000, sdc_int, 1'b0, hid_int, 1'b0 }),
@@ -375,7 +374,17 @@ wire 	    ram_we_n;
 wire [1:0]  ram_be;
 wire 	    ram_oe_n;
 wire		ram_refresh;   
-   
+
+wire fastram_sel;
+wire [22:1] fastram_addr;
+wire fastram_lds;
+wire fastram_uds;
+wire [15:0] fastram_dout;
+wire [15:0] fastram_din;
+wire [1:0] fastram_be = {fastram_uds,fastram_lds};
+wire fastram_wr;
+wire fastram_ready;
+
 wire [15:0] sdram_dout;
 
 assign ram_din = sdram_dout;
@@ -383,7 +392,8 @@ assign ram_din = sdram_dout;
 // pack config values into minimig config
 wire [5:0] chipset_config = { 1'b0,osd_chipset,osd_video_mode,1'b0 };
 wire [7:0] memory_config = { 4'b0_000, osd_slowmem, osd_chipmem };   
-wire [3:0] floppy_config = { osd_floppy_drives, 1'b0, osd_floppy_turbo };
+wire [2:0] fastram_config = { 1'b0, osd_fastmem };   
+wire [3:0] floppy_config = { osd_floppy_drives, osd_floppy_wrprot, osd_floppy_turbo };
 wire [3:0] video_config = { osd_video_filter, osd_video_scanlines };   
 wire [5:0] ide_config = { 5'b00000, osd_ide_enable };   
    
@@ -400,6 +410,7 @@ nanomig nanomig
  .hdd_led(leds[2]),
  
  .memory_config(memory_config),
+ .fastram_config(fastram_config),
  .chipset_config(chipset_config),
  .floppy_config(floppy_config),
  .video_config(video_config),
@@ -448,8 +459,16 @@ nanomig nanomig
  ._ram_we(ram_we_n),        // sram write enable
  ._ram_oe(ram_oe_n),        // sram output enable
  .chip48(48'd0),
- .refresh(ram_refresh)
-);
+ .refresh(ram_refresh),
+ 
+ .fastram_sel(fastram_sel),
+ .fastram_addr(fastram_addr),
+ .fastram_lds(fastram_lds),
+ .fastram_uds(fastram_uds),
+ .fastram_dout(fastram_dout),
+ .fastram_din(fastram_din),
+ .fastram_wr(fastram_wr),
+ .fastram_ready(fastram_ready));
 
 wire           flash_ready;  
 wire           mem_ready = sdram_ready && flash_ready && pll_lock;  
@@ -478,7 +497,7 @@ wire [15:0] flash_dout;
 reg [15:0]  flash_doutD;
 reg		    flash_cs;  
 reg [31:0]  word_count;
-reg [2:0]   state;
+reg [4:0]   state;
 wire        flash_data_strobe;
 wire        flash_busy;   
 
@@ -497,14 +516,14 @@ always @(posedge clk_28m or negedge mem_ready) begin
        flash_ram_addr <= { 4'hf, 18'h0 }; // write into 512k sdram segment used for kick rom
        word_count <= 22'h40001;           // 512k bytes ROM data = 256k words
 
-       state <= 3'h0;
+       state <= 5'h0;
        flash_ram_write <= 1'b0;
        flash_cs <= 1'b0;        
        flash_cnt <= 6'd0;
     end else begin
-        if((start_rom_copy || state == 7) && (word_count != 0)) begin
+        if((start_rom_copy || state == 23) && (word_count != 0)) begin
             flash_cs <= 1'b1;
-            flash_cnt <= 6'd15; // >= 30 @ 32MHz
+            flash_cnt <= 6'd45; // >= 45 @ 85MHz
         end else begin
             if(flash_cnt != 0) flash_cnt <= flash_cnt - 6'd1;
             if(flash_busy)     flash_cs <= 1'b0;
@@ -529,9 +548,9 @@ always @(posedge clk_28m or negedge mem_ready) begin
 
         // advance ram write state
         if(state != 0)  state <= state + 3'd1;
-        if(state == 1)  flash_ram_write <= 1'b1;
-        if(state == 6)  flash_ram_write <= 1'b0;
-        if(state == 7)  flash_ram_addr <= flash_ram_addr + 22'd1;
+        if(state == 3)  flash_ram_write <= 1'b1;
+        if(state == 18) flash_ram_write <= 1'b0;
+        if(state == 21) flash_ram_addr <= flash_ram_addr + 22'd1;
     end
 end
 
@@ -561,7 +580,6 @@ wire [1:0]  sdram_be      = rom_done?ram_be:2'b00;
 wire		sdram_we      = rom_done?sdram_rw:flash_ram_write; 
    
 sdram sdram (
-  	.sd_clk     ( O_sdram_clk   ), // sd clock
 	.sd_cke     ( O_sdram_cke   ), // clock enable
 	.sd_data    ( IO_sdram_dq   ), // 32 bit bidirectional data bus
 	.sd_addr    ( O_sdram_addr  ), // 11 bit multiplexed address bus
@@ -573,7 +591,7 @@ sdram sdram (
 	.sd_cas     ( O_sdram_cas_n ), // columns address select
 
 	// cpu/chipset interface
-	.clk        ( clk_71m       ), // sdram is accessed at 71MHz
+	.clk        ( clk_85m       ), // sdram is accessed at 85MHz
 	.reset_n    ( pll_lock      ), // init signal after FPGA config to initialize RAM
 
 	.ready      ( sdram_ready   ), // ram is ready and has been initialized
@@ -584,14 +602,22 @@ sdram sdram (
 	.addr       ( sdram_addr    ), // 22 bit word address
 	.ds         ( sdram_be      ), // upper/lower data strobe
 	.cs         ( sdram_cs      ), // cpu/chipset requests read/wrie
-	.we         ( sdram_we      )  // cpu/chipset requests write
+	.we         ( sdram_we      ), // cpu/chipset requests write
+			 
+	.p2_din        ( fastram_din     ), // data input from chipset/cpu
+	.p2_dout       ( fastram_dout    ),
+	.p2_addr       ( fastram_addr    ), // 22 bit word address
+	.p2_ds         ( fastram_be      ), // upper/lower data strobe
+	.p2_cs         ( fastram_sel     ), // cpu/chipset requests read/wrie
+	.p2_we         ( fastram_wr      ),  // cpu/chipset requests write
+	.p2_ack        ( fastram_ready   )
 );
 
-// run the flash a 71MHz. This is only used at power-up to copy kickstart
+// run the flash a 85MHz. This is only used at power-up to copy kickstart
 // from flash to sdram
-assign mspi_clk = ~clk_71m;   
+assign mspi_clk = clk_85m_shifted;   
 flash flash (
-    .clk       ( clk_71m     ),
+    .clk       ( clk_85m     ),
     .resetn    ( pll_lock    ),
     .ready     ( flash_ready ),
 
@@ -615,6 +641,8 @@ video_analyzer video_analyzer (
     .hs        ( hs_n      ),
     .vs        ( vs_n      ),
     .pal       ( vpal      ),
+    .short_frame ( short_frame ),
+    .wide_screen ( 1'b0 ),
     .interlace ( interlace ),
     .vreset    ( vreset    )
 );

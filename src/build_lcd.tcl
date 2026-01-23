@@ -65,15 +65,14 @@ add_file misc/sd_card.v
 add_file misc/sd_rw.v
 add_file misc/sdcmd_ctrl.v
 add_file misc/amiga_keymap.v
+add_file tang/nano20k/amigaclks.v
 add_file tang/nano20k/flash_dspi.v
-add_file tang/nano20k/gowin_clkdiv/gowin_clkdiv.v
-add_file tang/nano20k/gowin_rpll/pll_142m.v
 add_file tang/nano20k/gowin_dpb/sector_dpram.v
 add_file tang/nano20k/gowin_dpb/ide_dpram.v
 add_file tang/nano20k/top_lcd.sv
 add_file tang/nano20k/sdram.v
 add_file tang/nano20k/nanomig_lcd.cst
-add_file tang/nano20k/nanomig.sdc
+add_file tang/nano20k/nanomig_lcd.sdc
 add_file fx68k/microrom.mem
 add_file fx68k/nanorom.mem
 add_file tg68k/TG68K_Pack.vhd

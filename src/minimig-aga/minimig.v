@@ -279,6 +279,7 @@ module minimig
 	input	      ide_read,
 	output [15:0] ide_readdata
 );
+`default_nettype none
    
 //--------------------------------------------------------------------------------------
 
@@ -945,3 +946,4 @@ assign rst_out = reset;
 
 endmodule
 
+`default_nettype wire

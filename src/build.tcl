@@ -77,8 +77,6 @@ add_file misc/sdcmd_ctrl.v
 add_file misc/amiga_keymap.v
 add_file tang/nano20k/amigaclks.v
 add_file tang/nano20k/flash_dspi.v
-add_file tang/nano20k/gowin_clkdiv/gowin_clkdiv.v
-add_file tang/nano20k/gowin_rpll/pll_142m.v
 add_file tang/nano20k/gowin_dpb/sector_dpram.v
 add_file tang/nano20k/gowin_dpb/ide_dpram.v
 add_file tang/nano20k/top.sv
