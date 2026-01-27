@@ -80,21 +80,21 @@
         <File path="misc/video_analyzer.v" type="file.verilog" enable="1"/>
         <File path="misc/ws2812.v" type="file.verilog" enable="1"/>
         <File path="nanomig.v" type="file.verilog" enable="1"/>
-        <File path="tang/mega138k/flash_dspi.v" type="file.verilog" enable="1"/>
-        <File path="tang/mega138k/gowin_clkdiv/gowin_clkdiv.v" type="file.verilog" enable="1"/>
-        <File path="tang/mega138k/gowin_dpb/ide_dpram.v" type="file.verilog" enable="1"/>
-        <File path="tang/mega138k/gowin_dpb/sector_dpram.v" type="file.verilog" enable="1"/>
-        <File path="tang/mega138k/gowin_pll/pll_142m.v" type="file.verilog" enable="1"/>
-        <File path="tang/mega138k/gowin_pll/pll_142m_mod.v" type="file.verilog" enable="1"/>
-        <File path="tang/mega138k/gowin_pll/pll_init.v" type="file.verilog" enable="1"/>
-        <File path="tang/mega138k/top.sv" type="file.verilog" enable="1"/>
+        <File path="tang/mega138kpro/flash_dspi.v" type="file.verilog" enable="1"/>
+        <File path="tang/mega138kpro/gowin_clkdiv/gowin_clkdiv.v" type="file.verilog" enable="1"/>
+        <File path="tang/mega138kpro/gowin_dpb/ide_dpram.v" type="file.verilog" enable="1"/>
+        <File path="tang/mega138kpro/gowin_dpb/sector_dpram.v" type="file.verilog" enable="1"/>
+        <File path="tang/mega138kpro/gowin_pll/pll_142m.v" type="file.verilog" enable="1"/>
+        <File path="tang/mega138kpro/gowin_pll/pll_142m_mod.v" type="file.verilog" enable="1"/>
+        <File path="tang/mega138kpro/gowin_pll/pll_init.v" type="file.verilog" enable="1"/>
+        <File path="tang/mega138kpro/top.sv" type="file.verilog" enable="1"/>
         <File path="tang/primer25k/sdram.v" type="file.verilog" enable="1"/>
         <File path="tg68k/TG68K.vhd" type="file.vhdl" enable="1"/>
         <File path="tg68k/TG68K_ALU.vhd" type="file.vhdl" enable="1"/>
         <File path="tg68k/TG68K_Pack.vhd" type="file.vhdl" enable="1"/>
         <File path="tg68k/TG68KdotC_Kernel.vhd" type="file.vhdl" enable="1"/>
-        <File path="tang/mega138k/nanomig.cst" type="file.cst" enable="1"/>
-        <File path="tang/mega138k/nanomig.sdc" type="file.sdc" enable="1"/>
+        <File path="tang/mega138kpro/nanomig.cst" type="file.cst" enable="1"/>
+        <File path="tang/mega138kpro/nanomig.sdc" type="file.sdc" enable="1"/>
         <File path="fx68k/microrom.mem" type="file.other" enable="1"/>
         <File path="fx68k/nanorom.mem" type="file.other" enable="1"/>
     </FileList>

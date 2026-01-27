@@ -3,10 +3,10 @@
 */ 
 
 /* we need two copies in case of 256k kickroms
-     openFPGALoader --external-flash -o 0xc00000 kick13.rom
-     openFPGALoader --external-flash -o 0xc40000 kick13.rom
+     openFPGALoader --external-flash -o 0x600000 kick13.rom
+     openFPGALoader --external-flash -o 0x640000 kick13.rom
    or a single copy of e.g. a 512k diag rom
-     openFPGALoader --external-flash -o 0xc00000 DiagROM
+     openFPGALoader --external-flash -o 0x600000 DiagROM
 */
  
 module top(
@@ -37,20 +37,20 @@ module top(
   output [1:0]	O_sdram_ba, // two banks
   output [1:0]	O_sdram_dqm, // 16/2
 
-  // interface to external BL616/M0S on middle PMOD
-  inout [7:0]	m0s,
+  // the three PMOD ports
+  inout [7:0]	pmod0,
 
-  // two dual shock controllers on left PMOD, only P1 is used
-  // by MiSTeryNano for joystick, currently unused on NanoMig
-  output		ds1_csn,
-  output		ds1_sclk,
-  output		ds1_mosi,
-  input			ds1_miso,
-  output		ds2_csn,
-  output		ds2_sclk,
-  output		ds2_mosi,
-  input			ds2_miso, 
-
+  // give explicit directions for pmod1 as it's being used for the
+  // FPGA Companion and this allows for clock buffering. Clock glitches
+  // were observed when using inouts for the companion
+  input			pmod_companion_din,
+  output		pmod_companion_dout,
+  input			pmod_companion_clk,
+  input			pmod_companion_ss,
+  output		pmod_companion_intn,
+		   
+  inout [7:0]	pmod2,
+		   
   // SD card slot
   output		sd_clk,
   inout			sd_cmd, // MOSI
@@ -84,8 +84,29 @@ assign leds[3] = !rom_done;
 assign leds_n = ~leds;  
 
 // ============================== clock generation ===========================
-   
-`define PIXEL_CLOCK 28375160
+
+// current pll settings according to src/gowin_pll_parser.py
+
+/*
+  Input clock: 50 Mhz
+  pf: 850.0 Mhz
+  Output0:
+    Freq: 141.66666666666666 Mhz
+    Phase: 0.0°
+  Output1:
+    Freq: 85.0 Mhz
+    Phase: 0.0°
+  Output2:
+    Freq: 85.0 Mhz
+    Phase: 216.0°
+*/
+
+// 180° barely boots, crashes early
+// 216° boots
+// 252° boots, DiagROM reports some rom checksum errors
+
+// Pixel clock if derived from 141 2/3 MHz
+`define PIXEL_CLOCK 28333333
 
 wire clk_pixel_x5;   
 wire clk_85m;   
@@ -94,7 +115,7 @@ wire pll_lock;
 pll_142m pll_hdmi (
     .clkout0(clk_pixel_x5),
     .clkout1(clk_85m),
-    .clkout2(clk_85m_shifted),   // 270deg phase shifted
+    .clkout2(clk_85m_shifted),   // phase shifted
     .init_clk(clk),
     .lock(pll_lock),
     .clkin(clk)
@@ -109,6 +130,70 @@ Gowin_CLKDIV clk_div_5 (
     .clkout(clk_pixel)     // output clkout
 );
 
+// map the pmods
+wire [7:0] pmod_uart;
+wire [7:0] pmod_hexdebug;
+
+assign pmod0 = pmod_hexdebug;
+assign pmod2 = pmod_uart;
+  
+   
+/* ===================== debugging on PMODs ================= */
+
+// --------------- CP2102 UART ----------------
+// map uart for e.g. Diagrom
+wire	  uart_tx;   
+assign pmod_uart = { 2'bzz, uart_tx, 5'bzzzzz };   
+wire	  uart_rx = pmod_uart[7]; 
+   
+// --------------- HEX display ----------------
+
+// The hex display shows a 16 bit ROM XOR sum.
+// This should e.g. be 
+   
+/*
+  Sipeed POMD-DTx2(sic) pin to segment mapping
+ 
+  +-5-+
+  0   4
+  +-1-+   sel: 7
+  2   6   7=1 -> left
+  +-3-+   7=0 -> right
+*/
+
+reg [1:0] mux = 0;   
+reg [15:0] xor16;   
+wire [7:0] seven_seg_value = (mux == 0)?xor16[15:8]:xor16[7:0];
+   
+reg	  sel;      
+wire [3:0] nibble = sel?seven_seg_value[7:4]:seven_seg_value[3:0];   
+
+wire [6:0] digit =
+		   (mux == 2)?7'b0000010: // "-"
+		   (nibble == 4'h0)?7'b1111101: (nibble == 4'h1)?7'b1010000:
+		   (nibble == 4'h2)?7'b0111110: (nibble == 4'h3)?7'b1111010:
+		   (nibble == 4'h4)?7'b1010011: (nibble == 4'h5)?7'b1101011:
+		   (nibble == 4'h6)?7'b1101111: (nibble == 4'h7)?7'b1110000:
+		   (nibble == 4'h8)?7'b1111111: (nibble == 4'h9)?7'b1111011:
+		   (nibble == 4'ha)?7'b1110111: (nibble == 4'hb)?7'b1001111:
+		   (nibble == 4'hc)?7'b0101101: (nibble == 4'hd)?7'b1011110:
+		   (nibble == 4'he)?7'b0101111: 7'b0100111;
+    
+assign pmod_hexdebug = ~{sel, digit};
+
+always @(posedge clk) begin
+   reg [24:0] cnt;
+
+   sel <= cnt[16];
+   if(!cnt) begin
+	  // count 0,1,2,0,1 ...
+      if(mux < 2) mux <= mux + 1;
+      else        mux <= 0;              
+   end
+
+   cnt <= cnt + 1;
+end
+     
 wire	clk_28m = clk_pixel;
 wire	clk7_en;   
 wire	clk7n_en;   
@@ -142,7 +227,7 @@ end
 wire cpu_reset = |reset_cnt;
 wire sdram_ready;
 
-// -------------------------- M0S MCU interface -----------------------
+// -------------------------- FPGA Companion interface -----------------------
 
 // connect to ws2812 led
 wire [23:0] ws2812_color;
@@ -153,7 +238,7 @@ ws2812 ws2812_inst (
     .data(ws2812)
 );
 
-// interface to M0S MCU
+// interface to FPGA Companion
 wire       mcu_sys_strobe;        // mcu message byte valid for sysctrl
 wire       mcu_hid_strobe;        // -"- hid
 wire       mcu_osd_strobe;        // -"- osd
@@ -172,10 +257,10 @@ mcu_spi mcu (
 	 .reset(!pll_lock),
 
 	 // SPI interface to FPGA Companion
-     .spi_io_ss(m0s[2]),
-     .spi_io_clk(m0s[3]),
-     .spi_io_din(m0s[1]),
-     .spi_io_dout(m0s[0]),
+     .spi_io_ss(pmod_companion_ss),
+     .spi_io_clk(pmod_companion_clk),
+     .spi_io_din(pmod_companion_din),
+     .spi_io_dout(pmod_companion_dout),
 
 	 // byte wide data in/out to the submodules
      .mcu_sys_strobe(mcu_sys_strobe),
@@ -313,7 +398,7 @@ sysctrl sysctrl (
 		.system_fastmem(osd_fastmem),
         .system_joy_swap(osd_joy_swap),
 				 
-        .int_out_n(m0s[4]),
+        .int_out_n(pmod_companion_intn),
         .int_in( { 4'b0000, sdc_int, 1'b0, hid_int, 1'b0 }),
         .int_ack( int_ack ),
 
@@ -435,8 +520,8 @@ nanomig nanomig
  .audio_right(audio_right),
 
  // uart interface 
- .uart_rx(),
- .uart_tx(),
+ .uart_rx(uart_rx),
+ .uart_tx(uart_tx),
  
  // keyboard & mouse				 
  .mouse_buttons(mouse_buttons), // mouse buttons
@@ -507,7 +592,7 @@ wire [15:0] flash_dout;
 reg [15:0]  flash_doutD;
 reg		    flash_cs;  
 reg [31:0]  word_count;
-reg [2:0]   state;
+reg [4:0]   state;
 wire        flash_data_strobe;
 wire        flash_busy;   
 
@@ -518,21 +603,22 @@ reg [21:0]  flash_ram_addr;
 reg         flash_ram_write;
 reg [5:0]   flash_cnt;  
 
-always @(posedge clk_28m or negedge mem_ready) begin
+always @(posedge clk_85m or negedge mem_ready) begin
     if(!mem_ready) begin
        flash_addr <= 22'h300000;          // 6MB flash offset (word address),
 	                                      // flash driver this results in the flash address being 600000
        flash_ram_addr <= { 4'hf, 18'h0 }; // write into 512k sdram segment used for kick rom
        word_count <= 22'h40001;           // 512k bytes ROM data = 256k words
 
-       state <= 3'h0;
+       state <= 5'h0;
        flash_ram_write <= 1'b0;
        flash_cs <= 1'b0;        
        flash_cnt <= 6'd0;
+	   xor16 <= 16'h0000;	   
     end else begin
-        if((start_rom_copy || state == 7) && (word_count != 0)) begin
+        if((start_rom_copy || state == 23) && (word_count != 0)) begin
             flash_cs <= 1'b1;
-            flash_cnt <= 6'd15; // >= 30 @ 32MHz
+            flash_cnt <= 6'd45; // >= 45 @ 85MHz
         end else begin
             if(flash_cnt != 0) flash_cnt <= flash_cnt - 6'd1;
             if(flash_busy)     flash_cs <= 1'b0;
@@ -552,14 +638,16 @@ always @(posedge clk_28m or negedge mem_ready) begin
                  // allows to exactly determine the real access time by adjusting flash_cnt
                  // to the lowest value that gives a stable image
                  flash_doutD <= flash_dout;
+
+			   if(word_count > 22'h1) xor16 <= xor16 ^ flash_dout;
             end
         end
 
         // advance ram write state
-        if(state != 0)  state <= state + 3'd1;
-        if(state == 1)  flash_ram_write <= 1'b1;
-        if(state == 6)  flash_ram_write <= 1'b0;
-        if(state == 7)  flash_ram_addr <= flash_ram_addr + 22'd1;
+        if(state != 0)  state <= state + 5'd1;
+        if(state == 3)  flash_ram_write <= 1'b1;
+        if(state == 18) flash_ram_write <= 1'b0;
+        if(state == 21) flash_ram_addr <= flash_ram_addr + 22'd1;
     end
 end
 
@@ -621,9 +709,9 @@ sdram sdram (
 	.p2_ack        ( fastram_ready   )
 );
 
-// run the flash a 85MHz. This is only used at power-up to copy kickstart
+// run the flash at 85MHz. This is only used at power-up to copy kickstart
 // from flash to sdram
-assign mspi_clk = clk_85m_shifted;   
+assign mspi_clk = clk_85m;   
 flash flash (
     .clk       ( clk_85m     ),
     .resetn    ( pll_lock    ),

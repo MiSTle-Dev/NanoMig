@@ -6,7 +6,7 @@
 //Part Number: GW5AST-LV138FPG676AC1/I0
 //Device: GW5AST-138
 //Device Version: B
-//Created Time: Fri Jan 23 13:11:03 2026
+//Created Time: Sat Jan 24 15:25:56 2026
 
 module pll_142m_MOD (lock, clkout0, clkout1, clkout2, clkin, reset, icpsel, lpfres, lpfcap);
 
@@ -92,9 +92,9 @@ defparam PLL_inst.ODIV3_SEL = 8;
 defparam PLL_inst.ODIV4_SEL = 8;
 defparam PLL_inst.ODIV5_SEL = 8;
 defparam PLL_inst.ODIV6_SEL = 8;
-defparam PLL_inst.MDIV_SEL = 35;
-defparam PLL_inst.MDIV_FRAC_SEL = 4;
-defparam PLL_inst.ODIV0_FRAC_SEL = 2;
+defparam PLL_inst.MDIV_SEL = 34;
+defparam PLL_inst.MDIV_FRAC_SEL = 0;
+defparam PLL_inst.ODIV0_FRAC_SEL = 0;
 defparam PLL_inst.CLKOUT0_EN = "TRUE";
 defparam PLL_inst.CLKOUT1_EN = "TRUE";
 defparam PLL_inst.CLKOUT2_EN = "TRUE";
@@ -130,8 +130,8 @@ defparam PLL_inst.CLKOUT0_PE_COARSE = 0;
 defparam PLL_inst.CLKOUT0_PE_FINE = 0;
 defparam PLL_inst.CLKOUT1_PE_COARSE = 0;
 defparam PLL_inst.CLKOUT1_PE_FINE = 0;
-defparam PLL_inst.CLKOUT2_PE_COARSE = 7;
-defparam PLL_inst.CLKOUT2_PE_FINE = 4;
+defparam PLL_inst.CLKOUT2_PE_COARSE = 6;
+defparam PLL_inst.CLKOUT2_PE_FINE = 0;
 defparam PLL_inst.CLKOUT3_PE_COARSE = 0;
 defparam PLL_inst.CLKOUT3_PE_FINE = 0;
 defparam PLL_inst.CLKOUT4_PE_COARSE = 0;
