@@ -1,5 +1,5 @@
 //
-// flash_dspi.v - reading W25Q128FV, 128MBit spi flash
+// flash_dspi.v - reading W25Q64FV and similar, 64/128MBit spi flash
 //
 // This module runs a SPI flash in DSPI/IO mode. In this mode the
 // flash uses 2 bit IO for address and data. A full random 16 bit
@@ -10,7 +10,6 @@
 // At 80MHz this results in a random access time of 300 ns. At
 // 100 Mhz, it would be 240ns and at the max allowed 104MHz it
 // would be 230ns
-//
 
 module flash
 (
@@ -19,7 +18,7 @@ module flash
  output		   ready, 
 
  // chipset read interface
- input [21:0]	   address, // 16 bit word address
+ input [22:0]	   address, // 16 bit word address
  input		   cs, 
  output reg [15:0] dout,
  
@@ -37,8 +36,9 @@ module flash
  output reg	   busy
 );
 
+parameter	   READ_DELAY = 0;   
+	   
 reg		   dspi_mode;
-
 wire [1:0]	   dspi_out;
    
 // drive hold and wp to their static default
@@ -73,8 +73,7 @@ assign ready = (init == 5'd0);
 // send 16 1's during init on IO0 to make sure M4 = 1 and dspi is left
 wire spi_di = (init>1)?1'b1:CMD_RD_DIO[3'd7-state[2:0]];  // the command is sent in spi mode
    
-assign dspi_out = 
-		  (state== 6'd8)?{1'b0,address[21]}:
+assign dspi_out = (state== 6'd8)?address[22:21]:
 		  (state== 6'd9)?address[20:19]:
 		  (state==6'd10)?address[18:17]:
 		  (state==6'd11)?address[16:15]:
@@ -139,12 +138,12 @@ always @(posedge clk or negedge resetn) begin
         if(state == 6'd7)
             dspi_mode <= 1'b1;
 
-	// latch output and shift into 16 bit register
-	if(state >= 6'd25 && state <= 6'd32)
-            dout <= { dout[13:0], dspi_in};
+        // latch output and shift into 16 bit register
+	if(state >= 6'd24+READ_DELAY && state <= 6'd31+READ_DELAY)
+	  dout <= { dout[13:0], dspi_in};
 
         // signal that the transfer is done
-        if(state == 6'd32) begin
+        if(state == 6'd31+READ_DELAY) begin
             state <= 6'd0;	    
             busy <= 1'b0;
             mspi_cs <= 1'b1;	// deselect flash chip	 

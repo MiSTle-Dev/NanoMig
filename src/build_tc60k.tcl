@@ -74,8 +74,8 @@ add_file misc/sd_card.v
 add_file misc/sd_rw.v
 add_file misc/sdcmd_ctrl.v
 add_file misc/amiga_keymap.v
-add_file tang/primer25k/flash_dspi.v
-add_file tang/primer25k/sdram.v
+add_file misc/flash_dspi.v
+add_file misc/sdram.sv
 add_file tang/console60k/gowin_clkdiv/gowin_clkdiv.v
 add_file tang/primer25k/gowin_pll/pll_142m.v
 add_file tang/primer25k/gowin_pll/pll_142m_mod.v

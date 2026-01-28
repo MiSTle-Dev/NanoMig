@@ -587,7 +587,7 @@ always @(posedge clk_28m or negedge pll_lock) begin
 end
 
 /* -------------- state machine copying data from flash to sdram ---------------- */
-reg [21:0]  flash_addr;  
+reg [22:0]  flash_addr;  
 wire [15:0] flash_dout;
 reg [15:0]  flash_doutD;
 reg		    flash_cs;  
@@ -605,7 +605,7 @@ reg [5:0]   flash_cnt;
 
 always @(posedge clk_85m or negedge mem_ready) begin
     if(!mem_ready) begin
-       flash_addr <= 22'h300000;          // 6MB flash offset (word address),
+       flash_addr <= 23'h300000;          // 6MB flash offset (word address),
 	                                      // flash driver this results in the flash address being 600000
        flash_ram_addr <= { 4'hf, 18'h0 }; // write into 512k sdram segment used for kick rom
        word_count <= 22'h40001;           // 512k bytes ROM data = 256k words
@@ -626,10 +626,10 @@ always @(posedge clk_85m or negedge mem_ready) begin
             // ... static timing with fixed counter
             if(flash_cnt == 6'd1) begin
                state <= 1;
-               flash_addr <= flash_addr + 22'd1;
+               flash_addr <= flash_addr + 23'd1;
                word_count <= word_count - 22'd1;
 			   
-               if ((flash_addr == 22'h3000aa || flash_addr == 22'h3200aa) && flash_dout == 16'h6678)
+               if ((flash_addr == 23'h3000aa || flash_addr == 23'h3200aa) && flash_dout == 16'h6678)
 				 // transform bne.b to bra.b in Kickstart ROM 1.2/1.3 @ $f80154 (mirror) and $fc0154
 				 // this forces memory detection on every reset
 				 flash_doutD <= flash_dout & 16'hf0ff;
@@ -712,7 +712,7 @@ sdram sdram (
 // run the flash at 85MHz. This is only used at power-up to copy kickstart
 // from flash to sdram
 assign mspi_clk = clk_85m;   
-flash flash (
+flash #(.READ_DELAY(1)) flash (
     .clk       ( clk_85m     ),
     .resetn    ( pll_lock    ),
     .ready     ( flash_ready ),

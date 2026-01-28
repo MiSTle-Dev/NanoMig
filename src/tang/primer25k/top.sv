@@ -36,8 +36,14 @@ module top(
   output [1:0]	O_sdram_ba, // two banks
   output [1:0]	O_sdram_dqm, // 16/2
 
-  // interface to external BL616/M0S on middle PMOD
-  inout [4:0]	m0s,
+  // give explicit directions for pmod1 as it's being used for the
+  // FPGA Companion and this allows for clock buffering. Clock glitches
+  // were observed when using inouts for the companion
+  input			pmod_companion_din,
+  output		pmod_companion_dout,
+  input			pmod_companion_clk,
+  input			pmod_companion_ss,
+  output		pmod_companion_intn,
 
   // SD card slot
   output		sd_clk,
@@ -47,7 +53,7 @@ module top(
   output		jtagseln,
 
   // SPI connection to on-board BL616. By default an external
-  // connection is used with a M0S Dock / PiPico		   
+  // connection is used with a FPGA Companion		   
   input			spi_sclk,
   input			spi_csn,
   output		spi_dir,
@@ -68,13 +74,13 @@ assign leds[1] =  drv_leds[1] || drv_leds[0];
 // ============================== clock generation ===========================
 
 // Tang Primer 25 clocks are derived from 50Mhz
-// HDMI clock:  142 MHz
-// Pixel clock: 28.4 MHz (HDMI/5)
-// SDRAM and flash clock: 88.75 MHz, as close as possible to 85Mhz
-// Amiga clock: 7.1 (Pixel/4)
+// HDMI clock:  141.66667 MHz
+// Pixel clock: 28.3333 MHz (HDMI/5)
+// SDRAM and flash clock: 85 MHz
+// Amiga clock: 7.083333 (Pixel/4)
    
-// -> The resulting effective Amiga clock is in between the NTSC's 7.15909 and the
-// PAL's 7.09379 Mhz
+// -> The resulting effective Amiga clock is slightly lower than the 
+// NTSC's 7.15909 and the PAL's 7.09379 Mhz
 
 `define PIXEL_CLOCK 28400000
 
@@ -141,15 +147,17 @@ end
 wire cpu_reset = |reset_cnt;
 wire sdram_ready;
 
-// -------------------------- M0S MCU interface -----------------------
+// -------------------------- FPGA Companion MCU interface -----------------------
 // intn and dout are outputs driven by the FPGA to the MCU
 // din, ss and clk are inputs coming from the MCU
 // onboard connection to on-board BL616
 
 assign spi_dir = spi_io_dout;
 assign spi_irqn = spi_intn;
-assign m0s[4:0] = { spi_intn, 3'bzzz, spi_io_dout };
 
+assign pmod_companion_dout = spi_io_dout;
+assign pmod_companion_intn = spi_intn;
+   
 // by default the internal SPI is being used. Once there is
 // a select from the external spi, then the connection is
 // being switched
@@ -158,23 +166,23 @@ always @(posedge clk_28m) begin
     if(!pll_lock)
         spi_ext = 1'b0;
     else begin
-        // spi_ext is activated once the m0s pins 2 (ss or csn) is
-        // driven low by the m0s dock. This means that a m0s dock
+        // spi_ext is activated once the Companion pin 3 (ss/csn) is
+        // driven low by the Companion. This means that a companion
         // is connected and the FPGA switches its inputs to the
-        // m0s. Until then the inputs of the internal BL616 are
+        // companion. Until then the inputs of the internal BL616 are
         // being used.
-        if(m0s[2] == 1'b0)
+        if(pmod_companion_ss == 1'b0)
             spi_ext = 1'b1;
     end
 end
 
 // switch between internal SPI connected to the on-board bl616
-// or to the external one possibly connected to a M0S Dock
-wire spi_io_din = spi_ext?m0s[1]:spi_dat;
-wire spi_io_ss = spi_ext?m0s[2]:spi_csn;
-wire spi_io_clk = spi_ext?m0s[3]:spi_sclk;
+// or to the external one possibly connected to a external FPGA Companion
+wire spi_io_din = spi_ext?pmod_companion_din:spi_dat;
+wire spi_io_ss = spi_ext?pmod_companion_ss:spi_csn;
+wire spi_io_clk = spi_ext?pmod_companion_clk:spi_sclk;
    
-// interface to M0S MCU
+// interface to external MCU
 wire       mcu_sys_strobe;        // mcu message byte valid for sysctrl
 wire       mcu_hid_strobe;        // -"- hid
 wire       mcu_osd_strobe;        // -"- osd

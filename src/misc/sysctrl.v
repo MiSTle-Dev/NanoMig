@@ -40,9 +40,7 @@ module sysctrl (
   output reg [1:0]  system_chipmem,
   output reg [1:0]  system_slowmem,
   output reg [1:0]  system_fastmem,
-  output reg	    system_joy_swap,
-
-  output reg        companion_detected = 1'b0
+  output reg	    system_joy_swap
 );
 
 reg [3:0] state;
@@ -164,11 +162,6 @@ always @(posedge clk) begin
                 if(state == 4'd0) data_out <= 8'h5c;   // \ magic marker to identify a valid
                 if(state == 4'd1) data_out <= 8'h42;   // / FPGA core
                 if(state == 4'd2) data_out <= 8'h00;   // core id 0 = Generic core
-
-	        // report that communication with a companion has taken place. This
-	        // may be used in the top level to determine if JTAG needs to be enabled
-	        if(state == 4'd2)
-		 companion_detected <= 1'b1;
             end
 	   
             // CMD 1: there are two MCU controlled LEDs

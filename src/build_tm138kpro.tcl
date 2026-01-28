@@ -76,7 +76,7 @@ add_file misc/sd_card.v
 add_file misc/sd_rw.v
 add_file misc/sdcmd_ctrl.v
 add_file misc/amiga_keymap.v
-add_file tang/mega138kpro/flash_dspi.v
+add_file misc/flash_dspi.v
 add_file tang/mega138kpro/gowin_clkdiv/gowin_clkdiv.v
 add_file tang/mega138kpro/gowin_pll/pll_142m.v
 add_file tang/mega138kpro/gowin_pll/pll_142m_mod.v
@@ -84,7 +84,7 @@ add_file tang/mega138kpro/gowin_pll/pll_init.v
 add_file tang/mega138kpro/gowin_dpb/sector_dpram.v
 add_file tang/mega138kpro/gowin_dpb/ide_dpram.v
 add_file tang/mega138kpro/top.sv
-add_file tang/primer25k/sdram.v
+add_file misc/sdram.sv
 add_file tang/mega138kpro/nanomig.cst
 add_file tang/mega138kpro/nanomig.sdc
 add_file fx68k/microrom.mem

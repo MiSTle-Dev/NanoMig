@@ -74,7 +74,7 @@ add_file misc/sd_card.v
 add_file misc/sd_rw.v
 add_file misc/sdcmd_ctrl.v
 add_file misc/amiga_keymap.v
-add_file tang/primer25k/flash_dspi.v
+add_file misc/flash_dspi.v
 add_file tang/primer25k/gowin_clkdiv/gowin_clkdiv.v
 add_file tang/primer25k/gowin_pll/pll_142m.v
 add_file tang/primer25k/gowin_pll/pll_142m_mod.v
@@ -82,7 +82,7 @@ add_file tang/primer25k/gowin_pll/pll_init.v
 add_file tang/primer25k/gowin_dpb/sector_dpram.v
 add_file tang/primer25k/gowin_dpb/ide_dpram.v
 add_file tang/primer25k/top.sv
-add_file tang/primer25k/sdram.v
+add_file misc/sdram.sv
 add_file tang/primer25k/nanomig.cst
 add_file tang/primer25k/nanomig.sdc
 add_file fx68k/microrom.mem
@@ -108,5 +108,6 @@ set_option -cst_warn_to_error 1
 set_option -multi_boot 0
 set_option -mspi_jump 0
 set_option -bit_compress 1
+set_option -loading_rate 70.000
 
 run all

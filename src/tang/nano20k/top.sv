@@ -111,8 +111,6 @@ amigaclks amigaclks (
 	.video_locked()
 );
 
-assign O_sdram_clk = clk_85m_shifted;   
-
 wire	clk7_en;   
 wire	clk7n_en;   
 
@@ -649,9 +647,11 @@ wire [21:0] sdram_addr    = rom_done?ram_a[22:1]:flash_ram_addr;
 wire [15:0] sdram_din     = rom_done?ram_dout:flash_doutD;
 wire [1:0]  sdram_be      = rom_done?ram_be:2'b00;
 wire		sdram_we      = rom_done?sdram_rw:flash_ram_write; 
+
+assign O_sdram_clk = clk_85m_shifted;   
+assign O_sdram_cke = 1'b1;  // clock enable
    
-sdram sdram (
-	.sd_cke     ( O_sdram_cke   ), // clock enable
+sdram #(.DATA_WIDTH(32), .RASCAS_DELAY(2), .RAS_WIDTH(11), .CAS_WIDTH(8) ) sdram (
 	.sd_data    ( IO_sdram_dq   ), // 32 bit bidirectional data bus
 	.sd_addr    ( O_sdram_addr  ), // 11 bit multiplexed address bus
 	.sd_dqm     ( O_sdram_dqm   ), // two byte masks
