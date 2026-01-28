@@ -90,7 +90,7 @@ always @(posedge clk) begin
 
       // stay in reset for about 3 seconds or until MCU releases reset
       main_reset <= 1'b1;   
-      main_reset_timeout <= 32'd86_000_000;      
+      main_reset_timeout <= 3 * 32'd28_000_000;      
 
       buttons_irq_enable <= 1'b1;  // allow buttons irq
       int_ack <= 8'h00;
