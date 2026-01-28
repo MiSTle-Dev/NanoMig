@@ -381,7 +381,6 @@ sysctrl sysctrl (
 		.system_slowmem(osd_slowmem),
 		.system_fastmem(osd_fastmem),
 		.system_joy_swap(osd_joy_swap),
-        .companion_detected(companion_detected),
 				 
         .int_out_n(spi_intn),
         .int_in( { 4'b0000, sdc_int, 1'b0, hid_int, 1'b0 }),
