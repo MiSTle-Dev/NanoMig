@@ -38,9 +38,6 @@ module top(
   output [1:0]	O_sdram_ba,    // two banks
   output [3:0]	O_sdram_dqm,   // 32/4
 
-  // interface to external BL616/M0S
-  inout [4:0]	m0s,
-
   // internal lcd
   output		lcd_dclk,
   output		lcd_hs, // lcd horizontal synchronization
@@ -55,6 +52,14 @@ module top(
   output		sd_clk,
   inout			sd_cmd, // MOSI
   inout [3:0]	sd_dat, // 0: MISO
+
+  // SPI connection to on-board BL616 for 3921 assemblies 
+  // By default an external connection is used with a M0S Dock
+  input                 spi_sclk,// in 
+  input                 spi_csn, // in
+  output                spi_dir, // out
+  input                 spi_dat, // in
+  output                spi_irqn,// out
 	   
   // audio
   output		hp_bck,
@@ -154,11 +159,11 @@ mcu_spi mcu (
 	 .clk(clk_28m),
 	 .reset(!pll_lock),
 
-	 // SPI interface to BL616
-     .spi_io_ss(m0s[2]),
-     .spi_io_clk(m0s[3]),
-     .spi_io_din(m0s[1]),
-     .spi_io_dout(m0s[0]),
+     // SPI interface to FPGA Companion
+     .spi_io_ss ( spi_csn  ),
+     .spi_io_clk( spi_sclk ),
+     .spi_io_din( spi_dat  ),
+     .spi_io_dout( spi_dir ),
 
 	 // byte wide data in/out to the submodules
      .mcu_sys_strobe(mcu_sys_strobe),
@@ -295,7 +300,7 @@ sysctrl sysctrl (
 		.system_slowmem(osd_slowmem),
         .system_joy_swap(osd_joy_swap),
 				 
-        .int_out_n(m0s[4]),
+        .int_out_n(spi_irqn),
         .int_in( { 4'b0000, sdc_int, 1'b0, hid_int, 1'b0 }),
         .int_ack( int_ack ),
 

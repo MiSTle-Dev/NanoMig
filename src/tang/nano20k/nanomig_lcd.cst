@@ -90,17 +90,17 @@ IO_PORT "lcd_b[3]" IO_TYPE=LVCMOS33 DRIVE=24;
 IO_LOC "lcd_b[4]" 27;
 IO_PORT "lcd_b[4]" IO_TYPE=LVCMOS33 DRIVE=24;
 
-// companion interface
-IO_LOC "m0s[0]" 71;
-IO_PORT "m0s[0]" PULL_MODE=UP IO_TYPE=LVCMOS33;
-IO_LOC "m0s[1]" 72;
-IO_PORT "m0s[1]" PULL_MODE=UP IO_TYPE=LVCMOS33;
-IO_LOC "m0s[2]" 73;
-IO_PORT "m0s[2]" PULL_MODE=UP IO_TYPE=LVCMOS33;
-IO_LOC "m0s[3]" 74;
-IO_PORT "m0s[3]" PULL_MODE=UP IO_TYPE=LVCMOS33;
-IO_LOC "m0s[4]" 75;
-IO_PORT "m0s[4]" PULL_MODE=UP IO_TYPE=LVCMOS33;
+// connections to the internal BL616 controller
+IO_LOC "spi_csn" 86;
+IO_PORT "spi_csn" PULL_MODE=UP IO_TYPE=LVCMOS33;
+IO_LOC "spi_sclk" 13;
+IO_PORT "spi_sclk" PULL_MODE=UP IO_TYPE=LVCMOS33;
+IO_LOC "spi_dat" 76;
+IO_PORT "spi_dat" PULL_MODE=UP IO_TYPE=LVCMOS33;
+IO_LOC "spi_dir" 75;
+IO_PORT "spi_dir" PULL_MODE=NONE DRIVE=8 IO_TYPE=LVCMOS33;
+IO_LOC "spi_irqn" 69; // USB-C UART TX output
+IO_PORT "spi_irqn" PULL_MODE=NONE DRIVE=8 IO_TYPE=LVCMOS33;
 
 // audio amplifier
 IO_LOC "pa_en" 51;
