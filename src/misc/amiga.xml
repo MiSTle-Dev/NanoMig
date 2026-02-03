@@ -64,6 +64,10 @@
 	<listentry label="PAL" value="0"/>
 	<listentry label="NTSC" value="1"/>
       </list>
+      <list label="Swap Joyst:" id="J" default="1">
+	<listentry label="Off" value="0"/>
+	<listentry label="On" value="1"/>
+      </list>
     </menu>
     <menu label="Storage">
       <list label="Drives:" id="D" default="0">
