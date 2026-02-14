@@ -66,8 +66,8 @@ The necessary binaries can be found in the [project releases](https://github.com
     and TN20k, Console 60k/138k, Primer25k, Mega138k Pro integrated [onboard BL616](https://en.bouffalolab.com/) MPU
   * A default ADF disk image named ```df0.adf``` should be placed on SD card (e.g. workbench 1.3)
   * For the SD card to work [all components incl. the support MCU](https://github.com/harbaum/NanoMig/issues/5) have to work properly
-  * For the preparation of HDF images the HST-Imager works best. [](https://github.com/henrikstengaard/hst-imager)
-  * Professional Filesystem 3 (PFS3) is recommended for HDDs. [](https://aminet.net/package/disk/misc/pfs3aio)
+  * For the preparation of HDF images the HST-Imager works best. [HST-Imager](https://github.com/henrikstengaard/hst-imager)
+  * Professional Filesystem 3 (PFS3) is recommended for HDDs. [PFS3](https://aminet.net/package/disk/misc/pfs3aio)
 
 ## LED UI
 
