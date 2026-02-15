@@ -13,17 +13,18 @@ Current state:
   * Minimig based on [MiSTer Minimig AGA](https://github.com/MiSTer-devel/Minimig-AGA_MiSTer)
   * Amiga 500 and Amiga 1000 modes
   * Kick ROM stored in flash ROM
-  * Up to 2MB chip and 1.5MB slow RAM
+  * Up to 2MB chip, 4MB fast and 1.5MB slow RAM
   * OCS and ECS chipset (no AGA!)
   * Up to four virtual floppy drives
+  * Floppy disk write support
   * HDMI video and audio, PAL and NTSC
-  * Keyboard, mouse and joystick via USB
-  * Virtual IDE hard disk read and write support
+  * Keyboard and mouse via USB
+  * Joysticks via USB or DB9 ports 
+  * Up to two virtual IDE hard disks, read and write support
   * Runs on [Tang Nano 20k](https://wiki.sipeed.com/hardware/en/tang/tang-nano-20k/nano-20k.html), [Primer 25K](https://wiki.sipeed.com/hardware/en/tang/tang-primer-25k/primer-25k.html), [Mega 138K Pro](https://wiki.sipeed.com/hardware/en/tang/tang-mega-138k/mega-138k-pro.html) and [Tang Console with Mega 60k / 138k module](https://wiki.sipeed.com/hardware/en/tang/tang-console/mega-console.html)
   * [Fully simulated](sim)
 
 Planned features:
-  * Floppy disk write support
   * Accelerated 68020 support (may not fit)
   * AGA support (may not fit)
 
