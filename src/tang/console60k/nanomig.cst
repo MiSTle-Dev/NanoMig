@@ -4,10 +4,10 @@ IO_PORT "clk" PULL_MODE=NONE DRIVE=OFF BANK_VCCIO=3.3;
 // F4 = daughter board reset
 
 IO_LOC "reset_n" AA13;        // actually S0 on the board
-IO_PORT "reset_n" IO_TYPE=LVCMOS33 PULL_MODE=UP DRIVE=OFF BANK_VCCIO=3.3;
+IO_PORT "reset_n" IO_TYPE=LVCMOS15 PULL_MODE=UP DRIVE=OFF BANK_VCCIO=1.5;
 
 IO_LOC "user_n" AB13;        // S1
-IO_PORT "user_n" IO_TYPE=LVCMOS33 PULL_MODE=UP DRIVE=OFF BANK_VCCIO=3.3;
+IO_PORT "user_n" IO_TYPE=LVCMOS15 PULL_MODE=UP DRIVE=OFF BANK_VCCIO=1.5;
 
 // connections to the internal BL616 controller
 IO_LOC "spi_csn" T13; // TMS GPIO0 SPI_SS
@@ -25,6 +25,13 @@ NET_LOC "jtagseln" V_JTAGSELN;
 
 IO_LOC "bl616_jtagsel" V14;
 IO_PORT "bl616_jtagsel" PULL_MODE=UP IO_TYPE=LVCMOS33 BANK_VCCIO=3.3;
+
+// UART TX of BL616, output to FPGA
+IO_LOC "bl616_tx" M13; // TWI SCL
+IO_PORT "bl616_tx" IO_TYPE=LVCMOS33 BANK_VCCIO=3.3;
+
+IO_PORT "uart_ext_tx" PULL_MODE=NONE IO_TYPE=LVCMOS33; // UART TX
+IO_LOC "uart_ext_tx" C22;
 
 // re-use DONE and READY for LEDs
 IO_LOC "leds[0]" G11;

@@ -109,5 +109,6 @@ set_option -multi_boot 0
 set_option -mspi_jump 0
 set_option -bit_compress 1
 set_option -loading_rate 70.000
+set_option -user_code 00000002
 
 run all
