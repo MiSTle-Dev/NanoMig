@@ -71,6 +71,21 @@ module top(
   inout			sd_cmd, // MOSI
   inout [3:0]	sd_dat, // 0: MISO
 
+  output		lcd_clk,
+  output        lcd_en,
+  output		lcd_hs,
+  output		lcd_vs,
+  output [7:0]	lcd_r, //lcd red
+  output [7:0]	lcd_g, //lcd green
+  output [7:0]	lcd_b, //lcd blue
+  output		lcd_bl, //drive low to turn bl off
+
+  // I2S DAC
+  output		i2s_bclk,
+  output		i2s_lrck,
+  output		i2s_din,
+  output		pa_en,
+           
   // hdmi/tdms
   output		tmds_clk_n,
   output		tmds_clk_p,
@@ -114,6 +129,7 @@ pll_142m pll_hdmi (
     .clkout0(clk_pixel_x5),
     .clkout1(clk_85m),
     .clkout2(clk_85m_shifted),   // phase shifted
+    .clkout3(mspi_clk),
     .init_clk(clk),
     .lock(pll_lock),
     .clkin(clk)
@@ -176,6 +192,7 @@ wire       osd_video_wide;      // 0=normal, 1=wide screen (jailbars)
 wire [1:0] osd_video_filter;
 wire [1:0] osd_video_scanlines;
 wire       osd_joy_swap;        // 0=off, 1=on
+wire       rom_done;
 
 // generate a reset for some time after rom has been initialized
 reg [15:0] reset_cnt;
@@ -426,6 +443,11 @@ osd_u8g2 osd_u8g2 (
         .b_out(video_blue)
 );   
 
+// map to internal lcd
+assign lcd_r = {video_red, 2'b00};
+assign lcd_g = {video_green, 2'b00};
+assign lcd_b = {video_blue, 2'b00};
+   
 /* ---------------------- Minimig chipset ----------------------- */
 
 // two 15 bit audio channels
@@ -598,7 +620,6 @@ always @(posedge clk_28m or negedge pll_lock) begin
 end
 
 /* -------------- state machine copying data from flash to sdram ---------------- */
-reg [15:0]  xor16;
 reg [22:0]  flash_addr;  
 wire [15:0] flash_dout;
 reg [15:0]  flash_doutD;
@@ -616,8 +637,7 @@ reg [5:0]   flash_cnt;
 
 always @(posedge clk_85m or negedge mem_ready) begin
     if(!mem_ready) begin
-       flash_addr <= 23'h300000;          // 6MB flash offset (word address),
-	                                      // flash driver this results in the flash address being 600000
+       flash_addr <= 23'h300000;          // 6MB flash offset (word address)
        flash_ram_addr <= { 4'hf, 18'h0 }; // write into 512k sdram segment used for kick rom
        word_count <= 22'h40001;           // 512k bytes ROM data = 256k words
 
@@ -625,7 +645,6 @@ always @(posedge clk_85m or negedge mem_ready) begin
        flash_ram_write <= 1'b0;
        flash_cs <= 1'b0;        
        flash_cnt <= 6'd0;
-	   xor16 <= 16'h0000;	   
     end else begin
         if((start_rom_copy || state == 23) && (word_count != 0)) begin
             flash_cs <= 1'b1;
@@ -649,8 +668,6 @@ always @(posedge clk_85m or negedge mem_ready) begin
                  // allows to exactly determine the real access time by adjusting flash_cnt
                  // to the lowest value that gives a stable image
                  flash_doutD <= flash_dout;
-
-			   if(word_count > 22'h1) xor16 <= xor16 ^ flash_dout;
             end
         end
 
@@ -722,7 +739,7 @@ sdram sdram (
 
 // run the flash a 85MHz. This is only used at power-up to copy kickstart
 // from flash to sdram
-assign mspi_clk = clk_85m;   
+//assign mspi_clk = clk_85m;   
 flash #(.READ_DELAY(1)) flash (
     .clk       ( clk_85m     ),
     .resetn    ( !(!pll_lock || boot_button_detected) ),
@@ -753,6 +770,80 @@ video_analyzer video_analyzer (
     .interlace   ( interlace ),
     .vreset      ( vreset    )
 );
+
+assign lcd_clk = clk_pixel;
+assign lcd_hs = hs_n;   // no syncs on this lcd
+assign lcd_vs = vs_n;
+assign lcd_bl = !cpu_reset;   // enable display backlight once cpu is out of reset
+
+reg [9:0] hcnt;   // max 1023
+reg [9:0] vcnt;   // max 626
+
+// generate the 800x480 pixel display enable signal 
+assign lcd_en = (hcnt < 10'd800) && (vcnt < 10'd480);
+
+always @(posedge clk_pixel) begin
+   reg       last_vs_n, last_hs_n;
+
+   last_hs_n <= hs_n;   
+
+   // rising edge/end of hsync
+   if(hs_n && !last_hs_n) begin
+      hcnt <= 10'd980;
+
+      last_vs_n <= vs_n;   
+      if(vs_n && !last_vs_n) begin
+         vcnt <= 10'd946;                
+      end else
+        vcnt <= vcnt + 10'd1;    
+   end else
+      hcnt <= hcnt + 10'd1;    
+end
+/* ------------------- audio processing --------------- */
+
+// MAX98357A
+   
+// EN is actually the /SD_MODE of the MAX98357A and driving it high selects
+// left channel only. For stereo mixing there would have to be a "large" 
+// resistor as a pullup which isn't there on the TN20k
+
+assign pa_en = !cpu_reset;   // simply enable amplifier with left channel
+
+reg i2s_clk;
+reg [7:0] i2s_clk_cnt;
+always @(posedge clk_28m) begin
+    if(i2s_clk_cnt < 28375160 / (24000*32) / 2 - 1)
+        i2s_clk_cnt <= i2s_clk_cnt + 8'd1;
+    else begin
+        i2s_clk_cnt <= 8'd0;
+        i2s_clk <= ~i2s_clk;
+    end
+end
+
+// sign expand and add both channels
+wire [15:0] audio_mix = { audio_left[14], audio_left} + { audio_right[14], audio_right };
+   
+// shift audio down to reduce amp output volume to a sane range
+localparam AUDIO_SHIFT = 2;   
+wire [15:0] audio_scaled = { { AUDIO_SHIFT+1{audio_mix[15]}}, audio_mix[14:AUDIO_SHIFT] };   
+   
+// count 32 bits, 16 left and 16 right channel. MAX samples
+// on rising edge
+reg [15:0] audio;
+reg [4:0] audio_bit_cnt;
+always @(posedge i2s_clk) begin
+   if(cpu_reset) audio_bit_cnt <= 5'd0;
+   else          audio_bit_cnt <= audio_bit_cnt + 5'd1;
+
+   // latch data so it's stable during transmission
+   if(audio_bit_cnt == 5'd31)
+	 audio <= audio_scaled;   
+end
+
+// generate i2s signals
+assign i2s_bclk = !i2s_clk;
+assign i2s_lrck = cpu_reset?1'b0:audio_bit_cnt[4];
+assign i2s_din = cpu_reset?1'b0:audio[15-audio_bit_cnt[3:0]];
 
 /* -------------------- HDMI video and audio -------------------- */
 

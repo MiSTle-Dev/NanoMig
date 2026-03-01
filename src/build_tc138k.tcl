@@ -77,9 +77,9 @@ add_file misc/sdcmd_ctrl.v
 add_file misc/amiga_keymap.v
 add_file misc/flash_dspi.v
 add_file tang/mega138kpro/gowin_clkdiv/gowin_clkdiv.v
-add_file tang/mega138kpro/gowin_pll/pll_142m.v
-add_file tang/mega138kpro/gowin_pll/pll_142m_mod.v
-add_file tang/mega138kpro/gowin_pll/pll_init.v
+add_file tang/console138k/gowin_pll/pll_142m.v
+add_file tang/console138k/gowin_pll/pll_142m_mod.v
+add_file tang/console138k/pll_init.v
 add_file tang/mega138kpro/gowin_dpb/sector_dpram.v
 add_file tang/mega138kpro/gowin_dpb/ide_dpram.v
 add_file tang/console138k/top.sv
