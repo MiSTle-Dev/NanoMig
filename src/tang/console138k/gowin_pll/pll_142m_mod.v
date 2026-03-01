@@ -1,16 +1,16 @@
-//Tool Version: V1.9.10.03 (64-bit)
-//Part Number: GW5AST-LV138PG484AC1/I0
-//Device: GW5AST-138
-//Device Version: B
-module pll_142m (lock, clkout0, clkin);
+module pll_142m_MOD (lock, clkout0, clkout1, clkout2, clkout3, clkin, reset, icpsel, lpfres, lpfcap);
 
 output lock;
 output clkout0;
+output clkout1;
+output clkout2;
+output clkout3;
 input clkin;
+input reset;
+input [5:0] icpsel;
+input [2:0] lpfres;
+input [1:0] lpfcap;
 
-wire clkout1;
-wire clkout2;
-wire clkout3;
 wire clkout4;
 wire clkout5;
 wire clkout6;
@@ -33,7 +33,7 @@ PLL PLL_inst (
     .CLKFBOUT(clkfbout),
     .CLKIN(clkin),
     .CLKFB(gw_gnd),
-    .RESET(gw_gnd),
+    .RESET(reset),
     .PLLPWD(gw_gnd),
     .RESET_I(gw_gnd),
     .RESET_O(gw_gnd),
@@ -53,9 +53,9 @@ PLL PLL_inst (
     .DT1({gw_gnd,gw_gnd,gw_gnd,gw_gnd}),
     .DT2({gw_gnd,gw_gnd,gw_gnd,gw_gnd}),
     .DT3({gw_gnd,gw_gnd,gw_gnd,gw_gnd}),
-    .ICPSEL({gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd}),
-    .LPFRES({gw_gnd,gw_gnd,gw_gnd}),
-    .LPFCAP({gw_gnd,gw_gnd}),
+    .ICPSEL(icpsel),
+    .LPFRES(lpfres),
+    .LPFCAP(lpfcap),
     .PSSEL({gw_gnd,gw_gnd,gw_gnd}),
     .PSDIR(gw_gnd),
     .PSPULSE(gw_gnd),
@@ -76,9 +76,9 @@ defparam PLL_inst.FCLKIN = "50";
 defparam PLL_inst.IDIV_SEL = 1;
 defparam PLL_inst.FBDIV_SEL = 1;
 defparam PLL_inst.ODIV0_SEL = 6;
-defparam PLL_inst.ODIV1_SEL = 8;
-defparam PLL_inst.ODIV2_SEL = 8;
-defparam PLL_inst.ODIV3_SEL = 8;
+defparam PLL_inst.ODIV1_SEL = 10;
+defparam PLL_inst.ODIV2_SEL = 10;
+defparam PLL_inst.ODIV3_SEL = 10;
 defparam PLL_inst.ODIV4_SEL = 8;
 defparam PLL_inst.ODIV5_SEL = 8;
 defparam PLL_inst.ODIV6_SEL = 8;
@@ -86,9 +86,9 @@ defparam PLL_inst.MDIV_SEL = 17;
 defparam PLL_inst.MDIV_FRAC_SEL = 0;
 defparam PLL_inst.ODIV0_FRAC_SEL = 0;
 defparam PLL_inst.CLKOUT0_EN = "TRUE";
-defparam PLL_inst.CLKOUT1_EN = "FALSE";
-defparam PLL_inst.CLKOUT2_EN = "FALSE";
-defparam PLL_inst.CLKOUT3_EN = "FALSE";
+defparam PLL_inst.CLKOUT1_EN = "TRUE";
+defparam PLL_inst.CLKOUT2_EN = "TRUE";
+defparam PLL_inst.CLKOUT3_EN = "TRUE";
 defparam PLL_inst.CLKOUT4_EN = "FALSE";
 defparam PLL_inst.CLKOUT5_EN = "FALSE";
 defparam PLL_inst.CLKOUT6_EN = "FALSE";
@@ -120,9 +120,9 @@ defparam PLL_inst.CLKOUT0_PE_COARSE = 0;
 defparam PLL_inst.CLKOUT0_PE_FINE = 0;
 defparam PLL_inst.CLKOUT1_PE_COARSE = 0;
 defparam PLL_inst.CLKOUT1_PE_FINE = 0;
-defparam PLL_inst.CLKOUT2_PE_COARSE = 0;
+defparam PLL_inst.CLKOUT2_PE_COARSE = 6;
 defparam PLL_inst.CLKOUT2_PE_FINE = 0;
-defparam PLL_inst.CLKOUT3_PE_COARSE = 0;
+defparam PLL_inst.CLKOUT3_PE_COARSE = 7;
 defparam PLL_inst.CLKOUT3_PE_FINE = 0;
 defparam PLL_inst.CLKOUT4_PE_COARSE = 0;
 defparam PLL_inst.CLKOUT4_PE_FINE = 0;
@@ -164,7 +164,7 @@ defparam PLL_inst.DYN_DT0_SEL = "FALSE";
 defparam PLL_inst.DYN_DT1_SEL = "FALSE";
 defparam PLL_inst.DYN_DT2_SEL = "FALSE";
 defparam PLL_inst.DYN_DT3_SEL = "FALSE";
-defparam PLL_inst.DYN_ICP_SEL = "FALSE";
-defparam PLL_inst.DYN_LPF_SEL = "FALSE";
+defparam PLL_inst.DYN_ICP_SEL = "TRUE";
+defparam PLL_inst.DYN_LPF_SEL = "TRUE";
 
-endmodule //pll_142m
+endmodule //pll_142m_MOD
