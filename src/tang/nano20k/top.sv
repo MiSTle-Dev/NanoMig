@@ -720,7 +720,10 @@ always @(posedge clk_pixel) begin
     else begin
        aclk_cnt <= 9'd0;
        clk_audio <= ~clk_audio;
-	   audio_reg <= { { 1'b0, ~audio_left[14],audio_left[13:0]}, {1'b0, ~audio_right[14],audio_right[13:0]}};	   
+		wire [14:0] audio_left_scaled = audio_left >>> 1;
+		wire [14:0] audio_right_scaled = audio_right >>> 1;
+		audio_reg <= { { 1'b0, ~audio_left_scaled[14], audio_left_scaled[13:0] }, { 1'b0, ~audio_right_scaled[14], audio_right_scaled[13:0] } };	
+     // audio_reg <= { { 1'b0, ~audio_left[14],audio_left[13:0]}, {1'b0, ~audio_right[14],audio_right[13:0]}};	   
     end
 end
    
