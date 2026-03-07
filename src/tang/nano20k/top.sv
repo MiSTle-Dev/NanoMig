@@ -129,6 +129,7 @@ wire       osd_video_wide;      // 0=normal, 1=wide screen (jailbars)
 wire [1:0] osd_video_filter;
 wire [1:0] osd_video_scanlines;
 wire       osd_joy_swap;        // 0=off, 1=on
+wire [1:0] osd_volume;          // 0=25%, 1=50%, 2=75%, 3=100%
 
 // generate a reset for some time after rom has been initialized
 reg [15:0] reset_cnt;
@@ -347,6 +348,7 @@ sysctrl sysctrl (
 		.system_slowmem(osd_slowmem),
 		.system_fastmem(osd_fastmem),
         .system_joy_swap(osd_joy_swap),
+    	.system_volume(osd_volume),
 				 
         .int_out_n(spi_intn),
         .int_in( { 4'b0000, sdc_int, 1'b0, hid_int, 1'b0 }),
@@ -707,23 +709,56 @@ flash flash (
 
 /* -------------------- HDMI video and audio -------------------- */
 
-// latch audio, so it's stable during 48khz transfer
-reg [15:0] audio_reg [2];  
-   
-// generate 48khz audio clock
+// 1. Control signal for volume level (00=100%, 01=75%, 10=50%, 11=25%)
+wire [1:0] vol_sel = osd_volume; // testvalue 25%
+
+// 2. Cast inputs to signed wires to ensure correct arithmetic shifting (>>>)
+// This prevents audio distortion/crackling by preserving the sign bit
+wire signed [14:0] s_left  = audio_left;
+wire signed [14:0] s_right = audio_right;
+
+// 3. Volume calculation logic (Combinational Multiplexer)
+reg signed [14:0] left_v, right_v;
+
+always @(*) begin
+    case (vol_sel)
+        2'b01: begin // 75% (1/2 + 1/4)
+            left_v  = (s_left >>> 1)  + (s_left >>> 2);
+            right_v = (s_right >>> 1) + (s_right >>> 2);
+        end
+        2'b10: begin // 50% (1/2)
+            left_v  = (s_left >>> 1);
+            right_v = (s_right >>> 1);
+        end
+        2'b11: begin // 25% (1/4)
+            left_v  = (s_left >>> 2);
+            right_v = (s_right >>> 2);
+        end
+        default: begin // 100% (Normal)
+            left_v  = s_left;
+            right_v = s_right;
+        end
+    endcase
+end
+
+// 4. Audio output registers for HDMI transfer
+reg [15:0] audio_reg [0:1];  
+
+// Generate 48khz audio clock
 reg clk_audio;
 reg [8:0] aclk_cnt;
+
 always @(posedge clk_pixel) begin
-    // divisor = pixel clock / 48000 / 2 - 1
-    if(aclk_cnt < `PIXEL_CLOCK / 48000 / 2 -1)
-      aclk_cnt <= aclk_cnt + 9'd1;
-    else begin
-       aclk_cnt <= 9'd0;
-       clk_audio <= ~clk_audio;
-		wire [14:0] audio_left_scaled = audio_left >>> 1;
-		wire [14:0] audio_right_scaled = audio_right >>> 1;
-		audio_reg <= { { 1'b0, ~audio_left_scaled[14], audio_left_scaled[13:0] }, { 1'b0, ~audio_right_scaled[14], audio_right_scaled[13:0] } };	
-     // audio_reg <= { { 1'b0, ~audio_left[14],audio_left[13:0]}, {1'b0, ~audio_right[14],audio_right[13:0]}};	   
+    if(aclk_cnt < `PIXEL_CLOCK / 48000 / 2 - 1) begin
+        aclk_cnt <= aclk_cnt + 9'd1;
+    end else begin
+        aclk_cnt <= 9'd0;
+        clk_audio <= ~clk_audio;
+
+        // Assign scaled values to the HDMI registers
+        // ~bit[14] converts Signed data to Unsigned for the HDMI block
+        audio_reg[0] <= { 1'b0, ~left_v[14],  left_v[13:0] };
+        audio_reg[1] <= { 1'b0, ~right_v[14], right_v[13:0] };
     end
 end
    
