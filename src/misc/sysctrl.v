@@ -113,7 +113,7 @@ always @(posedge clk) begin
       system_fastmem <= 2'd0;      
       system_ide_enable <= 1'b0;
       system_joy_swap <= 1'b1;
-	  system_volume <= 2'd11;  
+	  system_volume <= 2'b01;  
    end 
    else 
    begin // if (reset)
@@ -225,7 +225,7 @@ always @(posedge clk) begin
 		   if(id == "I") system_ide_enable <= data_in[0];
 		   // value "J": Swap Joyst off(0) on(1)
 		   if(id == "J") system_joy_swap <= data_in[0];
-		   // Value "A": Volume 25% 50% 75% 100%
+		   // Value "A": Volume 25%(0), 50%(1), 75%(2), 100%(3)
 		   if(id == "A") system_volume <= data_in[1:0];	
                 end
             end
