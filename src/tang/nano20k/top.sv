@@ -708,10 +708,6 @@ flash flash (
 );
 
 /* -------------------- HDMI video and audio -------------------- */
-
-// Control signal for volume level (11=100%, 10=75%, 01=50%, 00=25%)
-wire [1:0] vol_sel = osd_volume; 
-
 // Cast inputs to signed wires to ensure correct arithmetic shifting (>>>)
 // This prevents audio distortion/crackling by preserving the sign bit
 wire signed [14:0] s_left  = audio_left;
@@ -721,7 +717,7 @@ wire signed [14:0] s_right = audio_right;
 reg signed [14:0] left_v, right_v;
 
 always @(*) begin
-    case (vol_sel)
+	case (osd_volume) // Control signal for volume level (11=100%, 10=75%, 01=50%, 00=25%)
         2'b10: begin // 75% (1/2 + 1/4)
             left_v  = (s_left >>> 1)  + (s_left >>> 2);
             right_v = (s_right >>> 1) + (s_right >>> 2);
@@ -753,6 +749,7 @@ reg clk_audio;
 reg [8:0] aclk_cnt;
 
 always @(posedge clk_pixel) begin
+	// divisor = pixel clock / 48000 / 2 - 1
     if(aclk_cnt < `PIXEL_CLOCK / 48000 / 2 - 1) begin
         aclk_cnt <= aclk_cnt + 9'd1;
     end else begin
