@@ -709,15 +709,15 @@ flash flash (
 
 /* -------------------- HDMI video and audio -------------------- */
 
-// 1. Control signal for volume level (00=100%, 01=75%, 10=50%, 11=25%)
-wire [1:0] vol_sel = osd_volume; // testvalue 25%
+// Control signal for volume level (11=100%, 10=75%, 01=50%, 00=25%)
+wire [1:0] vol_sel = osd_volume; 
 
-// 2. Cast inputs to signed wires to ensure correct arithmetic shifting (>>>)
+// Cast inputs to signed wires to ensure correct arithmetic shifting (>>>)
 // This prevents audio distortion/crackling by preserving the sign bit
 wire signed [14:0] s_left  = audio_left;
 wire signed [14:0] s_right = audio_right;
 
-// 3. Volume calculation logic (Combinational Multiplexer)
+// Volume calculation logic (Combinational Multiplexer)
 reg signed [14:0] left_v, right_v;
 
 always @(*) begin
@@ -738,14 +738,14 @@ always @(*) begin
             left_v  = s_left;
             right_v = s_right;
         end
-        default: begin // 100% (Normal)
+        default: begin // 50% (Normal)
             left_v  = (s_left >>> 1);
 			right_v = (s_right >>> 1);
 		end
     endcase
 end
 
-// 4. Audio output registers for HDMI transfer
+// Audio output registers for HDMI transfer
 reg [15:0] audio_reg [0:1];  
 
 // Generate 48khz audio clock
