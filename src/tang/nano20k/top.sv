@@ -722,22 +722,26 @@ reg signed [14:0] left_v, right_v;
 
 always @(*) begin
     case (vol_sel)
-        2'b01: begin // 75% (1/2 + 1/4)
+        2'b10: begin // 75% (1/2 + 1/4)
             left_v  = (s_left >>> 1)  + (s_left >>> 2);
             right_v = (s_right >>> 1) + (s_right >>> 2);
         end
-        2'b10: begin // 50% (1/2)
+        2'b01: begin // 50% (1/2)
             left_v  = (s_left >>> 1);
             right_v = (s_right >>> 1);
         end
-        2'b11: begin // 25% (1/4)
+        2'b00: begin // 25% (1/4)
             left_v  = (s_left >>> 2);
             right_v = (s_right >>> 2);
         end
-        default: begin // 100% (Normal)
+		2'b11: begin // 100% (Normal)
             left_v  = s_left;
             right_v = s_right;
         end
+        default: begin // 100% (Normal)
+            left_v  = (s_left >>> 1);
+			right_v = (s_right >>> 1);
+		end
     endcase
 end
 
