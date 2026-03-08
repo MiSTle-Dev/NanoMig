@@ -95,7 +95,7 @@ assign amiga =
                            // 46: PrtScr
                            // 47: Scroll Lock
                            // 48: Pause
-                           // 49: Insert
+  (code == 7'h49)?7'h5f:   // 49: Insert (also mapped to End)
   (code == 7'h4a)?7'h5a:   // 4a: Home -> KP-(
   (code == 7'h4b)?7'h5b:   // 4b: PageUp -> KP-)
   (code == 7'h4c)?7'h46:   // 4c: Delete
