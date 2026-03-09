@@ -89,4 +89,4 @@ The necessary binaries can be found in the [project releases](https://github.com
 | --------- | ----------- |
 | Left Amiga | Left meta (Windows) key |
 | Right Amiga | Right meta / Page Down |
-| Help | End |
+| Help | End / Insert |
