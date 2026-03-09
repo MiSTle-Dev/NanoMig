@@ -734,7 +734,7 @@ always @(*) begin
             left_v  = s_left;
             right_v = s_right;
         end
-        default: begin // 50% (Normal)
+        default: begin // 50% 
             left_v  = (s_left >>> 1);
 			right_v = (s_right >>> 1);
 		end
