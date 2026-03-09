@@ -10,61 +10,50 @@
   This code is an ugly mess as it's just written on the fly to test
   certain things. It's not meant to be nice or clean. But maybe
   someone find this useful anyway.
- */
+*/
 
-#ifdef VIDEO
 #include <SDL.h>
 #include <SDL_image.h>
-// one frame is 20.0326ms
-#endif
 
 #include "Vnanomig_tb.h"
+#include "Vnanomig_tb_nanomig_tb.h"
+
+// get access into the floppy structures
+#include "Vnanomig_tb_nanomig.h"
+#include "Vnanomig_tb_minimig.h"
+#include "Vnanomig_tb_paula.h"
+#include "Vnanomig_tb_paula_floppy.h"
+
 #include "verilated.h"
 #include "verilated_fst_c.h"
 
-// #define KICK "kick12.rom" 
+#include "Vnanomig_tb.h"
+
+//#define KICK "kick12.rom" 
 #define KICK "kick13.rom" 
 // #define KICK "kick31.rom" 
 // #define KICK "DiagROM/DiagROM"
 // #define KICK "../src/ram_test/ram_test.bin"
 // #define KICK "test_rom/test_rom.bin"
 
-// fdc test also enables ide
-#define FDC_TEST
-
-#ifdef FDC_TEST
-#define FLOPPY_ADF  "../disks/fdwrtest.adf"
-// #define FLOPPY_ADF  "../disks/wb13.adf"
-// #define FLOPPY_ADF  "Getaway_A.adf"
-// #define FLOPPY_ADF  "random.adf"
-
-// #define HARDDISK0_HDF   "../disks/AGS_NanoMig.HDF"
-// #define HARDDISK0_HDF   "../disks/dh0.hdf"
-// #define HARDDISK1_HDF   "../disks/dh1.hdf"
-
-// #define FDC_RAM_TEST_VERIFY   // verify track data against minimigs original firmware fdd.c. only works with ram_test rom
-FILE *adf_fd = NULL;
-FILE *hdf_fd[] = { NULL, NULL };
-#endif
-
-// #define UART_ONLY
-
-// with turbo kick, some vpos test exits with error
-
-// this can be used to write (Kick) memory access patterns into a file. This can
-// be used to verify the access in a different run to e.g. verify that faster
-// memory access still produces the same access pattern
-#define MEMTRACE  0   // 0 = no tracing, 1 = create, 2 = verify
-
-static Vnanomig_tb *tb;
+Vnanomig_tb *tb;
 static VerilatedFstC *trace;
-static double simulation_time;
+double simulation_time;
 
 #define TICKLEN   (0.5/28375160)
+#include "sd_card_config.h"       // for TICKLEN
+
+// with kick 1.3 and 512k
+//#define TRACESTART   3.5    // first floppy read
+
+// with kick 3.1 and 512k
+//#define TRACESTART   0.74    // power led on
+//#define TRACESTART   3.2     // floppy read
+//#define TRACESTART   4.7     // "no floppy" image
+//#define TRACESTART   9.6       // IDE test write
 
 // specfiy simulation runtime and from which point in time a trace should
 // be written
-//#define TRACESTART   0
 //#define TRACESTART   0.22
 //#define TRACESTART   0.44
 //#define TRACESTART   0.87
@@ -82,13 +71,11 @@ static double simulation_time;
 // 8.814 // write Nase.info
 // #define TRACESTART   8.810
 // #define TRACESTART   8.740
-#define TRACESTART   10.9   // FDC write
+// #define TRACESTART   10.9   // FDC write
 
 #ifdef TRACESTART
-#define TRACEEND     (TRACESTART + 0.15)   // 0.1s ~ 1G
+#define TRACEEND     (TRACESTART + 0.1)
 #endif
-
-// #define TRACEEND     (60.0)
 
 // with turbo kick:
 // 1432.701 ms, LED off 
@@ -111,9 +98,27 @@ static double simulation_time;
 // 783ms   -> first ide cs
 // 2773ms  -> first gayle selection
 
-/* =============================== video =================================== */
+// disable colorization for easier handling in editors 
+#if 1
+#define RED      "\033[1;31m"
+#define GREEN    "\033[1;32m"
+#define YELLOW   "\033[1;33m"
+#define END      "\033[0m"
+#else
+#define RED
+#define GREEN
+#define YELLOW
+#define END
+#endif
 
-#ifdef VIDEO
+// optionally parse a sector address into track/side/sector
+char *sector_string(int drive, uint32_t lba) {
+  static char str[32];
+  strcpy(str, "");
+  return str;
+}
+
+/* =============================== video =================================== */
 
 // This is the max texture size we can handle. The actual size at 28Mhz sampling rate
 // and without scan doubler will be 1816x313 since the actual pixel clock is only 7Mhz.
@@ -300,9 +305,7 @@ void capture_video(void) {
 	    sdl_cancelled = 1;
       }
       
-#ifndef UART_ONLY
       printf("%.3fms frame %d is %dx%d\n", simulation_time*1000, frame, frame_line_len, sy);
-#endif
 
       frame++;
       frame_line_len = 0;
@@ -310,7 +313,6 @@ void capture_video(void) {
     }    
   }
 }
-#endif
 
 void hexdump(void *data, int size) {
   int i, b2c;
@@ -334,19 +336,6 @@ void hexdump(void *data, int size) {
     n    += b2c;
   }
 }
-
-// disable colorization for easier handling in editors 
-#if 1
-#define RED      "\033[0;31m"
-#define GREEN    "\033[0;32m"
-#define YELLOW   "\033[1;33m"
-#define END      "\033[0m"
-#else
-#define RED
-#define GREEN
-#define YELLOW
-#define END
-#endif
 
 static void hexdiff(void *data, void *cmp, int size) {
   int i, b2c;
@@ -420,466 +409,111 @@ void load_kick(void) {
   fclose(fd);
 }
 
-#ifdef FDC_TEST
-// code taken from minimig firmware fdd.c
-#define TRACK_SIZE 12668
-#define HEADER_SIZE 0x40
-#define DATA_SIZE 0x400
-#define SECTOR_SIZE (HEADER_SIZE + DATA_SIZE)
-#define SECTOR_COUNT 11
-#define LAST_SECTOR (SECTOR_COUNT - 1)
-#define GAP_SIZE (TRACK_SIZE - SECTOR_COUNT * SECTOR_SIZE)
+void fdc_verify(uint16_t word) {
+  static uint16_t header[24];
+  static uint16_t csum[4];
+  static uint16_t data[512];
+  
+  static int state = -1;
+  static int count = 0;
 
-unsigned char track_buffer[TRACK_SIZE];
+  static int track, sector;
+  
+  // decode MFM encoded data as sent by
+  // the amiga paula floppy interface to the CPU
+  // printf("%d/%d busrd %04x\n", state, count, word);
 
-void SPI(int data) {
-  static int cnt = 0;
-
-  if(data == -1) {
-    printf("resetting buffer\n");
-    cnt=0;
+  // in whatever state we are, the sync marker
+  // throws us back into the start state
+  if(word == 0x4489) {
+    printf("FDC sync detected\n");
+    state = 0;
+    count = 0;
     return;
   }
-  
-  // we may receive more than a full track. This happens if the software
-  // requests more than 12668 bytes. The track then wraps and starts
-  // transmitting from the track start again ...
-  // We ignore this data on minimig size and wrap accordingly during
-  // comparison
-  if(cnt >= TRACK_SIZE) {
-    // printf("Track buffer overflow by %d\n", cnt - TRACK_SIZE);
-    cnt++;
-    return;
-  }
-  
-  track_buffer[cnt++] = data;  
-  if(cnt == TRACK_SIZE) {
-    printf("Minimig: complete firmware generated track in buffer\n");
-#if 0
-    // dump a single sector and header split into data and clock
-    for(int i=0;i<SECTOR_SIZE;i) {
-      printf("%04x:", i);
-#if 0
-      // print hex words
-      for(int j=0;j<8;j++,i+=2) {
-	unsigned short w = 256*track_buffer[i]+track_buffer[i+1];	
-	printf(" %04x", w);
-      }
-#else
-      // print data split clock and data bytes
-      for(int j=0;j<8;j++,i+=2) {
-	unsigned short w = 256*track_buffer[i]+track_buffer[i+1];
-	unsigned char b =
-	  ((w&0x8000)>>8)|((w&0x2000)>>7)|((w&0x0800)>>6)|((w&0x0200)>>5)|
-	  ((w&0x0080)>>4)|((w&0x0020)>>3)|((w&0x0008)>>2)|((w&0x0002)>>1);	
-	printf(" %02x", b);
-      }
 
-      printf(" ");
-      i-=16;
+  // in state -1 only the sync marker is accepted
+  if(state < 0) return;
+  
+  switch(state) {
+  case 0:
+    // state 0: collect header data
+    header[count++] = ((word&0xff) << 8) | ((word&0xff00) >> 8);
+    if(count == 24) {
+      // parse header
+      uint16_t csum0 = (header[0] ^ header[2]) & 0x5555;
+      uint16_t csum1 = (header[1] ^ header[3]) & 0x5555;
+      if((csum0 == (header[22]&0x5555)) && (csum1 == (header[23]&0x5555))) {
+	uint8_t *hdr8 = (uint8_t*)header;
+	
+	// checksum ok
+
+	// extract track and sector
+	track = ((hdr8[1] & 0x55)<<1) | (hdr8[5] & 0x55);
+	sector = ((hdr8[2] & 0x55)<<1) | (hdr8[6]& 0x55);
+
+	uint8_t sec2end = ((hdr8[3] & 0x55)<<1) | (hdr8[7]& 0x55);
+	printf("CPU reading FDC data for track %d, side %d, sector %d\n", track>>1, 1^(track&1), sector);
+
+	// expected sectors to end is 11-sector
+	if(sec2end != 11-sector) printf(RED "Unexpected sector to end %d" END "\n", sec2end);
       
-      for(int j=0;j<8;j++,i+=2) {
-	unsigned short w = 256*track_buffer[i]+track_buffer[i+1];
-	unsigned char b =
-	  ((w&0x4000)>>7)|((w&0x1000)>>6)|((w&0x0400)>>5)|((w&0x0100)>>4)|
-	  ((w&0x0040)>>3)|((w&0x0100)>>2)|((w&0x0004)>>1)|((w&0x0001)>>0);	
-	printf(" %02x", b);
-      }
-#endif      
-      printf("\n");
-    }    
-#endif
-  }
-}
-
-void SendSector(unsigned char *pData, unsigned char sector, unsigned char track,
-		unsigned char dsksynch, unsigned char dsksyncl)
-{
-    unsigned char header_checksum[4];
-    unsigned char data_checksum[4];
-    unsigned short i;
-    unsigned char x;
-    unsigned char *p;
-
-    // preamble
-    SPI(0xAA);
-    SPI(0xAA);
-    SPI(0xAA);
-    SPI(0xAA);
-
-    // synchronization
-    SPI(dsksynch);
-    SPI(dsksyncl);
-    SPI(dsksynch);
-    SPI(dsksyncl);
-
-    // odd bits of header
-    x = 0x55;
-    header_checksum[0] = x;
-    SPI(x);
-    x = track >> 1 & 0x55;
-    header_checksum[1] = x;
-    SPI(x);
-    x = sector >> 1 & 0x55;
-    header_checksum[2] = x;
-    SPI(x);
-    x = 11 - sector >> 1 & 0x55;
-    header_checksum[3] = x;
-    SPI(x);
-
-    // even bits of header
-    x = 0x55;
-    header_checksum[0] ^= x;
-    SPI(x);
-    x = track & 0x55;
-    header_checksum[1] ^= x;
-    SPI(x);
-    x = sector & 0x55;
-    header_checksum[2] ^= x;
-    SPI(x);
-    x = 11 - sector & 0x55;
-    header_checksum[3] ^= x;
-    SPI(x);
-
-    // sector label and reserved area (changes nothing to checksum)
-    i = 0x20;
-    while (i--)
-        SPI(0xAA);
-
-    // send header checksum
-    SPI(0xAA);
-    SPI(0xAA);
-    SPI(0xAA);
-    SPI(0xAA);
-    SPI(header_checksum[0] | 0xAA);
-    SPI(header_checksum[1] | 0xAA);
-    SPI(header_checksum[2] | 0xAA);
-    SPI(header_checksum[3] | 0xAA);
-
-    // calculate data checksum
-    data_checksum[0] = 0;
-    data_checksum[1] = 0;
-    data_checksum[2] = 0;
-    data_checksum[3] = 0;
-    p = pData;
-    i = DATA_SIZE / 2 / 4;
-    while (i--)
-    {
-        x = *p++;
-        data_checksum[0] ^= x ^ x >> 1;
-        x = *p++;
-        data_checksum[1] ^= x ^ x >> 1;
-        x = *p++;
-        data_checksum[2] ^= x ^ x >> 1;
-        x = *p++;
-        data_checksum[3] ^= x ^ x >> 1;
+	state = 1;
+	count = 0;
+      } else {
+	printf(RED "Header checksum failed:  %04x,%04x != %04x,%04x" END "\n", csum0, csum1, header[22]&0x5555, header[23]&0x5555);	
+	state = -1;
+	exit(-1);
+      }	
     }
+    break;
 
-    // send data checksum
-    SPI(0xAA);
-    SPI(0xAA);
-    SPI(0xAA);
-    SPI(0xAA);
-    SPI(data_checksum[0] | 0xAA);
-    SPI(data_checksum[1] | 0xAA);
-    SPI(data_checksum[2] | 0xAA);
-    SPI(data_checksum[3] | 0xAA);
+  case 1:
+    // state 1: collect data checksum
+    csum[count++] = ((word&0xff) << 8) | ((word&0xff00) >> 8);
+    if(count == 4) { state = 2; count = 0; }
+    break;
 
-    // odd bits of data field
-    i = DATA_SIZE / 2;
-    p = pData;
-    while (i--)
-        SPI(*p++ >> 1 | 0xAA);
+  case 2:
+    // state 2: collect data 
+    data[count++] = ((word&0xff) << 8) | ((word&0xff00) >> 8);
+    if(count == 512) {
+      // decode data
+      uint8_t decoded[512];
 
-    // even bits of data field
-    i = DATA_SIZE / 2;
-    p = pData;
-    while (i--)
-      SPI(*p++ | 0xAA);
+      uint8_t *d8 = (uint8_t*)data;
+      // decode odd bits
+      for(int i=0;i<512;i++) decoded[i]  = (d8[i] & 0x55)<<1;
+      // decode even bits
+      for(int i=0;i<512;i++) decoded[i] |= (d8[512+i] & 0x55);
 
-#if 0
-    printf("header checksum: %02x/%02x/%02x/%02x\n",
-           header_checksum[0] | 0xAA,header_checksum[1] | 0xAA,
-           header_checksum[2] | 0xAA,header_checksum[3] | 0xAA);
-    
-    printf("data checksum: %02x/%02x/%02x/%02x\n",
-           data_checksum[0] | 0xAA,data_checksum[1] | 0xAA,
-           data_checksum[2] | 0xAA,data_checksum[3] | 0xAA);   
-#endif
-}
+      // mask clock bits from received checksum
+      csum[0] &= 0x5555; csum[1] &= 0x5555; csum[2] &= 0x5555; csum[3] &= 0x5555;      
 
-void SendGap(void) {
-  unsigned short i = GAP_SIZE;
-  while (i--)
-    SPI(0xAA);
-}
+      // calculate checksum from received data
+      uint32_t dcsum = 0;
+      uint32_t *dec32 = (uint32_t*)decoded;
+      for(int i=0;i<128;i++) dcsum ^= (dec32[i] ^ dec32[i]>>1) & 0x55555555;
 
-static unsigned char sector_buffer[11][512];
-
-void build_track_buffer(int sector, unsigned char *data) {
-  static int last_track = -1;
-  
-  int track_sec = sector % 11;   // sector within track
-
-  if(sector/11 != last_track) {
-    printf("track now %d\n", sector/11);
-    last_track = sector/11;
-    SPI(-1);
-  }
-
-  printf("Loading track %d, side %d, sector %d\n", sector/22, (sector/11)%2, sector%11);
-  
-  if(!data) {
-    fseek(adf_fd, sector*512, SEEK_SET);
-    if(fread(sector_buffer[track_sec], 1, 512, adf_fd) != 512) {  perror("read error"); return; }
-  } else
-    memcpy(sector_buffer[track_sec], data, 512);
-
-  SendSector(sector_buffer[track_sec], track_sec, sector/11, 0x44, 0x89);
-
-  // send GAP after last sector
-  if(track_sec == 10)
-    SendGap();
-}
-
-// The ram_test programs the hardware to sync onto 0x4489. This
-// will result in the first 6 bytes not being written to ram
-#define FDC_SKIP 6
-
-#ifdef SD_EMU
-// Calculate CRC7
-// It's a 7 bit CRC with polynomial x^7 + x^3 + 1
-// input:
-//   crcIn - the CRC before (0 for first step)
-//   data - byte for CRC calculation
-// return: the new CRC7
-uint8_t CRC7_one(uint8_t crcIn, uint8_t data) {
-  const uint8_t g = 0x89;
-  uint8_t i;
-
-  crcIn ^= data;
-  for (i = 0; i < 8; i++) {
-    if (crcIn & 0x80) crcIn ^= g;
-    crcIn <<= 1;
-  }
-  
-  return crcIn;
-}
-
-// Calculate CRC16 CCITT
-// It's a 16 bit CRC with polynomial x^16 + x^12 + x^5 + 1
-// input:
-//   crcIn - the CRC before (0 for rist step)
-//   data - byte for CRC calculation
-// return: the CRC16 value
-uint16_t CRC16_one(uint16_t crcIn, uint8_t data) {
-  crcIn  = (uint8_t)(crcIn >> 8)|(crcIn << 8);
-  crcIn ^=  data;
-  crcIn ^= (uint8_t)(crcIn & 0xff) >> 4;
-  crcIn ^= (crcIn << 8) << 4;
-  crcIn ^= ((crcIn & 0xff) << 4) << 1;
-  
-  return crcIn;
-}
-
-uint8_t getCRC(unsigned char cmd, unsigned long arg) {
-  uint8_t CRC = CRC7_one(0, cmd);
-  for (int i=0; i<4; i++) CRC = CRC7_one(CRC, ((unsigned char*)(&arg))[3-i]);
-  return CRC;
-}
-
-uint8_t getCRC_bytes(unsigned char *data, int len) {
-  uint8_t CRC = 0;
-  while(len--) CRC = CRC7_one(CRC, *data++);
-  return CRC;  
-}
-
-unsigned long long reply(unsigned char cmd, unsigned long arg) {
-  unsigned long r = 0;
-  r |= ((unsigned long long)cmd) << 40;
-  r |= ((unsigned long long)arg) << 8;
-  r |= getCRC(cmd, arg);
-  r |= 1;
-  return r;
-}
-
-#define OCR  0xc0ff8000  // not busy, CCS=1(SDHC card), all voltage, not dual-voltage card
-#define RCA  0x0013
-
-// total cid respose is 136 bits / 17 bytes
-unsigned char cid[17] = "\x3f" "\x02TMS" "A08G" "\x14\x39\x4a\x67" "\xc7\x00\xe4";
-
-void sd_handle()  {
-  static int last_sdclk = -1;
-  static unsigned long sector = 0xffffffff;
-  static unsigned long long flen;
-  static FILE *fd = NULL;
-  static uint8_t sector_data[520];   // 512 bytes + four 16 bit crcs
-  static long long cmd_in = -1;
-  static long long cmd_out = -1;
-  static unsigned char *cmd_ptr = 0;
-  static int cmd_bits = 0;
-  static unsigned char *dat_ptr = 0;
-  static int dat_bits = 0;
-  static int last_was_acmd = 0;
-  
-  if(tb->sdclk != last_sdclk) {
-    // rising sd card clock edge
-    if(tb->sdclk) {
-      cmd_in = ((cmd_in << 1) | tb->sdcmd) & 0xffffffffffffll;
-
-      // sending 4 data bits
-      if(dat_ptr && dat_bits) {
-        if(dat_bits == 128*8 + 16 + 1 + 1) {
-          // card sends start bit
-          tb->sddat_in = 0;
-          printf("READ-4 START\n");
-        } else if(dat_bits > 1) {
-          if(dat_bits == 128*8 + 16 + 1) printf("READ DATA START\n");
-          if(dat_bits == 1) printf("READ DATA END\n");
-          int nibble = dat_bits&1;   // 1: high nibble, 0: low nibble
-          if(nibble) tb->sddat_in = (*dat_ptr >> 4)&15;
-          else       tb->sddat_in = *dat_ptr++ & 15;
-        } else
-	  tb->sddat_in = 15;
-	
-        dat_bits--;
-      }
+      if(dcsum != *(uint32_t*)(csum+2))
+	printf(RED "Data checksum failure 0x%08x != 0x%08x" END "\n", dcsum, *(uint32_t*)(csum+2));
       
-      if(cmd_ptr && cmd_bits) {
-        int bit = 7-((cmd_bits-1) & 7);
-        tb->sdcmd_in = (*cmd_ptr & (0x80>>bit))?1:0;
-        if(bit == 7) cmd_ptr++;
-        cmd_bits--;
-      } else {      
-        tb->sdcmd_in = (cmd_out & (1ll<<47))?1:0;
-        cmd_out = (cmd_out << 1)|1;
-      }
-      
-      // check if bit 47 is 0, 46 is 1 and 0 is 1
-      if( !(cmd_in & (1ll<<47)) && (cmd_in & (1ll<<46)) && (cmd_in & (1ll<<0))) {
-        unsigned char cmd  = (cmd_in >> 40) & 0x7f;
-        unsigned long arg  = (cmd_in >>  8) & 0xffffffff;
-        unsigned char crc7 = cmd_in & 0xfe;
+      // get original sector data from sd card
+      uint8_t orig[512];
+      // TODO: fix drive index
+      sd_get_sector(0, track*11+sector, orig);
+
+      if(memcmp(decoded, orig, 512) != 0) {
+	printf(RED "Data LBA %d comparison failed with checksum %08x" END "\n",  track*11+sector, dcsum);
+	hexdiff(decoded, orig, 512);
+      } else
+	printf(GREEN "Data successfully received for LBA %d with checksum %08x" END "\n",  track*11+sector, dcsum);
 	
-        // r1 reply:
-        // bit 7 - 0
-        // bit 6 - parameter error
-        // bit 5 - address error
-        // bit 4 - erase sequence error
-        // bit 3 - com crc error
-        // bit 2 - illegal command
-        // bit 1 - erase reset
-        // bit 0 - in idle state
-
-        if(crc7 == getCRC(cmd, arg)) {
-          printf("%cCMD %2d, ARG %08lx\n", last_was_acmd?'A':' ', cmd & 0x3f, arg);
-          switch(cmd & 0x3f) {
-          case 0:  // Go Idle State
-            break;
-          case 8:  // Send Interface Condition Command
-            cmd_out = reply(8, arg);
-            break;
-          case 55: // Application Specific Command
-            cmd_out = reply(55, 0);
-            break;
-          case 41: // Send Host Capacity Support
-            cmd_out = reply(63, OCR);
-            break;
-          case 2:  // Send CID
-            cid[16] = getCRC_bytes(cid, 16) | 1;  // Adjust CRC
-            cmd_ptr = cid;
-            cmd_bits = 136;
-            break;
-           case 3:  // Send Relative Address
-            cmd_out = reply(3, (RCA<<16) | 0);  // status = 0
-            break;
-          case 7:  // select card
-            cmd_out = reply(7, 0);    // may indicate busy          
-            break;
-          case 6:  // set bus width
-            printf("Set bus width to %ld\n", arg);
-            cmd_out = reply(6, 0);
-            break;
-          case 16: // set block len (should be 512)
-            printf("Set block len to %ld\n", arg);
-            cmd_out = reply(16, 0);    // ok
-            break;
-          case 17:  // read block
-            printf("Request to read single block %ld\n", arg);
-            cmd_out = reply(17, 0);    // ok
-
-            // load sector
-            {
-	      // check for floppy data request
-	      if(!fd) {
-		fd = fopen(FLOPPY_ADF, "rb");
-		if(!fd) { perror("OPEN ERROR"); exit(-1); }
-		fseek(fd, 0, SEEK_END);
-		flen = ftell(fd);
-		printf("Image size is %lld\n", flen);
-		fseek(fd, 0, SEEK_SET);
-	      }
-	      
-              fseek(fd, 512 * arg, SEEK_SET);
-              int items = fread(sector_data, 2, 256, fd);
-              if(items != 256) perror("fread()");
-
-	      // trigger minimig MFM encoding for comparison
-	      build_track_buffer(arg, sector_data);
-            }
-            {
-              unsigned short crc[4] = { 0,0,0,0 };
-              unsigned char dbits[4];
-              for(int i=0;i<512;i++) {
-                // calculate the crc for each data line seperately
-                for(int c=0;c<4;c++) {
-                  if((i & 3) == 0) dbits[c] = 0;
-                  dbits[c] = (dbits[c] << 2) | ((sector_data[i]&(0x10<<c))?2:0) | ((sector_data[i]&(0x01<<c))?1:0);      
-                  if((i & 3) == 3) crc[c] = CRC16_one(crc[c], dbits[c]);
-                }
-              }
-
-              printf("SDC CRC = %04x/%04x/%04x/%04x\n", crc[0], crc[1], crc[2], crc[3]);
-
-              // append crc's to sector_data
-              for(int i=0;i<8;i++) sector_data[512+i] = 0;
-              for(int i=0;i<16;i++) {
-                int crc_nibble =
-                  ((crc[0] & (0x8000 >> i))?1:0) +
-                  ((crc[1] & (0x8000 >> i))?2:0) +
-                  ((crc[2] & (0x8000 >> i))?4:0) +
-                  ((crc[3] & (0x8000 >> i))?8:0);
-
-                sector_data[512+i/2] |= (i&1)?(crc_nibble):(crc_nibble<<4);
-              }
-            }
-            dat_ptr = sector_data;
-            dat_bits = 128*8 + 16 + 1 + 1;
-	    break;
-            
-          default:
-            printf("unexpected command\n");
-          }
-
-          last_was_acmd = (cmd & 0x3f) == 55;
-          
-          cmd_in = -1;
-        } else
-          printf("CMD %02x, ARG %08lx, CRC7 %02x != %02x!!\n", cmd, arg, crc7, getCRC(cmd, arg));         
-      }      
-    }      
-    last_sdclk = tb->sdclk;     
+      state = -1;
+    }
+    break;
   }
-}      
-#endif
-#endif
- 
-#if MEMTRACE > 0
-FILE *mem_fd = NULL;
-#endif
-
-#define RDB_U32(a)  (((unsigned long)(sector_buffer[0][4*(a)])<<24) + ((unsigned long)(sector_buffer[0][4*(a)+1])<<16) + ((unsigned long)(sector_buffer[0][4*(a)+2])<<8) + (unsigned long)(sector_buffer[0][4*(a)+3]))
+}
 
 // proceed simulation by one tick
 void tick(int c) {
@@ -887,25 +521,6 @@ void tick(int c) {
   static int sector_tx = 0;
   static int sector_tx_cnt = 512;
   static int sector_rx_cnt = 512;  
-#ifndef SD_EMU      
-  static int write_drv;
-  static int write_sector;
-  static int write_ack_delay = 0;
-#endif
-  
-#if MEMTRACE > 0
-  if(!mem_fd) {
-#if MEMTRACE == 1
-    printf("Writing memory trace\n");
-    mem_fd = fopen("memtrace.txt", "w");
-    if(!mem_fd) { perror("cannot open 'memtrace.txt' for writing"); exit(-1); }
-#else
-    printf("Verifying memory trace\n");
-    mem_fd = fopen("memtrace.txt", "r");
-    if(!mem_fd) { perror("cannot open 'memtrace.txt' for reading"); exit(-1); }
-#endif
-  }  
-#endif
   
   tb->clk = c;
 
@@ -913,18 +528,16 @@ void tick(int c) {
 
     static int cpu_reset = -1;
     if (tb->cpu_reset != cpu_reset) {
-      printf("%.3fms <<<<<<<<<<<<<CPU changed reset to %d>>>>>>>>>>>>>\n",
-	     simulation_time*1000, tb->cpu_reset);
+      printf("%.3fms CPU changed reset to %d\n", simulation_time*1000, tb->cpu_reset);
       cpu_reset = tb->cpu_reset;
     }
     
-    // leave reset after 20 ms of simulation time
-    if ( tb->reset && simulation_time > 0.02 && simulation_time < 0.03) {
-      printf("%.3fms Out of reset\n", simulation_time*1000);
+    // release reset after 10 ms of simulation time
+    if ( tb->reset && simulation_time > 0.005 && simulation_time < 0.0051) {
+      printf("%.3fms Releasing reset\n", simulation_time*1000);
       tb->reset = 0;
     }
     
-#ifndef UART_ONLY
     // check for power led
     static int pwr_led = -1;
     if(tb->pwr_led != pwr_led) {
@@ -945,7 +558,6 @@ void tick(int c) {
       printf("%.3fms HDD LED = %s\n", simulation_time*1000, tb->hdd_led?"ON":"OFF");
       hdd_led = tb->hdd_led;
     }
-#endif
     
     // ========================== analyze uart output (for diag rom) ===========================
     static int tx_data = tb->uart_tx;
@@ -976,104 +588,15 @@ void tick(int c) {
 	if(!(tx_byte & 0x200)) {
 	  printf("----> broken stop bit!!!!!!!!!!!\n");
 	}
-	else {
-#ifndef UART_ONLY
+	else 
 	  printf("UART(%02x %c)\n", (tx_byte >> 1)&0xff, (tx_byte >> 1)&0xff);
-#else
-	  printf("%c", (tx_byte >> 1)&0xff);
-	  fflush(stdout);
-#endif
-	}
+
 	tx_byte = 0xffff;
       }
       
       tx_last = simulation_time;
     }
   
-#ifdef FDC_TEST
-    /* ----------------- sdc interface ---------------- */
-    
-#ifndef SD_EMU
-    // send bytes into sdc buffer
-    tb->sdc_byte_in_strobe = 0;
-    static int sub_cnt = 0;
-
-    if(sub_cnt++ == 8) {
-      sub_cnt = 0;
-
-      if(tb->sdc_done) {
-	tb->sdc_byte_addr = 0;      
-	tb->sdc_done = 0;
-      }
-	
-      // push requested sector data into core
-      if(tb->sdc_busy) {
-	if(write_ack_delay) {
-	  write_ack_delay--;
-	  if(!write_ack_delay) {
-	    tb->sdc_done = 1;
-	    tb->sdc_busy = 0;
-	  }
-	}
-
-	if(sector_rx_cnt < 512) {
-
-	  // the address has been put out already. Now read data and
-	  // increase the address
-	  sector_buffer[0][sector_rx_cnt++] = tb->sdc_byte_out_data;
-	  
-	  if(sector_rx_cnt == 512) {
-	    // dump data that should be written
-	    // hexdump(sector_buffer[0], 512);
-
-	    printf("Writing to drive %d, sector %d\n", write_drv, write_sector);
-	    if(write_drv < 4) {
-	      // read original sector for comparison
-	      char ref[512];	      
-	      fseeko(adf_fd, write_sector*512ll, SEEK_SET);
-	      if(fread(ref, 1, 512, adf_fd) != 512) {
-		perror("adf read error"); return; }
-
-	      hexdiff(ref, sector_buffer[0], 512);
-#if 0
-	      fseeko(adf_fd, write_sector*512ll, SEEK_SET);
-	      if(fwrite(sector_buffer[0], 1, 512, adf_fd) != 512) {
-		perror("adf write error"); return; }
-#endif
-	    } else {	      
-	      /* write data to image */
-	      fseeko(hdf_fd[write_drv-4], write_sector*512ll, SEEK_SET);
-	      if(fwrite(sector_buffer[0], 1, 512, hdf_fd[write_drv-4]) != 512) {
-		perror("hdf write error"); return; }
-	    }
-#if 0
-	    write_ack_delay = 50000;  // wait some time before clearing busy
-	    // 5000 gives some delay which needs paula to cope with this
-	    // 50000 causes the fifo to run full and throttles the amiga
-#else
-	    tb->sdc_done = 1;
-	    tb->sdc_busy = 0;
-#endif
-	  } else
-	    tb->sdc_byte_addr = sector_rx_cnt;
-	}
-	  
-	if(sector_tx_cnt < 512) {
-	  // printf("Send %d/%d\n", sector_tx, sector_tx_cnt);
-	  
-	  tb->sdc_byte_in_strobe = 1;
-	  tb->sdc_byte_in_data = sector_buffer[sector_tx][sector_tx_cnt];
-	  tb->sdc_byte_addr = sector_tx_cnt++;
-	  
-	  if(sector_tx_cnt == 512) {
-	    tb->sdc_done = 1;
-	    tb->sdc_busy = 0;
-	  }
-	}
-      }
-    }
-#endif
-    
     if(tb->clk7n_en) {    
 #ifdef FDC_RAM_TEST_VERIFY
       static int ram_cnt = 0;
@@ -1102,158 +625,20 @@ void tick(int c) {
       }
 #endif
 
-#ifndef SD_EMU      
-      static int sdc_wr = -1;
-      if(tb->sdc_wr != sdc_wr && (!tb->sdc_wr || (!tb->sdc_busy && !tb->sdc_done))) {
-	printf("%.3fms SD: sdc_wr = %d\n", simulation_time*1000, tb->sdc_wr);
-	sdc_wr = tb->sdc_wr;
-
-	if(tb->sdc_wr & 0x0f ) {
-	  int drv = (tb->sdc_wr&0x01)?0:
-	    (tb->sdc_wr&0x02)?1:
-	    (tb->sdc_wr&0x04)?2:
-	    3;
-	    
-	  tb->sdc_busy = 1;  // acknowledge reception of command
-
-	  printf("%.3fms SD FDC %d write request, sector %d (tr %d, sd %d, sec %d)\n",
-		 simulation_time*1000, drv, tb->sdc_sector, tb->sdc_sector/22,
-		 (tb->sdc_sector/11)&1, tb->sdc_sector%11);
-
-	  write_drv = drv;
-	  write_sector = tb->sdc_sector;
-	  tb->sdc_byte_addr = sector_rx_cnt = 0;
-	}
-	
-	if(tb->sdc_wr & 0x30 ) {
-	  int drv = (tb->sdc_wr&0x10)?4:5;
-	  tb->sdc_busy = 1;
-
-	  printf("%.3fms SD HDD %d write request, sector %d\n",
-		 simulation_time*1000, drv, tb->sdc_sector);
-
-	  write_drv = drv;
-	  write_sector = tb->sdc_sector;
-	  tb->sdc_byte_addr = sector_rx_cnt = 0;
-	}
-      }
-
-      static int sdc_rd = -1;
-      if(tb->sdc_rd != sdc_rd && (!tb->sdc_rd || (!tb->sdc_busy && !tb->sdc_done))) {
-	printf("%.3fms SD: sdc_rd = %d\n", simulation_time*1000, tb->sdc_rd);
-	sdc_rd = tb->sdc_rd;
-	
-	if(tb->sdc_rd == 1) {
-	  tb->sdc_busy = 1;
-	  printf("%.3fms SD FDC read request, sector %d (tr %d, sd %d, sec %d)\n",
-		 simulation_time*1000, tb->sdc_sector, tb->sdc_sector/22,
-		 (tb->sdc_sector/11)&1, tb->sdc_sector%11);
-	  
-	  // this triggers two things:
-	  // - the track is read into a track buffer using the minimig MFM encoder
-	  // - the sectors are sent into Paula/Floppy as raw sectors
-	  build_track_buffer(tb->sdc_sector, NULL);
-	  sector_tx_cnt = 0;
-	  sector_tx = tb->sdc_sector%11;
-	}
-	
-	if(tb->sdc_rd & 0x30 && (!tb->sdc_rd || (!tb->sdc_busy && !tb->sdc_done))) {
-	  int drv = (tb->sdc_rd&0x10)?0:1;
-	  
-	  tb->sdc_busy = 1;
-	  printf("%.3fms SD HDD %d read request, sector %d\n",
-		 simulation_time*1000, drv, tb->sdc_sector);
-
-	  // send one sector into core
-
-	  // Minimig 80MB image:
-	  // 80936960 Bytes
-	  // 158080 sectors total (2*2*2*2*2*2*2*5*13*19)
-	  // CSH from RDB: 627/63/4 = 158004
-	  
-	  if(hdf_fd[drv]) {
-	    fseeko(hdf_fd[drv], tb->sdc_sector*512ll, SEEK_SET);
-	    if(fread(sector_buffer[0], 1, 512, hdf_fd[drv]) != 512) {
-	      perror("hdf read error"); return; }
-	    hexdump(sector_buffer[0], 512);
-
-	    // dump some info on rdb
-	    if(tb->sdc_sector == 0) {
-	      if( strncmp((char*)sector_buffer[0], "RDSK", 4) != 0)
-		printf("Not a RDB image!!\n");
-	      else {
-		printf("DRV%d RDB ID ok\n", drv);
-		printf("Blocksize:  %ld\n", RDB_U32(4));
-		printf("Cylinders:  %ld\n", RDB_U32(16));
-		printf("Heads:      %ld\n", RDB_U32(18));
-		printf("Sectors:    %ld\n", RDB_U32(17));
-	      }
-	    }
-	  }
-	  
-	  sector_tx_cnt = 0;
-	  sector_tx = 0;
-	}
-      }
-#endif
     }
-
-    // fake a disk image insertion
-    static int insert_counter = 0;
-    if(insert_counter < 1000) {
-      // check if floppy image can be mounted    
-      if(insert_counter == 100) {
-#ifdef FLOPPY_ADF
-	printf("FLOPPY: Using image '%s'\n", FLOPPY_ADF);
-#endif
-	if(adf_fd) {
-	  fseek(adf_fd, 0, SEEK_END);
-	  tb->sdc_img_size = ftello(adf_fd);
- 
-	  printf("FLOPPY: Mounting df0 image size %ld bytes.\n", tb->sdc_img_size);	
-	} else
-	  printf("FLOPPY: Unable to open floppy disk image. Not mounting disk.\n");
-      }
-      
-      if(insert_counter == 200 || insert_counter == 300) {
-	int drv = (insert_counter == 200)?0:1;
-	
-	if(!drv) {
-#ifdef HARDDISK0_HDF
-	  printf("HDD0: Using image '%s'\n", HARDDISK0_HDF);
-#endif
-	} else {
-#ifdef HARDDISK1_HDF
-	  printf("HDD1: Using image '%s'\n", HARDDISK1_HDF);
-#endif
-	}
-	
-	if(hdf_fd[drv]) {
-	  fseek(hdf_fd[drv], 0, SEEK_END);
-	  tb->sdc_img_size = ftello(hdf_fd[drv]);
-	  
-	  printf("HDD%d: Mounting image size %ld bytes.\n", drv, tb->sdc_img_size);	
-	} else
-	  printf("HDD%d: Unable to open harddisk image. Not mounting disk.\n", drv);
-      }
-      
-      if(tb->sdc_img_size) {  
-	if(insert_counter == 120) tb->sdc_img_mounted = 1<<0;
-	if(insert_counter == 220) tb->sdc_img_mounted = 1<<4;
-	if(insert_counter == 320) tb->sdc_img_mounted = 1<<5;
-	if(insert_counter == 140 || insert_counter == 240 || insert_counter == 340) tb->sdc_img_mounted = 0;
-	if(insert_counter == 160 || insert_counter == 260 || insert_counter == 360) tb->sdc_img_size = 0;
-      }
-      insert_counter++;
-    }
-
-#ifdef SD_EMU
+    
     // full sd card emulation enabled
     sd_handle();
-#endif    
+
+    // capture CPU access to floppy fifo in order to verify sd card/floppy
+    // encoding/decoding
     
-#endif
-    
+    if(tb->clk7n_en) {    
+      // analyze CPU accessing paula/floppy
+      if(tb->nanomig_tb->nanomig->minimig->PAULA1->pf1->busrd)
+	fdc_verify(tb->nanomig_tb->nanomig->minimig->PAULA1->pf1->fifo_out);
+    }
+      
     /* ----------------- simulate ram/kick ---------------- */
 
     // counter within 7 Mhz cycle
@@ -1283,73 +668,6 @@ void tick(int c) {
 	  fatal = 1;
 	}	
 	
-#if MEMTRACE == 1
-	if(tb->ram_address >= 0x3e0000) {	
-	  // write kick access to trace file
-	  fprintf(mem_fd, "K %08x %04x\n", tb->ram_address, tb->ramdata_in);
-	}
-#elif MEMTRACE == 2
-	if(tb->ram_address >= 0x3e0000) {	
-	  static int err_cnt = 0;
-
-	  if(err_cnt < 30) {
-	    static int skip_to_addr = 0;
-	    static int skipped = 0;
-
-	    if(skip_to_addr && tb->ram_address != skip_to_addr) {
-	      // printf("skipping %08x\n", tb->ram_address);
-	      skipped++;
-	    } else if(skip_to_addr) {
-	      printf("%.3fms skipped %d in simulation\n", simulation_time*1000, skipped);
-	      skip_to_addr = 0;
-	    } else {
-	      
-	      // read trace file and compare to kick access
-	      char m_c;
-	      int m_a, m_d; 
-	      int x = fscanf(mem_fd, "%c %x %x\n", &m_c, &m_a, &m_d);
-	      if(x != 3) { printf("======> End of trace <==========\n"); err_cnt = 100; }
-	      else {
-		
-		static int last_addr = 0;
-		
-		// we need to skip certain code when running the CPU at different speeds
-		// as kickstart will wait for certain hardware events and will wait a different
-		// time of CPU speed varies.
-		
-		// VPOS subroutine at kick 1.3 $fcb00c
-		// if the previous address was the one beforehand, then this is not
-		// actually the call to this routine but only the prefetching of the code before
-		if( tb->ram_address == (0x7cb00c>>1) && last_addr != (0x7cb00a>>1)) {		
-		  printf("Entered vpos routine from %08x\n", last_addr<<1);
-		  
-		  // the last address is read again when the execution returns to the caller
-		  int skip = 0;
-		  do {
-		    x = fscanf(mem_fd, "%c %x %x\n", &m_c, &m_a, &m_d);
-		    skip++;
-		  } while(x == 3 && m_a != last_addr);
-		  
-		  printf("Skipping %d reads in trace\n", skip);
-		  skip_to_addr = last_addr;
-		  skipped = 0;
-		} else {
-		
-		  last_addr = tb->ram_address;
-		
-		  if(m_c != 'K' || m_a != tb->ram_address || m_d != tb->ramdata_in) {
-		    // stop complaining after 20 errors
-		    printf("%.3fms Kick read verify failed: %c is %08x/%04x, expected %08x/%04x\n",
-			   simulation_time*1000, m_c, tb->ram_address<<1, tb->ramdata_in, m_a<<1, m_d);
-		    err_cnt++;
-		  }
-		}
-	      }
-	    }
-	  }
-	}
-#endif
-	
 	// printf("%.3fms MEM RD ADDR %08x = %04x\n", simulation_time*1000, tb->ram_address << 1, tb->ramdata_in);
       }
       if(!tb->_ram_we) {
@@ -1361,14 +679,14 @@ void tick(int c) {
 	if(!tb->_ram_bhe) ram_b[0] = tb->ram_data>>8;
 	if(!tb->_ram_ble) ram_b[1] = tb->ram_data&0xff;
       }
+      
     }
-  }
   
+  }
+
   tb->eval();
 
-#ifdef VIDEO
   if(c) capture_video();
-#endif
 
   if(simulation_time == 0)
     ticks = GetTickCountMs();
@@ -1399,79 +717,37 @@ int main(int argc, char **argv) {
   
   load_kick();
 
-#ifdef VIDEO
   init_video();
-#endif
 
   // Create an instance of our module under test
   tb = new Vnanomig_tb;
   tb->trace(trace, 99);
   trace->open("nanomig.fst");
-  
-#ifdef FDC_TEST
-#ifdef FLOPPY_ADF
-  // try to open adf floppy image
-  adf_fd = fopen(FLOPPY_ADF, "r+b");
-  if(!adf_fd) { perror("open adf file"); }
-#else
-  printf("No floppy adf specified\n");
-#endif
-  
-#ifdef HARDDISK0_HDF
-  // try to open hdf harddisk image
-  hdf_fd[0] = fopen(HARDDISK0_HDF, "r+b");
-  if(!hdf_fd[0]) { perror("DRV0: open hdf file"); }
-#else
-  printf("DRV0: No harddisk hdf specified\n");
-#endif
-  
-#ifdef HARDDISK1_HDF
-  // try to open hdf harddisk image
-  hdf_fd[1] = fopen(HARDDISK1_HDF, "rb");
-  if(!hdf_fd[1]) { perror("DRV1: open hdf file"); }
-#else
-  printf("DRV1: No harddisk hdf specified\n");
-#endif
-#endif
 
+  sd_init();
+  
   tb->reset = 1;
   tb->memory_config = 0x00; // 0x00=512k, 0x01=1M, 0x0f=3.5M
-  tb->fastram_config = 0x2; // 0=none, 1=2MB, 2=4MB
+  tb->fastram_config = 0;   // 0=none, 1=2MB, 2=4MB
   tb->floppy_config = 0x1;  // 1 = one fast drive
   tb->ide_config = 0x7;     // 7=two drives
-  
+
   /* run for a while */
   while(
-#ifdef TRACEEND
+#ifdef TRACESTART
 	simulation_time<TRACEEND &&
 #endif
-#ifdef VIDEO 
-	!sdl_cancelled &&
-#endif
-	1) {
-#ifdef TRACEEND
+	!sdl_cancelled) {
+#ifdef TRACESTART
     // do some progress outout
     int percentage = 100 * simulation_time / TRACEEND;
     static int last_perc = -1;
     if(percentage != last_perc) {
-#ifndef UART_ONLY
       printf("progress: %d%%\n", percentage);
-#endif
       last_perc = percentage;
     }
 #endif
 
-    // apply reset after 6 seconds for 1ms
-    if(simulation_time < 0.1) {      
-      static int x_reset = -1;
-      tb->reset = (int)(simulation_time * 1000) == 6000;
-      if(tb->reset != x_reset){
-	if(x_reset != -1) printf("%.3fms RESET changed to %d\n",
-				 1000*simulation_time, tb->reset);
-      }
-      x_reset = tb->reset;
-    }
-	
     tick(1);
     tick(0);
   }
@@ -1479,16 +755,4 @@ int main(int argc, char **argv) {
   printf("stopped after %.3fms\n", 1000*simulation_time);
   
   trace->close();
-
-  // hexdump(ram+(0x97f0/2), 512);
-  
-#ifdef FDC_TEST
-  if(adf_fd) fclose(adf_fd);
-  if(hdf_fd[0]) fclose(hdf_fd[0]);
-  if(hdf_fd[1]) fclose(hdf_fd[1]);
-#endif
-
-#if MEMTRACE > 0
-  if(mem_fd) fclose(mem_fd);
-#endif
 }

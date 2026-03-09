@@ -6,6 +6,9 @@
 // it can internally read and write at any rate. This file also has a 512
 // byte sector buffer to allow the same for the MCU communicating via SPI.
 //
+// The main testbench for this is the NanoMac's testbench. It allows to
+// stress test concurrent FPGA Companion and Core accesses etc.
+//
 
 module sd_card # (
     parameter [2:0] CLK_DIV = 3'd2,
@@ -47,13 +50,14 @@ module sd_card # (
     input [7:0]		  rstart, // up to eight different sources can request data 
     input [7:0]		  wstart, 
     input [31:0]	  rsector,
-    output			  rbusy,
+	output reg [2:0]  rsrc,     // source currently being process and for which 
+    output			  rbusy,    //        busy and done are valid
     output			  rdone,
 
     // sector data output interface (sync with clk)
     input [7:0]		  inbyte,
 
-	output			  outen,   // when outen=1, a byte of sector content
+	output			  outen, // when outen=1, a byte of sector content
                                // is read out from outbyte
 	output [8:0]	  outaddr, // outaddr from 0 to 511, because the
                                // sector size is 512
@@ -78,19 +82,42 @@ reg [8:0]  mcu_tx_cnt;
 // only export outen if the resulting data is for the core
 wire louten;  
 
-// drive outen only if the core reads data for itself
-assign outen = (state == CORE_IO && rstart_int)?louten:1'b0;   
+// ===== keep track of MCU requesting sector IO ======
+reg [2:0]  mcu_request;
+localparam [2:0] MCU_REQ_IDLE       = 3'd0,   // waitring for mcu requests
+				 MCU_REQ_READ       = 3'd1,   // received read request
+				 MCU_REQ_WRITE      = 3'd2,   // received write request
+				 MCU_READING        = 3'd3,   // SD card read in progress, writing data to local buffer
+				 MCU_READY2TRANSFER = 3'd4,   // SD card read done, signal MCU that it may read from buffer
+				 MCU_TRANSFERRING   = 3'd5,   // MCU is reading from buffer
+				 MCU_READY2WRITE    = 3'd6,   // MCU has filled write buffer and sd write can be started
+				 MCU_WRITING        = 3'd7;   // MCU is writing to SD card
    
-// Keep track of current sector destination. We cannot use the command
-// directly as the MCU may alter this during sector transfer
-localparam [2:0] IDLE         = 3'd0,
-                 MCU_READ_SD  = 3'd1,   // read from SD
-                 MCU_READ_TX  = 3'd2,   // transmit to MCU for read
-                 MCU_WRITE_SD = 3'd3,   // write to SD
-                 MCU_WRITE_RX = 3'd4,   // receive from MCU for write
-                 CORE_IO      = 3'd5;   // core itself does SD card IO
+reg [31:0] mcu_sector;   // sector requested by MCU
 
-reg [2:0] state; 
+// ===== keep track of Core requesting sector IO ======
+reg [2:0]  core_request;
+localparam [2:0] CORE_REQ_IDLE      = 3'd0,   //waitring for core requests
+				 CORE_REQ_READ      = 3'd1,
+				 CORE_REQ_WRITE     = 3'd2,
+				 CORE_READING       = 3'd3,   
+				 CORE_WRITING       = 3'd4;
+      
+reg [31:0] core_sector;  // sector requested by core
+
+wire	   busy_int;   // the internal/original busy signal as coming from the sd_rw
+wire	   done_int;   //                   -"- done -"-
+
+// The internal busy and done are only exposed to the core if a core transfer is being
+// handled. This will prevent the core from seeing external MCU transfers and assuming
+// its own request is being handled
+wire core_in_progress = (core_request == CORE_READING) || (core_request == CORE_WRITING);   
+assign rbusy = core_in_progress?busy_int:1'b0;
+assign rdone = core_in_progress?done_int:1'b0;   
+   
+// drive outen only if the core reads data for itself
+assign outen = (core_request == CORE_READING)?louten:1'b0;   
+   
 wire [7:0] inbyte_int;  
 
 // interrupt handling
@@ -98,6 +125,25 @@ wire rstart_any = {|{rstart}};
 wire wstart_any = {|{wstart}};
 wire start_any = rstart_any || wstart_any;
 
+// drive index for the current request
+wire [2:0] drive =
+		   (rstart[0] || wstart[0])?3'd0:
+		   (rstart[1] || wstart[1])?3'd1:
+		   (rstart[2] || wstart[2])?3'd2:
+		   (rstart[3] || wstart[3])?3'd3:
+		   (rstart[4] || wstart[4])?3'd4:
+		   (rstart[5] || wstart[5])?3'd5:
+		   (rstart[6] || wstart[6])?3'd6:
+		   3'd7;   
+
+// The MCU may allow for direct SD card access if the image is
+// continous (not fragmeneted) on card. In that case only the
+// start sector has to be known and the core will read and
+// write from and to the sd card without and further interaction
+// with the Companion.
+reg [31:0] direct_start [8];   
+wire	   direct_enable = direct_start[drive] != 32'd0;   
+   
 wire [7:0] doutb;
 reg  dinb_we;
 
@@ -106,11 +152,13 @@ sector_dpram #(8, 9) buffer
 (
 	.clock(clk),
 
-	.address_a(outaddr),
-	.wren_a((state == MCU_READ_SD) && louten),
+    // SD card side of buffer
+	.address_a(outaddr), 
+	.wren_a((mcu_request == MCU_READING) && louten),
 	.data_a(outbyte),
 	.q_a(inbyte_int),
 
+    // MCU/FPGA Companion side of buffer
 	.address_b(mcu_tx_cnt),
 	.wren_b(dinb_we),
 	.data_b(data_in),
@@ -118,15 +166,17 @@ sector_dpram #(8, 9) buffer
 );
 `else   
 sector_dpram buffer(
+    // SD card side of buffer
     .clka(clk),
     .reseta(1'b0), 
     .cea(1'b1), 					
     .ada(outaddr), 
-    .wrea((state == MCU_READ_SD) && louten), 
+    .wrea((mcu_request == MCU_READING) && louten), 
     .dina(outbyte),
     .ocea(1'b1), 
     .douta(inbyte_int),
 					
+    // MCU/FPGA Companion side of buffer
     .clkb(clk), 
     .resetb(1'b0), 
     .ceb(1'b1), 
@@ -137,7 +187,7 @@ sector_dpram buffer(
     .doutb(doutb)					
 );
 `endif
-   
+
 always @(posedge clk) begin
    reg	  startD;   
    
@@ -146,9 +196,14 @@ always @(posedge clk) begin
       startD <= 1'b0;
    end else begin
       startD <= start_any;
+
+	  // Raising edge of start_any means that the core
+	  // is requesting a sector read or write. If the requesting
+	  // device is not enabled for direct io, then the MCU needs
+	  // to be triggered for sector translation.
 	  
-      // rising edge of rstart_any raises interrupt
-      if(start_any && !startD)
+      // rising edge of start_any raises interrupt
+      if(start_any && !startD && !direct_enable)
         irq <= 1'b1;
 	  
       // iack clears interrupt
@@ -167,92 +222,195 @@ always @(posedge clk) begin
       wstart_int <= 1'b0;
       image_size <= 64'd0;
       image_mounted <= 8'b00000000;
-      state <= IDLE;      
 	  dinb_we <=1'b0;
+
+	  // no MCU or core request by now
+	  mcu_request <= MCU_REQ_IDLE;	  
+	  core_request <= CORE_REQ_IDLE;	  
    end else begin
       image_mounted <= 8'b00000000;
 
-      // done from sd reader acknowledges/clears start
-      if(rdone) begin
+	  // handle MCU/core requests
+	  if(!busy_int && !done_int) begin
+		 // honour requests if SD card is idle
+		 if(core_request == CORE_REQ_WRITE) begin
+			$display("sd_card.v: Process pending core write request");
+			core_request <= CORE_WRITING;
+
+			lsector <= core_sector; // latch sector to be read
+			wstart_int <= 1'b1;     // request sector to be written to sd card
+
+			// latch source currently being processed
+			rsrc <= wstart[0]?3'd0:wstart[1]?3'd1:wstart[2]?3'd2:wstart[3]?3'd3:
+					wstart[4]?3'd4:wstart[5]?3'd5:wstart[6]?3'd6:7'd7;			
+		 end 
+
+		 else if(core_request == CORE_REQ_READ) begin
+			$display("sd_card.v: Process pending core read request");
+			core_request <= CORE_READING;
+
+			lsector <= core_sector; // latch sector to be read
+			rstart_int <= 1'b1;     // request sector to be read from sd card			
+
+			// latch source currently being processed
+			rsrc <= rstart[0]?3'd0:rstart[1]?3'd1:rstart[2]?3'd2:rstart[3]?3'd3:
+					rstart[4]?3'd4:rstart[5]?3'd5:rstart[6]?3'd6:7'd7;			
+		 end
+
+		 else if(mcu_request == MCU_REQ_READ) begin
+			$display("sd_card.v: Process pending MCU read request");
+			mcu_request <= MCU_READING;
+			
+			lsector <= mcu_sector;  // latch sector to be read
+			rstart_int <= 1'b1;     // request sector to be read from sd card
+		 end
+
+		 else if(mcu_request == MCU_READY2WRITE) begin
+			$display("sd_card.v: Process pending MCU write request");
+			mcu_request <= MCU_WRITING;
+			
+			lsector <= mcu_sector;  // latch sector to be written
+			wstart_int <= 1'b1;     // request sector to be written to sd card
+			mcu_tx_cnt <= 9'd0;
+		 end
+	  end
+
+	  // a SD card transfer has ended, in case of a read, the MCU
+	  // may now read the data
+	  if(done_int) begin
+		 // done from sd reader acknowledges/clears start
 		 rstart_int <= 1'b0;
 		 wstart_int <= 1'b0;
-      end
+
+		 if(core_request == CORE_READING) begin
+			$display("sd_card.v: Core SD read done");
+			core_request <= CORE_REQ_IDLE;
+		 end
+
+		 else if(core_request == CORE_WRITING) begin
+			$display("sd_card.v: Core SD write done");
+			core_request <= CORE_REQ_IDLE;
+		 end
+			
+		 else if(mcu_request == MCU_READING) begin
+			$display("sd_card.v: MCU read done, waiting for MCU transfer");
+			mcu_request <= MCU_READY2TRANSFER;
+		 end
+		 
+		 else if(mcu_request == MCU_WRITING) begin
+			$display("sd_card.v: MCU SD write done");
+			mcu_request <= MCU_REQ_IDLE;
+		 end
+
+		 else
+		   $error("sd_card.v: Error, spurious done_int");
+	  end
 	  
-	  // buffer writing is triggered via dinb_we
+	  // buffer writing on MCU write is triggered via dinb_we
 	  dinb_we <=1'b0;
-	  if(dinb_we) begin
-		 if(mcu_tx_cnt < 9'd511)
-		   mcu_tx_cnt <= mcu_tx_cnt + 9'd1;
-		 else begin
-			wstart_int <= 1'b1;
-			state <= MCU_WRITE_SD;
+	  if(mcu_request == MCU_REQ_WRITE) begin
+		 if(dinb_we) begin
+			if(mcu_tx_cnt < 9'd511)
+			  mcu_tx_cnt <= mcu_tx_cnt + 9'd1;
+			else begin
+			   // buffer has been filled by MCU -> can start writing
+			   mcu_request <= MCU_READY2WRITE;			   
+			end
+		 end
+	  end
+
+	  if(!data_strobe) begin
+		 // If the core requests IO and direct access is enabled, then
+		 // don't wait for the MCU. Instead the sector to be read from SD card
+		 // is a direct offset of the requested sector relative from the
+		 // start of the image on card.
+		 if(start_any && direct_enable && core_request == CORE_REQ_IDLE) begin
+			$display("sd_card.v: Direct request for drive %0d, sector %0d", drive, rsector);
+			
+			core_sector <= direct_start[drive] + rsector;
+			if(rstart_any) core_request <= CORE_REQ_READ;
+			if(wstart_any) core_request <= CORE_REQ_WRITE;
 		 end
 	  end
 	  
-      if(data_strobe) begin
+      else begin // data_strobe active		 
          if(data_start) begin
 			command <= data_in;
-			
-			// differentiate between the two reads
-			if(data_in == 8'd2 || data_in == 8'd3)
-              state <= (data_in == 8'd3)?MCU_READ_SD:CORE_IO;
+			$display("sd_card.v: MCU start byte received: %0d", data_in);
 			
 			byte_cnt <= 4'd0;	    
-			data_out <= { card_stat, card_type, rbusy, 1'b0 };
+			data_out <= { card_stat, card_type, 2'b0 };
 		 end else begin
 			// SDC CMD 1: STATUS
 			if(command == 8'd1) begin
-               // request status information, for the MCU it doesn't matter whether
+               // request status byte, for the MCU it doesn't matter whether
 			   // the core wants to write or to read
-			   if(byte_cnt == 4'd0) data_out <= rstart | wstart;
+
+			   // only forward request if direct_enable has not been enabled by MCU
+			   if(byte_cnt == 4'd0) data_out <= direct_enable?8'h00:(rstart | wstart);
 			   if(byte_cnt == 4'd1) data_out <= rsector[31:24];
 			   if(byte_cnt == 4'd2) data_out <= rsector[23:16];
 			   if(byte_cnt == 4'd3) data_out <= rsector[15: 8];
-			   if(byte_cnt == 4'd4) data_out <= rsector[ 7: 0];
+			   if(byte_cnt == 4'd4) begin
+				  data_out <= rsector[ 7: 0];
+				  $display("sd_card.v: MCU status request");
+			   end  
 
-			   // this command can optionally send additional (debug) data
-			   if(byte_cnt == 4'd5) data_out <= { ~rsector[7], 7'd0 };   // indicate that more data is valid
-			   if(byte_cnt == 4'd6) data_out <= { 7'b0000000, |wstart};  // optional data to indicate writes
+               // this command can optionally send additional (debug) data
+               if(byte_cnt == 4'd5) data_out <= { ~rsector[7], 7'd0 };   // indicate that more data is valid
+               if(byte_cnt == 4'd6) data_out <= { 7'b0000000, |wstart};  // optional data to indicate writes
 			end
-			
-			// SDC CMD 2: CORE_RW, CMD 3: MCU_READ
-			if(command == 8'd2 || command == 8'd3) begin
-               // inform MCU about read state once command has
-               // been transferred. Return 0xff until command is
-               // complete, then the state of rstart_int, so the MCU
-               // can wait for 0 to be read when waiting for
-               // sector data to become available
+
+			// SDC CMD 2: CORE_RW
+			if(command == 8'd2) begin
                if(byte_cnt <= 4'd3) data_out <= 8'hff;
-               else	                data_out <= { 7'd0, rstart_int ||  wstart_int };
+               else	                data_out <= 8'h00;
 			   
-               if(byte_cnt == 4'd0) lsector[31:24] <= data_in;
-               if(byte_cnt == 4'd1) lsector[23:16] <= data_in;
-               if(byte_cnt == 4'd2) lsector[15: 8] <= data_in;
+               if(byte_cnt == 4'd0) core_sector[31:24] <= data_in;
+               if(byte_cnt == 4'd1) core_sector[23:16] <= data_in;
+               if(byte_cnt == 4'd2) core_sector[15: 8] <= data_in;
                if(byte_cnt == 4'd3) begin 
-                  lsector[ 7: 0] <= data_in;
+                  core_sector[ 7: 0] <= data_in;
+				  $display("sd_card.v: Core request %0d/%0d sector %0d/%8x", rstart, wstart, {core_sector[31:8], data_in}, {core_sector[31:8], data_in});				  
 				  
 				  // distinguish between read and write
-				  if(rstart_any || command == 8'd3) rstart_int <= 1'b1;
-				  if(wstart_any) wstart_int <= 1'b1;
+				  if(rstart_any) core_request <= CORE_REQ_READ;	  
+				  if(wstart_any) core_request <= CORE_REQ_WRITE;
                end
+			end
+				 
+			// SDC CMD 3: MCU_READ
+			if(command == 8'd3) begin
+			   // Store the entire MCU request separately and handle
+			   // it once the SD card is idle
 			   
-               // MCU has requested a sector. Start returning data once it arrives
-               if(command == 8'd3) begin
-                    // If sector has been requested from sd card, rstart_int
-                    // has thus been set and all data has arrived, so
-                    // rstart_int is reset again, then start mcu transfer
-                    if(byte_cnt >= 4'd4) begin
-                        if(!rstart_int) begin
-                            state <= MCU_READ_TX;
-                            mcu_tx_cnt <= 9'd0;
-                        end
-				  
-                        if(state == MCU_READ_TX) begin
-                            data_out <= doutb;					 
-                            mcu_tx_cnt <= mcu_tx_cnt + 9'd1;
-                        end
-                    end
-                end	       
+               if(byte_cnt == 4'd0) mcu_sector[31:24] <= data_in;
+               if(byte_cnt == 4'd1) mcu_sector[23:16] <= data_in;
+               if(byte_cnt == 4'd2) mcu_sector[15: 8] <= data_in;
+               if(byte_cnt == 4'd3) begin 
+                  mcu_sector[ 7: 0] <= data_in;				  
+				  $display("sd_card.v: MCU read request sector %0d/%8x", {mcu_sector[31:8], data_in}, {mcu_sector[31:8], data_in});  
+				  mcu_request <= MCU_REQ_READ;	  
+               end
+
+			   // return data once in reading state
+               if(byte_cnt <= 4'd3) 
+				 data_out <= 8'hff;            // return 0xff during command transfer
+			   else begin
+				  if(mcu_request == MCU_READY2TRANSFER) begin
+					 data_out <= 8'h00;		   // return 0x00 when data ready to be transferred/read by MCU
+					 mcu_tx_cnt <= 9'd0;
+					 mcu_request <= MCU_TRANSFERRING;
+				  end else if(mcu_request == MCU_TRANSFERRING) begin
+					 data_out <= doutb;					 
+					 if(byte_cnt > 4'd4) begin
+						mcu_tx_cnt <= mcu_tx_cnt + 9'd1;
+						if(mcu_tx_cnt == 9'd511)
+						  mcu_request <= MCU_REQ_IDLE;
+					 end
+				  end else
+					data_out <= 8'h01;         // return 0x01 while waiting for data
+			   end					
 			end
 			
 			// SDC CMD 4: INSERTED
@@ -264,58 +422,76 @@ always @(posedge clk) begin
 			   if(byte_cnt == 4'd2) image_size[23:16] <= data_in;
 			   if(byte_cnt == 4'd3) image_size[15:8]  <= data_in;
 			   if(byte_cnt == 4'd4) begin 
-				  image_size[7:0]   <= data_in;
-				  if(image_target <= 8'd7)  // images 0..7 are supported
-					image_mounted[image_target] <= 1'b1;
+				  image_size[7:0] <= data_in;
+				  if(image_target <= 8'd7) begin  // images 0..7 are supported
+					 $display("sd_card.v: MCU inserted image %0d with %0d bytes", image_target, { image_size[63:8], data_in } );
+					 direct_start[image_target] <= 32'd0;
+					 image_mounted[image_target] <= 1'b1;
+				  end
 			   end
 			end
 			
 			// SDC CMD 5: MCU WRITE
 			if(command == 8'd5) begin
 			   // MCU requests to write a sector
-               if(byte_cnt == 4'd0) lsector[31:24] <= data_in;
-               if(byte_cnt == 4'd1) lsector[23:16] <= data_in;
-               if(byte_cnt == 4'd2) lsector[15: 8] <= data_in;
+               if(byte_cnt == 4'd0) mcu_sector[31:24] <= data_in;
+               if(byte_cnt == 4'd1) mcu_sector[23:16] <= data_in;
+               if(byte_cnt == 4'd2) mcu_sector[15: 8] <= data_in;
                if(byte_cnt == 4'd3) begin 
-                  lsector[ 7: 0] <= data_in;
-                  mcu_tx_cnt <= 9'd0;		  
-                  state <= MCU_WRITE_RX;
+                  mcu_sector[ 7: 0] <= data_in;
+				  $display("sd_card.v: MCU write request sector %0d/%8x", {mcu_sector[31:8], data_in}, {mcu_sector[31:8], data_in});
+				  mcu_request <= MCU_REQ_WRITE;				  
+				  mcu_tx_cnt <= 9'd0;
                end
 			   
 			   // send "busy" while transfer is still in progress
-			   data_out <= rbusy?8'h01:8'h00; 
+			   data_out <= (mcu_request != MCU_REQ_IDLE)?8'h01:8'h00; 
+
+			   // data transfer into local buffer
+			   if(mcu_request == MCU_REQ_WRITE) begin
+				  // Trigger write to buffer. Writing the buffer is now delayed by
+				  // one cycle. Thus the address update is triggered by dinb_we
+				  // above.
+				  dinb_we <= 1'b1;
+			   end 
+			end
+			
+			// SDC CMD 6: ENABLE DIRECT ACCESS
+			if(command == 8'd6) begin
+			   reg [24:0] ds;
 			   
-			   // data transfer from MCU to buffer
-			   if(!wstart_int && state == MCU_WRITE_RX) begin	  
-				  // data transfer into local buffer
-				  if(byte_cnt > 4'd3) begin
-					 // Trigger write to buffer. Writing the buffer is now delayed by
-					 // one cycle. Thus the address update is triggered by dinb_we
-					 // above.
-					 dinb_we <= 1'b1;
-				  end 
-			   end
-			end
-			
-			// SDC CMD 6: DIRECT is not used/supported
-			
-			// SDC CMD 7: LARGE FILE INSERTED
-			if(command == 8'd7) begin
-			   // MCU reports that some large image has been inserted.
+			   // MCU reports that the core may access the image
+			   // directy without sector translation
 			   if(byte_cnt == 4'd0) image_target <= data_in;
-			   if(byte_cnt == 4'd1) image_size[63:56] <= data_in;
-			   if(byte_cnt == 4'd2) image_size[55:48] <= data_in;
-			   if(byte_cnt == 4'd3) image_size[47:40] <= data_in;
-			   if(byte_cnt == 4'd4) image_size[39:32] <= data_in;
-			   if(byte_cnt == 4'd5) image_size[31:24] <= data_in;
-			   if(byte_cnt == 4'd6) image_size[23:16] <= data_in;
-			   if(byte_cnt == 4'd7) image_size[15:8]  <= data_in;
-			   if(byte_cnt == 4'd8) begin 
-				  image_size[7:0]   <= data_in;
-				  if(image_target <= 8'd7)  // images 0..7 are supported
-					image_mounted[image_target] <= 1'b1;
+               if(byte_cnt == 4'd1) ds[23:16] <= data_in;
+               if(byte_cnt == 4'd2) ds[15: 8] <= data_in;
+               if(byte_cnt == 4'd3) ds[ 7: 0] <= data_in;
+               if(byte_cnt == 4'd4) begin
+				  direct_start[image_target] <= { ds, data_in };
+				  $display("sd_card.v: MCU direct start %0d with offset %0d(%8x)", image_target, { ds, data_in }, { ds, data_in });
 			   end
 			end
+
+            // SDC CMD 7: LARGE FILE INSERTED, usually used for HDD images > 4GB
+            if(command == 8'd7) begin
+               // MCU reports that some large image has been inserted.
+               if(byte_cnt == 4'd0) image_target <= data_in;
+               if(byte_cnt == 4'd1) image_size[63:56] <= data_in;
+               if(byte_cnt == 4'd2) image_size[55:48] <= data_in;
+               if(byte_cnt == 4'd3) image_size[47:40] <= data_in;
+               if(byte_cnt == 4'd4) image_size[39:32] <= data_in;
+               if(byte_cnt == 4'd5) image_size[31:24] <= data_in;
+               if(byte_cnt == 4'd6) image_size[23:16] <= data_in;
+               if(byte_cnt == 4'd7) image_size[15:8]  <= data_in;
+               if(byte_cnt == 4'd8) begin 
+                  image_size[7:0]   <= data_in;
+                  if(image_target <= 8'd7) begin // images 0..7 are supported
+					 $display("sd_card.v: MCU inserted large image %0d with %0d bytes", image_target, { image_size[63:8], data_in } );
+					 direct_start[image_target] <= 32'd0;
+                     image_mounted[image_target] <= 1'b1;
+				  end
+               end
+            end
 			
 			if(byte_cnt != 4'd15) byte_cnt <= byte_cnt + 4'd1;    
          end
@@ -343,10 +519,11 @@ sd_rw #(.CLK_DIV(CLK_DIV), .SIMULATE(SIMULATE)) sd_rw (
    .rstart( rstart_int ), 
    .wstart( wstart_int ), 
    .sector( lsector ),
-   .rbusy( rbusy ),
-   .rdone( rdone ),
+   .rbusy( busy_int ),
+   .rdone( done_int ),
 
-   .inbyte((state == CORE_IO)?inbyte:inbyte_int),
+   // data to be written to SD card either comes from local MCU buffer or from core
+   .inbyte((core_request == CORE_WRITING)?inbyte:inbyte_int),
    .outen(louten),
    .outaddr(outaddr),
    .outbyte(outbyte)

@@ -25,31 +25,23 @@ module nanomig_tb
    output [3:0]	 green,
    output [3:0]	 blue,
 
-   input [7:0] memory_config,
-   input [2:0] fastram_config,
-   input [3:0] floppy_config,
-   input [5:0] ide_config,
+   input [7:0]	 memory_config,
+   input [2:0]	 fastram_config,
+   input [3:0]	 floppy_config,
+   input [5:0]	 ide_config,
    
-   input [7:0]	 sdc_img_mounted,
-   input [63:0]	 sdc_img_size,
-
-`ifdef SD_EMU   
    output	 sdclk,
    output	 sdcmd,
    input	 sdcmd_in,
    output [3:0]	 sddat,
    input [3:0]	 sddat_in,
-`else
-   output [7:0]	 sdc_rd,
-   output [7:0]	 sdc_wr,
-   output [31:0] sdc_sector,
-   input	 sdc_busy,
-   input	 sdc_done,
-   input	 sdc_byte_in_strobe,
-   input [8:0]	 sdc_byte_addr,
-   input [7:0]	 sdc_byte_in_data,
-   output [7:0]	 sdc_byte_out_data,
-`endif // !`ifdef SD_EMU
+
+   input	 mcu_data_strobe,
+   input	 mcu_data_start,
+   input [7:0]	 mcu_data_in,
+   output [7:0]	 mcu_data_out,
+   output	 mcu_irq,
+   input	 mcu_iack,
    
    // external ram/rom interface
    output [15:0] ram_data, // sram data bus
@@ -61,9 +53,9 @@ module nanomig_tb
    output	 _ram_oe      // sram output enable
    );
    
-`ifdef SD_EMU
 // for floppy IO the SD card itself may be included into the simulation or not
 wire [7:0]	 sdc_rd;
+wire [7:0]	 sdc_wr;
 wire [31:0]	 sdc_sector;
 wire		 sdc_busy;
 wire		 sdc_done;
@@ -72,7 +64,11 @@ wire [8:0]	 sdc_byte_addr;
 wire [7:0]	 sdc_byte_in_data;
 wire [7:0]	 sdc_byte_out_data;
 
-sd_rw #(
+// interface to sd card
+wire [63:0]      image_size;   
+wire [7:0]       image_mounted;     
+
+sd_card #(
     .CLK_DIV(3'd0),                // for 28 Mhz clock
     .SIMULATE(1'b1)
 ) sd_card (
@@ -87,19 +83,29 @@ sd_rw #(
     .sddat_in(sddat_in),
 
     // user read sector command interface (sync with clk)
-    .rstart(sdc_rd), 
+    .rstart(sdc_rd),
     .wstart(sdc_wr), 
-    .sector(sdc_sector),
+    .rsector(sdc_sector),
     .rbusy(sdc_busy),
     .rdone(sdc_done),
                  
+    // mcu interface
+    .data_strobe(mcu_data_strobe),
+    .data_start(mcu_data_start),
+    .data_in(mcu_data_in),
+    .data_out(mcu_data_out),
+    .irq(mcu_irq),
+    .iack(mcu_iack),
+
+    .image_size(image_size),
+    .image_mounted(image_mounted),
+
     // sector data output interface (sync with clk)
     .inbyte(sdc_byte_out_data),
     .outen(sdc_byte_in_strobe),  // when outen=1, a byte of sector content is read out from outbyte
     .outaddr(sdc_byte_addr),  // outaddr from 0 to 511, because the sector size is 512
     .outbyte(sdc_byte_in_data)   // a byte of sector content
 );
-`endif //  `ifdef SD_EMU
    
 nanomig nanomig (
 		 // system pins
@@ -128,8 +134,8 @@ nanomig nanomig (
 		 .joystick1(6'b000000),
 		 
 		 // sd card interface for floppy disk emulation
-		 .sdc_img_mounted    ( sdc_img_mounted     ),
-		 .sdc_img_size       ( sdc_img_size        ),  // length of image file		 
+		 .sdc_img_mounted    ( image_mounted     ),
+		 .sdc_img_size       ( image_size        ),  // length of image file		 
 		 .sdc_rd(sdc_rd),
 		 .sdc_wr(sdc_wr),
 		 .sdc_sector(sdc_sector),

@@ -1,15 +1,15 @@
 [*]
 [*] GTKWave Analyzer v3.3.116 (w)1999-2023 BSI
-[*] Tue Jan 20 11:50:39 2026
+[*] Sat Mar  7 20:20:40 2026
 [*]
-[dumpfile] "/home/tharbaum/tmp/private_stuff/mistlite/nanomig/sim/nanomig.fst"
-[dumpfile_mtime] "Tue Jan 20 11:49:08 2026"
-[dumpfile_size] 17825080
-[savefile] "/home/tharbaum/tmp/private_stuff/mistlite/nanomig/sim/nanomig.gtkw"
-[timestart] 10926627600000
-[size] 1962 1124
-[pos] 166 65
-*-26.105511 10926901808398 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[dumpfile] "./nanomig.fst"
+[dumpfile_mtime] "Sat Mar  7 20:09:15 2026"
+[dumpfile_size] 27226591
+[savefile] "./nanomig.gtkw"
+[timestart] 9673634303200
+[size] 1962 1215
+[pos] 270 57
+*-16.705509 9673634659123 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] TOP.
 [treeopen] TOP.nanomig_tb.
 [treeopen] TOP.nanomig_tb.nanomig.
@@ -21,11 +21,14 @@
 [treeopen] TOP.nanomig_tb.nanomig.minimig.PAULA1.
 [treeopen] TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.
 [treeopen] TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.unnamedblk1.
+[treeopen] TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.unnamedblk3.
 [treeopen] TOP.nanomig_tb.nanomig.minimig.USERIO1.
+[treeopen] TOP.nanomig_tb.sd_card.
+[treeopen] TOP.nanomig_tb.sd_card.sd_rw.
 [sst_width] 267
 [signals_width] 336
 [sst_expanded] 1
-[sst_vpaned_height] 778
+[sst_vpaned_height] 835
 @28
 TOP.nanomig_tb.nanomig.amiga_clk.clk_28
 TOP.nanomig_tb.nanomig.reset
@@ -33,21 +36,35 @@ TOP.nanomig_tb.nanomig.reset
 TOP.nanomig_tb.nanomig.cpu_wrapper.chip_addr[23:1]
 @22
 TOP.nanomig_tb.nanomig.cpu_wrapper.cpu_addr[31:0]
-@28
-TOP.nanomig_tb.nanomig.minimig.sel_kick
-@22
 [color] 1
 TOP.nanomig_tb.nanomig.cpu_wrapper.cpu_din[15:0]
 TOP.nanomig_tb.nanomig.cpu_wrapper.cpu_dout[15:0]
-@28
-TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.dma_active
-TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.dsklen_dma
-TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.dsklen_wr
 @24
 TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.dsklen_len[13:0]
-@22
-TOP.nanomig_tb.nanomig.sdc_img_mounted[7:0]
+@200
+-IDE
 @28
+TOP.nanomig_tb.nanomig.ide_active
+TOP.nanomig_tb.nanomig.ide_write
+TOP.nanomig_tb.nanomig.sdc_addr_toggle
+TOP.nanomig_tb.nanomig.ide_read
+@22
+TOP.nanomig_tb.nanomig.ide_readdata[15:0]
+@23
+TOP.nanomig_tb.nanomig.ide_readdataD[7:0]
+@22
+TOP.nanomig_tb.nanomig.sdc_byte_out_data[7:0]
+TOP.nanomig_tb.nanomig.sdc_byte_addr[8:0]
+@200
+@28
+TOP.nanomig_tb.nanomig.ide_sdc_wr[1:0]
+@200
+-Floppy
+@22
+TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.disk_present[3:0]
+@28
+TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.blckint
+TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.syncint
 TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.trackwr
 TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.dmas
 TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.dskstate[1:0]
@@ -70,31 +87,39 @@ TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.wr_sector_header_word[31:0]
 @28
 TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.lenzero
 TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.dmaon
-@22
-TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.fifo_in[15:0]
-@28
 TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.fifo_empty
 TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.fifo_full
+TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.db1.clk7_en
+TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.db1.equal
 TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.buswr
 @24
 TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.fifo_wr
+@22
+TOP.nanomig_tb.sd_card.outaddr[8:0]
+TOP.nanomig_tb.sd_card.outbyte[7:0]
+TOP.nanomig_tb.sd_card.sd_rw.sddat_stat[3:0]
+@24
+TOP.nanomig_tb.sd_card.sd_rw.u_sdcmd_ctrl.state[2:0]
+@22
+TOP.nanomig_tb.sd_card.sd_rw.sddat_in[3:0]
+[color] 2
+TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.sdc_byte_addr[8:0]
+TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.sdc_byte_in_data[7:0]
 @28
-TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.db1.clk7_en
+TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.sdc_byte_in_strobe
+@22
+TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.unnamedblk1.fd_dma_rd_ptr[7:0]
+TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.fd_dma_buf_out[15:0]
+TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.floppy_sector_data[15:0]
+TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.floppy_data[15:0]
+TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.fifo_in[15:0]
 @24
 TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.db1.in_ptr[11:0]
-TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.db1.out_ptr[11:0]
 @28
-TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.stbdat
+[color] 2
+TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.busrd
 @22
-TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.cpu_wr_state[3:0]
-@25
-[color] 3
-TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.cpu_wr_cnt[8:0]
-@22
-[color] 6
-TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.fd_dma_buf_wr_state[3:0]
-@24
-TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.fd_dma_wr_ptr[8:0]
+TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.fifo_word_counter[9:0]
 @c00022
 TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.fifo_out[15:0]
 @28
@@ -116,19 +141,18 @@ TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.fifo_out[15:0]
 (15)TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.fifo_out[15:0]
 @1401200
 -group_end
-@22
-[color] 2
-TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.wr_sector_csum[15:0]
 @24
+TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.db1.out_ptr[11:0]
+@22
+TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.cpu_wr_state[3:0]
+@24
+[color] 3
+TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.cpu_wr_cnt[8:0]
 TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.sdc_sector[31:0]
 @22
 TOP.nanomig_tb.nanomig.sdc_rd[7:0]
-TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.sdc_wr[3:0]
 @28
 TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.sdc_busy
 TOP.nanomig_tb.nanomig.sdc_done
-TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.fd_dma_buffer_trigger_wr
-@22
-TOP.nanomig_tb.nanomig.minimig.PAULA1.pf1.fd_dma_buffer_data_wr[7:0]
 [pattern_trace] 1
 [pattern_trace] 0

@@ -249,7 +249,7 @@ wire [7:0]  sd_img_mounted;
 reg         sd_ready;
 
 sd_card #(
-    .CLK_DIV(3'd1)                   // for 28 Mhz clock
+    .CLK_DIV(3'd0)                   // for 28 Mhz clock
 ) sd_card (
     .rstn(pll_lock),                 // rstn active-low, 1:working, 0:reset
     .clk(clk_28m),                   // clock

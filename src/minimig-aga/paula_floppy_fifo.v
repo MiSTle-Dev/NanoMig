@@ -29,23 +29,32 @@ assign empty = (equal && (in_ptr[11] == out_ptr[11]));
 assign full =  (equal && (in_ptr[11] != out_ptr[11]));
 
 always @(posedge clk) begin
-  if (clk7_en) begin
-  	if (reset) begin
-  		in_ptr <= 12'd0;
-  		out_ptr <= 12'd0;
-  	end else begin
-	   if(wr && !full) begin
-  		mem[in_ptr[10:0]] <= in;
-  		in_ptr <= in_ptr + 12'd1;
-	        if(empty) out <= in;	      
-	   end
-  	   if(rd && !empty) begin
-	        out <= mem[out_ptr[10:0] + 11'd1];
-  		out_ptr <= out_ptr + 12'd1;
-	   end
-	end
-  end
+   reg empty_write;
+   
+   if (clk7_en) begin
+      empty_write <= 1'b0;
+      
+      if (reset) begin
+  	 in_ptr <= 12'd0;
+  	 out_ptr <= 12'd0;
+	 empty_write <= 1'b0;
+      end else begin
+  	 if(rd && !empty) begin
+	    if(empty_write) out <= in;	   
+	    else            out <= mem[out_ptr[10:0] + 11'd1];	    
+  	    out_ptr <= out_ptr + 12'd1;
+	 end
+	 if(wr && !full) begin
+  	    mem[in_ptr[10:0]] <= in;
+  	    in_ptr <= in_ptr + 12'd1;
+	    if(empty) begin
+	       out <= in;
+	       empty_write <= 1'b1;	       
+	    end
+	 end
+      end
+   end
 end
-
+   
 endmodule
 
