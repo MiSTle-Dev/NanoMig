@@ -162,7 +162,7 @@ reg   [3:0] disk_present = 4'b0000;	// disk present status
 wire   [3:0] disk_writable;	        // disk write access status
 
 wire        _selx;			// active whenever any drive is selected
-wire  [1:0] sel;			//selected drive number
+wire  [1:0]  sel /* verilator public */;	//selected drive number
 
 reg   [1:0] drives;			// number of currently connected floppy drives (1-4)
 

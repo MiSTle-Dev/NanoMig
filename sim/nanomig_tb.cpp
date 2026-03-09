@@ -46,11 +46,13 @@ double simulation_time;
 // with kick 1.3 and 512k
 //#define TRACESTART   3.5    // first floppy read
 
+
 // with kick 3.1 and 512k
 //#define TRACESTART   0.74    // power led on
 //#define TRACESTART   3.2     // floppy read
 //#define TRACESTART   4.7     // "no floppy" image
 //#define TRACESTART   9.6       // IDE test write
+
 
 // specfiy simulation runtime and from which point in time a trace should
 // be written
@@ -409,7 +411,7 @@ void load_kick(void) {
   fclose(fd);
 }
 
-void fdc_verify(uint16_t word) {
+void fdc_verify(int drive, uint16_t word) {
   static uint16_t header[24];
   static uint16_t csum[4];
   static uint16_t data[512];
@@ -500,8 +502,7 @@ void fdc_verify(uint16_t word) {
       
       // get original sector data from sd card
       uint8_t orig[512];
-      // TODO: fix drive index
-      sd_get_sector(0, track*11+sector, orig);
+      sd_get_sector(drive, track*11+sector, orig);
 
       if(memcmp(decoded, orig, 512) != 0) {
 	printf(RED "Data LBA %d comparison failed with checksum %08x" END "\n",  track*11+sector, dcsum);
@@ -636,7 +637,7 @@ void tick(int c) {
     if(tb->clk7n_en) {    
       // analyze CPU accessing paula/floppy
       if(tb->nanomig_tb->nanomig->minimig->PAULA1->pf1->busrd)
-	fdc_verify(tb->nanomig_tb->nanomig->minimig->PAULA1->pf1->fifo_out);
+	fdc_verify(tb->nanomig_tb->nanomig->minimig->PAULA1->pf1->sel, tb->nanomig_tb->nanomig->minimig->PAULA1->pf1->fifo_out);
     }
       
     /* ----------------- simulate ram/kick ---------------- */
@@ -729,8 +730,8 @@ int main(int argc, char **argv) {
   tb->reset = 1;
   tb->memory_config = 0x00; // 0x00=512k, 0x01=1M, 0x0f=3.5M
   tb->fastram_config = 0;   // 0=none, 1=2MB, 2=4MB
-  tb->floppy_config = 0x1;  // 1 = one fast drive
-  tb->ide_config = 0x7;     // 7=two drives
+  tb->floppy_config = 0x5;  // 1 = one fast drive, 5 = two fast drives
+  tb->ide_config = 0x0;     // 0=no drive, 7=two drives
 
   /* run for a while */
   while(
