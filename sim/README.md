@@ -187,7 +187,47 @@ When booting the floppy will first be accessed at around 3 seconds
 simulation time with plenty of debug output about disk IO on the
 console.
 
+## Providing your own test cases
 
+If you want to report a bug in the core, then it's very helpful
+to provide test cases that can be run in the simulation. These test
+cases should come in the form of a self running ADF floppy disk
+image. Self-running means that the ADF can be loaded into the
+simulation, and it runs up to the issue it's demonstrating any user
+interaction required. This is needed since the simulation does not
+support Keyboard or mouse input.
+
+For example when debugging the floppy disk write routines, a regular
+workbench ADF image was taken and a startup file was added that would
+copy a test file from floppy to floppy on startup. Under Linux such a
+disk can be created using
+[```rdbtool```](https://github.com/cnvogelg/amitools/blob/main/docs/tools/rdbtool.rst)
+like so:
+
+```
+DF0=fdwrtest.adf
+cp wb13.adf $DF0
+echo "ECHO \"Writing test.txt\"" > startup
+echo "COPY DF0:test.txt DF0:test2.txt" >> startup
+echo "TYPE DF0:test2.txt" >> startup
+echo "Test Text" > test.txt
+xdftool $DF0 delete S/Startup-Sequence
+xdftool $DF0 write startup S/Startup-Sequence
+xdftool $DF0 write test.txt test.txt
+```
+
+The resulting ```fdwrtest.adf``` can be run inside the
+Verilator simulation just like any other disk by specifying it in the
+[```sd_card_config.h```](sd_card_config.h) file.
+
+Creating such test images is not NanoMig or MiSTle specific. These ADF
+image can be created and run on emulators like WinUAE and even on real
+hardware.
+
+Since the Verilator simulation can be quite slow and often need to be
+run many times when trying to fix the issue, it's very helpful if
+these test images expose the issue to be debugged as early in the boot
+process as possible.
 
 ## Screenshots
 
