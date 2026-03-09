@@ -446,7 +446,9 @@ always @(posedge clk_sys) begin
 	 // this really only works with HW multipliers in the FPGA
 	 ide_sdc_sector <= (ide_cylinder * heads[0] + ide_head) * sectors[0] +
 			   ide_sector - 1;
-	 
+
+	 // TODO: check why this message comes twice, the test for !ide_sdc_rd
+	 // should prevent that
 	 $display("IDE%0d RD %0d/%0d/%0d -> %0d", ide_drv, 
 		  ide_cylinder, ide_head, ide_sector, 
 		  (ide_cylinder * heads[0] + ide_head) * sectors[0] +
@@ -569,7 +571,7 @@ always @(posedge clk_sys) begin
 	   // request to continue a multi sector transfer that
 	   // exceeds the max io size
 	   if(ide_request[2:0] == 3'b101) begin
-	      // check if it's a read or write in prgress
+	      // check if it's a read or write in progress
 
 	      if ( ide_cmd == 8'hc4 ) begin
 		 // read multiple command: jump right to next read
@@ -1045,8 +1047,10 @@ end
 // IDE payload is being received in 16 bit words from but is being sent
 // as bytes to the SD card
 wire [7:0] sdc_byte_out_data_fdc;   
+reg [7:0] ide_readdataD;
 assign sdc_byte_out_data = ide_active?
-			   (sdc_byte_addr[0]?ide_readdata[15:8]:ide_readdata[7:0]):
+			   // get all odd bytes from latch except the first one which wasn't latched
+			   (!sdc_byte_addr[0]?ide_readdata[7:0]:((sdc_byte_addr==1)?ide_readdata[15:8]:ide_readdataD)):
 			   sdc_byte_out_data_fdc;   
 
 // The sd card just requests addresses and minimig returns matching data. The ide uses ide_write
@@ -1056,12 +1060,19 @@ assign sdc_byte_out_data = ide_active?
 reg sdc_addr_toggle;   
 always @(posedge clk_sys) begin
    reg last_sdc_addr;   
-   last_sdc_addr <= sdc_byte_addr[1];
+   reg latch_data;   
+   last_sdc_addr <= sdc_byte_addr[0];
 
-   // generate a trigger after every odd byte
-   sdc_addr_toggle <= last_sdc_addr ^ sdc_byte_addr[1];   
+   // generate a ide data trigger whenever an even address was reached
+   sdc_addr_toggle <= !last_sdc_addr &&  sdc_byte_addr[0];
+   // generate a latch signal for the resulting ide read data when
+   // an odd address is being reached
+   latch_data      <=  last_sdc_addr && !sdc_byte_addr[0];      
+   if(latch_data) ide_readdataD <= ide_readdata[15:8];
+//   if(last_sdc_addr && !sdc_byte_addr[0])
+//     ide_readdataD <= ide_readdata;
 end
-   
+
 wire ide_write = (!ide_exec_cnt[0] && (
      (ide_exec == IDE_EXEC_SET_CONFIG) || 
      (ide_exec == IDE_EXEC_SET_REGS) || 

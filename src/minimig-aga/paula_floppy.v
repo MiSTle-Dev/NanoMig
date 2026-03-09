@@ -143,7 +143,7 @@ wire        _dsktrack0;		// disk heads are over track 0
 wire        dsktracklast;       // disk heads are over last track
 
 wire [15:0] fifo_in;		// fifo data in
-wire [15:0] fifo_out; 		// fifo data out as sent to CPU
+wire [15:0] fifo_out /* verilator public */; // fifo data out as sent to CPU
 wire        fifo_wr;		// fifo write enable
 reg         fifo_wr_del;	// fifo write enable delayed
 wire        fifo_rd;		// fifo read enable
@@ -736,7 +736,7 @@ assign lenzero = (dsklen[13:0]==0);
 
 //--------------------------------------------------------------------------------------
 //disk data read path
-wire	busrd;				// bus read
+wire	busrd /* verilator public */;	// bus read
 wire	buswr;				// bus write
 reg	trackrdok;			// track read enable
 
