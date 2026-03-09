@@ -717,7 +717,7 @@ wire signed [14:0] s_right = audio_right;
 reg signed [14:0] left_v, right_v;
 
 always @(*) begin
-	case (osd_volume) // Control signal for volume level (11=100%, 10=75%, 01=50%, 00=25%)
+	case (osd_volume) // Control signal for volume level
         2'b10: begin // 75% (1/2 + 1/4)
             left_v  = (s_left >>> 1)  + (s_left >>> 2);
             right_v = (s_right >>> 1) + (s_right >>> 2);
