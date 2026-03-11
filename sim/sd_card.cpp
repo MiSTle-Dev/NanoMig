@@ -24,8 +24,8 @@ extern double simulation_time;
 
 // disable colorization for easier handling in editors 
 #if 1
-#define RED      "\033[0;31m"
-#define GREEN    "\033[0;32m"
+#define RED      "\033[1;31m"
+#define GREEN    "\033[1;32m"
 #define YELLOW   "\033[1;33m"
 #define END      "\033[0m"
 #else
@@ -37,7 +37,7 @@ extern double simulation_time;
 
 extern char *sector_string(int drive, uint32_t lba);
 
-static void hexdump(void *data, int size) {
+void hexdump(void *data, int size) {
   int i, b2c;
   int n=0;
   char *ptr = (char*)data;
@@ -60,7 +60,7 @@ static void hexdump(void *data, int size) {
   }
 }
 
-static void hexdiff(void *data, void *cmp, int size) {
+static void hexdiff_color(void *data, void *cmp, int size, char *color) {
   int i, b2c;
   int n=0;
   char *ptr = (char*)data;
@@ -68,20 +68,33 @@ static void hexdiff(void *data, void *cmp, int size) {
 
   if(!size) return;
 
+  // check if there's a difference at all
+  if(memcmp(data, cmp, size) == 0) {
+    hexdump(data, size);
+    return;
+  }
+   
   while(size>0) {
     printf("%04x: ", n);
 
     b2c = (size>16)?16:size;
     for(i=0;i<b2c;i++) {
       if(cptr[i] == ptr[i])      
-	printf("%02x ", 0xff&ptr[i]);
+        printf(" %02x  ", 0xff&ptr[i]);
       else
-      	printf(YELLOW "%02x" END " ", 0xff&ptr[i]);
+        printf("%s%02x" GREEN "%02x" END " ", color,
+	       0xff&ptr[i], 0xff&cptr[i]);
     }
       
     printf("  ");
     for(i=0;i<(16-b2c);i++) printf("   ");
-    for(i=0;i<b2c;i++)      printf("%c", isprint(ptr[i])?ptr[i]:'.');
+    for(i=0;i<b2c;i++) {
+      if(cptr[i] == ptr[i])      
+	printf("%c ", isprint(ptr[i])?ptr[i]:'.');
+      else
+	printf("%s%c" GREEN "%c" END, color,
+	       isprint(ptr[i])?ptr[i]:'.', isprint(cptr[i])?cptr[i]:'.');	
+    }
     printf("\n");
 
     ptr  += b2c;
@@ -89,6 +102,10 @@ static void hexdiff(void *data, void *cmp, int size) {
     size -= b2c;
     n    += b2c;
   }
+}
+
+void hexdiff(void *data, void *cmp, int size) {
+  hexdiff_color(data, cmp, size, (char*)RED);
 }
 
 /* ============================= FPGA Companion (sd card part) ====================== */
@@ -306,6 +323,17 @@ void fc_handle(void) {
     }
   }
   companion_cnt++;
+
+#ifdef FC_RW_STORM
+  // do random mcu sector read/write accesses
+  if(companion_cnt > MS2FC(20) && !handler && !(random() % 100000)) {
+    // printf("\033[1;33m%.3fms PÖNG!\033[0m\n", simulation_time*1000);
+    if(random() & 1) handler = mcu_read_handler;
+    else             handler = mcu_write_handler;
+    companion_next = companion_cnt;
+    companion_byte = 0;
+  }
+#endif
 }  
 
 // =========================================== SD card itself ==========================================
@@ -505,8 +533,11 @@ void sd_handle(void)  {
 		fseek(fd[drive], 512 * lba, SEEK_SET);
 		int items = fread(ref, 2, 256, fd[drive]);
 		if(items != 256) perror("fread()");
-		
-		hexdiff(sector_data, ref, 512);
+
+		// a difference in data for writing does not mean
+		// an error but just that data has been modified
+		// by the amiga. Thus will color the changed parts yellow
+		hexdiff_color(sector_data, ref, 512, (char*)YELLOW);
 	      } else 	    
 		hexdump(sector_data, 520);
 	      
@@ -713,6 +744,9 @@ void sd_handle(void)  {
 }      
 
 void sd_init(void) {
+  // assure reproducable results
+  srandom(0x12345678);
+
   // mcu is idle
   tb->mcu_data_strobe = 0;
   tb->mcu_data_start = 0;

@@ -316,73 +316,6 @@ void capture_video(void) {
   }
 }
 
-void hexdump(void *data, int size) {
-  int i, b2c;
-  int n=0;
-  char *ptr = (char*)data;
-
-  if(!size) return;
-
-  while(size>0) {
-    printf("%04x: ", n);
-
-    b2c = (size>16)?16:size;
-    for(i=0;i<b2c;i++)      printf("%02x ", 0xff&ptr[i]);
-    printf("  ");
-    for(i=0;i<(16-b2c);i++) printf("   ");
-    for(i=0;i<b2c;i++)      printf("%c", isprint(ptr[i])?ptr[i]:'.');
-    printf("\n");
-
-    ptr  += b2c;
-    size -= b2c;
-    n    += b2c;
-  }
-}
-
-static void hexdiff(void *data, void *cmp, int size) {
-  int i, b2c;
-  int n=0;
-  char *ptr = (char*)data;
-  char *cptr = (char*)cmp;
-
-  if(!size) return;
-
-  // check if there's a difference at all
-  if(memcmp(data, cmp, size) == 0) {
-    hexdump(data, size);
-    return;
-  }
-   
-  while(size>0) {
-    printf("%04x: ", n);
-
-    b2c = (size>16)?16:size;
-    for(i=0;i<b2c;i++) {
-      if(cptr[i] == ptr[i])      
-        printf(" %02x  ", 0xff&ptr[i]);
-      else
-        printf(RED "%02x" GREEN "%02x" END " ",
-	       0xff&ptr[i], 0xff&cptr[i]);
-    }
-      
-    printf("  ");
-    for(i=0;i<(16-b2c);i++) printf("   ");
-    for(i=0;i<b2c;i++) {
-      if(cptr[i] == ptr[i])      
-	printf("%c ", isprint(ptr[i])?ptr[i]:'.');
-      else
-	printf(RED "%c" GREEN "%c" END,
-	       isprint(ptr[i])?ptr[i]:'.', isprint(cptr[i])?cptr[i]:'.');	
-    }
-    printf("\n");
-
-    ptr  += b2c;
-    cptr  += b2c;
-    size -= b2c;
-    n    += b2c;
-  }
-}
-
 static uint64_t GetTickCountMs() {
   struct timespec ts;
   
@@ -411,106 +344,134 @@ void load_kick(void) {
   fclose(fd);
 }
 
-void fdc_verify(int drive, uint16_t word) {
-  static uint16_t header[24];
-  static uint16_t csum[4];
-  static uint16_t data[512];
-  
-  static int state = -1;
-  static int count = 0;
+// The amiga does MFM data encoding in software and the floppy controller
+// itself inside paula is rather simple. The data inside ADF floppy images
+// as stored on an SD card is not MFM encoded. This means that on a read
+// data from SD card needs to be MFM encoded by the core so the Amiga OS
+// can decode this. And the MFM data created by the Amiga OS during a write
+// needs to be decoded by the core before being written to SD card. To
+// verify that this process works correctly, the testbench captures data
+// inside the core when read or written by the Amiga and decodes it. The
+// resuling data is then compared with the data that is actually being
+// stored on the simulated sd card. This allows to verify that the cores
+// MFM encoding and decoding matches what the Amiga expects.
 
-  static int track, sector;
+void fdc_verify(int is_wr, int drive, uint16_t word) {
+  static struct state_S {
+    uint16_t header[24];
+    uint16_t csum[4];
+    uint16_t data[512];
   
+    int state = -1;
+    int count = 0;
+
+    int track, sector;
+  } io[2];
+    
   // decode MFM encoded data as sent by
-  // the amiga paula floppy interface to the CPU
-  // printf("%d/%d busrd %04x\n", state, count, word);
+  // the amiga paula floppy interface to the CPU or by the CPU to paula
+  // printf("%d/%d bus%s %04x\n", io[is_wr].state, io[is_wr].count, is_wr?"wr":"rd", word);
 
   // in whatever state we are, the sync marker
   // throws us back into the start state
   if(word == 0x4489) {
-    printf("FDC sync detected\n");
-    state = 0;
-    count = 0;
+    printf("FDC %s sync detected\n", is_wr?"write":"read");
+    io[is_wr].state = 0;
+    io[is_wr].count = 0;
     return;
   }
 
   // in state -1 only the sync marker is accepted
-  if(state < 0) return;
+  if(io[is_wr].state < 0) return;
   
-  switch(state) {
+  switch(io[is_wr].state) {
   case 0:
     // state 0: collect header data
-    header[count++] = ((word&0xff) << 8) | ((word&0xff00) >> 8);
-    if(count == 24) {
-      // parse header
-      uint16_t csum0 = (header[0] ^ header[2]) & 0x5555;
-      uint16_t csum1 = (header[1] ^ header[3]) & 0x5555;
-      if((csum0 == (header[22]&0x5555)) && (csum1 == (header[23]&0x5555))) {
-	uint8_t *hdr8 = (uint8_t*)header;
+    io[is_wr].header[io[is_wr].count++] = ((word&0xff) << 8) | ((word&0xff00) >> 8);
+    if(io[is_wr].count == 24) {
+      // remove all clock bits
+      for(int i=0;i<24;i++) io[is_wr].header[i] &= 0x5555;
+      
+      // build header checksum
+      uint16_t csum0 = 0, csum1 = 0;
+      for(int i=0;i<11;i++) {
+	csum0 ^= io[is_wr].header[2*i+0];
+	csum1 ^= io[is_wr].header[2*i+1];
+      }
+      
+      if((csum0 == io[is_wr].header[22]) && (csum1 == io[is_wr].header[23])) {
+	uint8_t *hdr8 = (uint8_t*)io[is_wr].header;
 	
-	// checksum ok
+	// checksum ok, continue ...
 
 	// extract track and sector
-	track = ((hdr8[1] & 0x55)<<1) | (hdr8[5] & 0x55);
-	sector = ((hdr8[2] & 0x55)<<1) | (hdr8[6]& 0x55);
+	io[is_wr].track =  (hdr8[1]<<1) | hdr8[5];
+	io[is_wr].sector = (hdr8[2]<<1) | hdr8[6];
 
-	uint8_t sec2end = ((hdr8[3] & 0x55)<<1) | (hdr8[7]& 0x55);
-	printf("CPU reading FDC data for track %d, side %d, sector %d\n", track>>1, 1^(track&1), sector);
+	uint8_t sec2end = (hdr8[3]<<1) | hdr8[7];
+	printf("CPU %sing FDC data for track %d, side %d, sector %d, sec2end %d \n", is_wr?"writ":"read",
+	       io[is_wr].track>>1, 1^(io[is_wr].track&1), io[is_wr].sector, sec2end);
 
-	// expected sectors to end is 11-sector
-	if(sec2end != 11-sector) printf(RED "Unexpected sector to end %d" END "\n", sec2end);
-      
-	state = 1;
-	count = 0;
+	io[is_wr].state = 1;
+	io[is_wr].count = 0;
       } else {
-	printf(RED "Header checksum failed:  %04x,%04x != %04x,%04x" END "\n", csum0, csum1, header[22]&0x5555, header[23]&0x5555);	
-	state = -1;
-	exit(-1);
+	printf(RED "Header checksum failed:  %04x,%04x != %04x,%04x" END "\n", csum0, csum1, io[is_wr].header[22], io[is_wr].header[23]);	
+	hexdump(io[is_wr].header, 48);
+	io[is_wr].state = -1;
+	//	exit(-1);
       }	
     }
     break;
 
   case 1:
     // state 1: collect data checksum
-    csum[count++] = ((word&0xff) << 8) | ((word&0xff00) >> 8);
-    if(count == 4) { state = 2; count = 0; }
+    io[is_wr].csum[io[is_wr].count++] = ((word&0xff) << 8) | ((word&0xff00) >> 8);
+    if(io[is_wr].count == 4) { io[is_wr].state = 2; io[is_wr].count = 0; }
     break;
 
   case 2:
     // state 2: collect data 
-    data[count++] = ((word&0xff) << 8) | ((word&0xff00) >> 8);
-    if(count == 512) {
+    io[is_wr].data[io[is_wr].count++] = ((word&0xff) << 8) | ((word&0xff00) >> 8);
+    if(io[is_wr].count == 512) {
       // decode data
       uint8_t decoded[512];
 
-      uint8_t *d8 = (uint8_t*)data;
+      uint8_t *d8 = (uint8_t*)io[is_wr].data;
       // decode odd bits
       for(int i=0;i<512;i++) decoded[i]  = (d8[i] & 0x55)<<1;
       // decode even bits
       for(int i=0;i<512;i++) decoded[i] |= (d8[512+i] & 0x55);
 
       // mask clock bits from received checksum
-      csum[0] &= 0x5555; csum[1] &= 0x5555; csum[2] &= 0x5555; csum[3] &= 0x5555;      
+      io[is_wr].csum[0] &= 0x5555; io[is_wr].csum[1] &= 0x5555;
+      io[is_wr].csum[2] &= 0x5555; io[is_wr].csum[3] &= 0x5555;      
 
       // calculate checksum from received data
       uint32_t dcsum = 0;
       uint32_t *dec32 = (uint32_t*)decoded;
       for(int i=0;i<128;i++) dcsum ^= (dec32[i] ^ dec32[i]>>1) & 0x55555555;
 
-      if(dcsum != *(uint32_t*)(csum+2))
-	printf(RED "Data checksum failure 0x%08x != 0x%08x" END "\n", dcsum, *(uint32_t*)(csum+2));
+      if(dcsum != *(uint32_t*)(io[is_wr].csum+2))
+	printf(RED "%s data checksum failure 0x%08x != 0x%08x" END "\n",
+	       is_wr?"Write":"Read", dcsum, *(uint32_t*)(io[is_wr].csum+2));
       
       // get original sector data from sd card
       uint8_t orig[512];
-      sd_get_sector(drive, track*11+sector, orig);
+      sd_get_sector(drive, io[is_wr].track*11+io[is_wr].sector, orig);
 
       if(memcmp(decoded, orig, 512) != 0) {
-	printf(RED "Data LBA %d comparison failed with checksum %08x" END "\n",  track*11+sector, dcsum);
-	hexdiff(decoded, orig, 512);
+	if(is_wr)
+	  // just display the message here. Data itself will be printed by sd card emu
+	  printf(YELLOW "Write data LBA %d has been modified" END "\n", io[is_wr].track*11+io[is_wr].sector);
+	else {
+	  printf(RED "Read data LBA %d comparison failed" END "\n", io[is_wr].track*11+io[is_wr].sector);
+	  hexdiff(decoded, orig, 512);
+	}
       } else
-	printf(GREEN "Data successfully received for LBA %d with checksum %08x" END "\n",  track*11+sector, dcsum);
+	printf(GREEN "%s data successfully received for LBA %d" END "\n",
+	       is_wr?"Write":"Read", io[is_wr].track*11+io[is_wr].sector);
 	
-      state = -1;
+      io[is_wr].state = -1;
     }
     break;
   }
@@ -634,10 +595,14 @@ void tick(int c) {
     // capture CPU access to floppy fifo in order to verify sd card/floppy
     // encoding/decoding
     
-    if(tb->clk7n_en) {    
-      // analyze CPU accessing paula/floppy
+    if(tb->clk7_en) {
+      // analyze CPU reading paula/floppy
       if(tb->nanomig_tb->nanomig->minimig->PAULA1->pf1->busrd)
-	fdc_verify(tb->nanomig_tb->nanomig->minimig->PAULA1->pf1->sel, tb->nanomig_tb->nanomig->minimig->PAULA1->pf1->fifo_out);
+	fdc_verify(false, tb->nanomig_tb->nanomig->minimig->PAULA1->pf1->sel, tb->nanomig_tb->nanomig->minimig->PAULA1->pf1->fifo_out);
+
+      // analyze CPU writing paula/floppy
+      if(tb->nanomig_tb->nanomig->minimig->PAULA1->pf1->buswr)
+	fdc_verify(true, tb->nanomig_tb->nanomig->minimig->PAULA1->pf1->sel, tb->nanomig_tb->nanomig->minimig->PAULA1->pf1->fifo_in);
     }
       
     /* ----------------- simulate ram/kick ---------------- */
