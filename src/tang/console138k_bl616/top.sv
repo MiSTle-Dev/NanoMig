@@ -116,6 +116,7 @@ wire [1:0] osd_chipset;         // 0=OCS-A500, 1=OCS-A1000, 2=ECS
 wire       osd_video_mode;      // PAL (0=PAL, 1=NTSC)
 wire [1:0] osd_video_filter;
 wire [1:0] osd_video_scanlines;
+wire [2:0] osd_volume;          // Mute=0, 1=25%, 2=50%, 3=75%, 4=100%
 
 // generate a reset for some time after rom has been initialized
 reg [15:0] reset_cnt;
@@ -324,6 +325,7 @@ sysctrl sysctrl (
 		.system_video_scanlines(osd_video_scanlines),
 		.system_chipmem(osd_chipmem),
 		.system_slowmem(osd_slowmem),
+        .system_volume(osd_volume),
 				 
         .int_out_n(spi_intn),
         .int_in( { 4'b0000, sdc_int, 1'b0, hid_int, 1'b0 }),
@@ -637,8 +639,10 @@ video_analyzer video_analyzer (
 /* -------------------- HDMI video and audio -------------------- */
 
 // latch audio, so it's stable during 48khz transfer
-reg [15:0] audio_reg [2];  
-   
+reg [15:0] audio_reg [2]; 
+reg [14:0] scaled_audio_left;
+reg [14:0] scaled_audio_right;
+
 // generate 48khz audio clock
 reg clk_audio;
 reg [8:0] aclk_cnt;
@@ -649,7 +653,37 @@ always @(posedge clk_pixel) begin
     else begin
        aclk_cnt <= 9'd0;
        clk_audio <= ~clk_audio;
-	   audio_reg <= { { 1'b0, ~audio_left[14],audio_left[13:0]}, {1'b0, ~audio_right[14],audio_right[13:0]}};	   
+
+   // Scale values and Assign scaled values to the HDMI registers
+        case (osd_volume) 
+            3'b100: begin // 100%
+                scaled_audio_left  <= audio_left;
+                scaled_audio_right <= audio_right;
+            end
+            3'b011: begin // 75%
+                scaled_audio_left  <= ($signed(audio_left)  >>> 1) + ($signed(audio_left)  >>> 2);
+                scaled_audio_right <= ($signed(audio_right) >>> 1) + ($signed(audio_right) >>> 2);
+            end
+            3'b010: begin // 50%
+                scaled_audio_left  <= $signed(audio_left)  >>> 1;
+                scaled_audio_right <= $signed(audio_right) >>> 1;
+            end
+            3'b001: begin // 25%
+                scaled_audio_left  <= $signed(audio_left)  >>> 2;
+                scaled_audio_right <= $signed(audio_right) >>> 2;
+            end
+            3'b000: begin // Mute
+                scaled_audio_left  <= 15'd0;
+                scaled_audio_right <= 15'd0;
+            end
+            default: begin
+                scaled_audio_left  <= $signed(audio_left)  >>> 1;
+                scaled_audio_right <= $signed(audio_right) >>> 1;
+            end
+        endcase
+
+	   audio_reg <= { { 1'b0, ~scaled_audio_left[14],scaled_audio_left[13:0]}, {1'b0, ~scaled_audio_right[14],scaled_audio_right[13:0]}};	
+
     end
 end
    
