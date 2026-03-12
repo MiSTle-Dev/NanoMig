@@ -96,6 +96,13 @@
       <fileselector label="Harddisk DH1:" ext="hdf" index="5" default="dh1.hdf"/>
     </menu>
     <menu label="Settings">
+   <list label="Volume:" id="A" default="2">
+      <listentry label="Mute" value="0"/>
+	<listentry label="25%" value="1"/>
+	<listentry label="50%" value="2"/>
+	<listentry label="75%" value="3"/>
+	<listentry label="100%" value="4"/>
+      </list>
       <list label="Scanlines:" id="L" default="0">
 	<listentry label="None" value="0"/>
 	<listentry label="Dim" value="1"/>

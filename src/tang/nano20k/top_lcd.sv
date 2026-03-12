@@ -118,6 +118,7 @@ wire       osd_video_wide;      // 0=normal, 1=wide screen (jailbars)
 wire [1:0] osd_video_filter;
 wire [1:0] osd_video_scanlines;
 wire       osd_joy_swap;        // 0=off, 1=on
+wire [2:0] osd_volume;          // Mute=0, 1=25%, 2=50%, 3=75%, 4=100%
 
 // generate a reset for some time after rom has been initialized
 reg [15:0] reset_cnt;
@@ -299,6 +300,7 @@ sysctrl sysctrl (
 		.system_fastmem(osd_fastmem),
 		.system_slowmem(osd_slowmem),
         .system_joy_swap(osd_joy_swap),
+    	.system_volume(osd_volume),
 				 
         .int_out_n(spi_irqn),
         .int_in( { 4'b0000, sdc_int, 1'b0, hid_int, 1'b0 }),
@@ -690,6 +692,11 @@ end
 
 assign pa_en = !cpu_reset;   // simply enable amplifier with left channel
 
+// latch audio, so it's stable during 48khz transfer
+reg [15:0] audio_reg [2]; 
+reg [14:0] scaled_audio_left;
+reg [14:0] scaled_audio_right;
+
 reg clk_audio;
 reg [7:0] aclk_cnt;
 always @(posedge clk_28m) begin
@@ -698,11 +705,41 @@ always @(posedge clk_28m) begin
     else begin
         aclk_cnt <= 8'd0;
         clk_audio <= ~clk_audio;
+
+   // Scale values and Assign scaled values to the HDMI registers
+        case (osd_volume) 
+            3'b100: begin // 100%
+                scaled_audio_left  <= audio_left;
+                scaled_audio_right <= audio_right;
+            end
+            3'b011: begin // 75%
+                scaled_audio_left  <= ($signed(audio_left)  >>> 1) + ($signed(audio_left)  >>> 2);
+                scaled_audio_right <= ($signed(audio_right) >>> 1) + ($signed(audio_right) >>> 2);
+            end
+            3'b010: begin // 50%
+                scaled_audio_left  <= $signed(audio_left)  >>> 1;
+                scaled_audio_right <= $signed(audio_right) >>> 1;
+            end
+            3'b001: begin // 25%
+                scaled_audio_left  <= $signed(audio_left)  >>> 2;
+                scaled_audio_right <= $signed(audio_right) >>> 2;
+            end
+            3'b000: begin // Mute
+                scaled_audio_left  <= 15'd0;
+                scaled_audio_right <= 15'd0;
+            end
+            default: begin
+                scaled_audio_left  <= $signed(audio_left)  >>> 1;
+                scaled_audio_right <= $signed(audio_right) >>> 1;
+            end
+        endcase
+
+	   audio_reg <= { { 1'b0, ~scaled_audio_left[14],scaled_audio_left[13:0]}, {1'b0, ~scaled_audio_right[14],scaled_audio_right[13:0]}};	
     end
 end
 
 // sign expand and add both channels
-wire [15:0] audio_mix = { audio_left[14], audio_left} + { audio_right[14], audio_right };
+wire [15:0] audio_mix = { audio_reg[0][14], audio_reg[0]} + { audio_reg[1][14], audio_reg[1] };
    
 // shift audio down to reduce amp output volume to a sane range
 localparam AUDIO_SHIFT = 3;   
@@ -718,7 +755,7 @@ always @(posedge clk_audio) begin
 
    // latch data so it's stable during transmission
    if(audio_bit_cnt == 5'd31)
-	 audio <= audio_scaled;   
+	 audio <= audio_scaled;
 end
 
 // generate i2s signals
