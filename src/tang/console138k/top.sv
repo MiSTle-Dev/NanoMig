@@ -8,21 +8,20 @@
    or a single copy of e.g. a 512k diag rom
      openFPGALoader --external-flash -o 0x600000 DiagROM
 */
- 
+
+// LED usage:
+// RGB led1, CFG:  G = ready, R = power/sys_act, B = done
+// RGB led2, VBUS: G = power, R = charge, B = stdby
+
+// on som, done and ready
+
 module top(
   input			clk, // 50 MHz in
 
   input			reset_n, // S2
   input			user_n, // S1
 
-  output [1:0]	leds,
-
-  // interface to Tang onboard BL616 UART
-  input			uart_rx,
-  output		uart_tx,
-  // onboard Bl616 monitor console port interface
-  // output		bl616_mon_tx,
-  // input		bl616_mon_rx,
+  output [2:0]	leds,
 
   // spi flash interface
   output		mspi_cs,
@@ -43,8 +42,22 @@ module top(
   output [1:0]	O_sdram_ba, // two banks
   output [1:0]	O_sdram_dqm, // 16/2
 
-  // interface to external BL616/M0S on middle PMOD
-  inout [4:0]	m0s,
+  // give explicit connections for pmod0 as it's being used for the
+  // FPGA Companion and this allows for clock buffering. Clock glitches
+  // were observed when using inouts for the companion
+  input			pmod_companion_din,
+  output		pmod_companion_dout,
+  input			pmod_companion_clk,
+  input			pmod_companion_ss,
+  output		pmod_companion_intn,
+
+  // PMOD1 closer to the HDMI
+  inout [7:0]	pmod1,
+
+  output		jtagseln,
+  input			bl616_jtagsel,
+  input			bl616_tx,
+  output		uart_ext_tx,
 
   // interface to onboard BL616 µC
   input			spi_sclk, 
@@ -58,6 +71,21 @@ module top(
   inout			sd_cmd, // MOSI
   inout [3:0]	sd_dat, // 0: MISO
 
+  output		lcd_clk,
+  output        lcd_en,
+  output		lcd_hs,
+  output		lcd_vs,
+  output [7:0]	lcd_r, //lcd red
+  output [7:0]	lcd_g, //lcd green
+  output [7:0]	lcd_b, //lcd blue
+  output		lcd_bl, //drive low to turn bl off
+
+  // I2S DAC
+  output		i2s_bclk,
+  output		i2s_lrck,
+  output		i2s_din,
+  output		pa_en,
+           
   // hdmi/tdms
   output		tmds_clk_n,
   output		tmds_clk_p,
@@ -65,34 +93,64 @@ module top(
   output [2:0]	tmds_d_p
 );
 
-assign uart_tx = 1'b1;
-//assign uart_tx = bl616_mon_rx;
-//assign bl616_mon_tx = uart_rx;
+// pmod 1 is unused
+assign pmod1 = 8'hzz;
+      
+// physcial dsub9 joystick & mouse port 1 is unused
+wire [5:0] db9_joy = { 6'b000000 };
+
+// physcial dsub9 joystick port 2 ís unused
+wire [5:0] db9_joy2 = { 6'b000000 };
+   
 wire [1:0]	drv_leds;
 // wire floppy and hdd drive leds into a single one
-assign leds[1] =  drv_leds[1] || drv_leds[0];   
+// led 1 is the red part of the CFG RGB led
+assign leds[2] =  1'b1;  
+assign leds[1] =  drv_leds[1] || drv_leds[0]; 
 
 // ============================== clock generation ===========================
-   
-// HDMI clock:  141.8758 MHz
-// Pixel clock: 28.37516 MHz (HDMI/5)
-// SDRAM clock: 70.9379 MHz (HDMI/2)
-// Amiga clock: 7.09379 (Pixel/4)
-   
-`define PIXEL_CLOCK 28375160
+
+// current pll settings according to src/gowin_pll_parser.py
+
+/*
+  Input clock: 50 Mhz
+  pf: 850.0 Mhz
+  Output0:
+    Freq: 141.66666666666666 Mhz
+    Phase: 0.0°
+  Output1:
+    Freq: 85.0 Mhz
+    Phase: 0.0°
+  Output2:
+    Freq: 85.0 Mhz
+    Phase: 216.0°
+  Output2:
+    Freq: 85.0 Mhz
+    Phase: 270.0°
+*/
+
+// 180° barely boots, crashes early
+// 216° boots
+// 252° boots, DiagROM reports some rom checksum errors
+
+// Pixel clock if derived from 141 2/3 MHz
+`define PIXEL_CLOCK 28333333
 
 wire clk_pixel_x5;   
+wire clk_85m;   
+wire clk_85m_shifted;   
 wire pll_lock;   
 pll_142m pll_hdmi (
     .clkout0(clk_pixel_x5),
+    .clkout1(clk_85m),
+    .clkout2(clk_85m_shifted), // 216 deg phase shifted
+    .clkout3(), // mspi_clk),        // 270 deg phase shifted
+    .init_clk(clk),
     .lock(pll_lock),
     .clkin(clk)
 );
 
-reg clk_71m;
-always @(posedge clk_pixel_x5)
-  if(!pll_lock) clk_71m <= 1'b0;
-  else          clk_71m <= !clk_71m;
+assign O_sdram_clk = clk_85m_shifted;
 
 wire clk_pixel;
 Gowin_CLKDIV clk_div_5 (
@@ -105,17 +163,52 @@ wire	clk_28m = clk_pixel;
 wire	clk7_en;   
 wire	clk7n_en;   
 
+// ========================== Startup control ===========================
+
+// The startup control detects whether one of the user buttons (usually
+// used for reset or OSD open/close) is pressed during core startup. 
+
+   
+// The MiSTle project makes extensive use of various components of the
+// gowin FPGAs:
+// 1) They use the FPGAs flash memory as program storage using runtime
+   
+// The gowin programmer is unable to write to a flash that is in dspi
+// mode. With any of the two buttons pressed during powerup, the flash
+// driver will thus be kept in reset forever, leaving the flash memory
+// in regular SPI mode to make sure the programmer can access it.
+
+reg	spi_ext = 1'b0;       // set when the external SPI interface on PMOD is active
+reg boot_button_detected = 1'b1;
+always @(posedge pll_lock)
+  boot_button_detected <= !user_n || !reset_n;   
+
+// led 2 is the green component of the CFG RGB led
+// let it light up, when JTAG is enabled
+// 1'bz: let resistor drive led low/on, 1'b1: led off
+assign leds[2] = jtagseln?1'b1:1'bz;
+// enable JTAG if any button has been pressed during boot and also once
+// the external FPGA Companion has been seen
+//assign jtagseln = !(!pll_lock || boot_button_detected || spi_ext || bl616_jtagsel);
+assign jtagseln = !(bl616_jtagsel);
+assign uart_ext_tx = bl616_tx;   // from BL616 to PMOD
+
 // control signals generated by the user via the OSD
 wire 	   osd_reset;   
 wire [1:0] osd_chipmem;         // 0=512k, 1=1M, 2=1.5M, 3=2M
 wire [1:0] osd_slowmem;         // 0=None, 1=512k, 2=1M, 3=1.5M
+wire [1:0] osd_fastmem;         // 0=None, 1=2M, 2=4M
 wire [1:0] osd_floppy_drives;
 wire       osd_floppy_turbo;
+wire       osd_floppy_wrprot;
 wire       osd_ide_enable;
 wire [1:0] osd_chipset;         // 0=OCS-A500, 1=OCS-A1000, 2=ECS
 wire       osd_video_mode;      // PAL (0=PAL, 1=NTSC)
+wire       osd_video_wide;      // 0=normal, 1=wide screen (jailbars)
 wire [1:0] osd_video_filter;
 wire [1:0] osd_video_scanlines;
+wire       osd_joy_swap;        // 0=off, 1=on
+wire       rom_done;
 
 // generate a reset for some time after rom has been initialized
 reg [15:0] reset_cnt;
@@ -130,10 +223,7 @@ end
 wire cpu_reset = |reset_cnt;
 wire sdram_ready;
 
-// -------------------------- M0S MCU interface -----------------------
-// intn and dout are outputs driven by the FPGA to the MCU
-// din, ss and clk are inputs coming from the MCU
-assign m0s[4:0] = { spi_intn, 3'bzzz, spi_io_dout };
+// -------------------------- FPGA Companion MCU interface -----------------------
 
 // map output data onto both spi outputs
 wire spi_io_dout;
@@ -144,11 +234,13 @@ wire spi_intn;
 assign spi_dir = spi_io_dout;
 assign spi_irqn = spi_intn;
 
+assign pmod_companion_dout = spi_io_dout;
+assign pmod_companion_intn = spi_intn;
+   
 // by default the internal SPI is being used. Once there is
 // a select from the external spi, then the connection is
 // being switched
-reg spi_ext;
-always @(posedge clk_28m) begin
+always @(posedge clk) begin
     if(!pll_lock)
         spi_ext = 1'b0;
     else begin
@@ -157,19 +249,18 @@ always @(posedge clk_28m) begin
         // is connected and the FPGA switches its inputs to the
         // m0s. Until then the inputs of the internal BL616 are
         // being used.
-        if(m0s[2] == 1'b0)
-//          spi_ext = 1'b1; // auto switchover disabled !!!
-            spi_ext = 1'b0; // workaround for AST138K
+        if(pmod_companion_ss == 1'b0)
+            spi_ext = 1'b0;
     end
 end
 
 // switch between internal SPI connected to the on-board bl616
-// or to the external one possibly connected to a M0S Dock
-wire spi_io_din = spi_ext?m0s[1]:spi_dat;
-wire spi_io_ss = spi_ext?m0s[2]:spi_csn;
-wire spi_io_clk = spi_ext?m0s[3]:spi_sclk;
-
-// interface to M0S MCU
+// or to the external one possibly connected to a FPGA Companion
+wire spi_io_din = spi_ext?pmod_companion_din:spi_dat;
+wire spi_io_ss = spi_ext?pmod_companion_ss:spi_csn;
+wire spi_io_clk = spi_ext?pmod_companion_clk:spi_sclk;
+   
+// interface to FPGA Companion
 wire       mcu_sys_strobe;        // mcu message byte valid for sysctrl
 wire       mcu_hid_strobe;        // -"- hid
 wire       mcu_osd_strobe;        // -"- osd
@@ -228,7 +319,7 @@ wire        sd_busy, sd_done;
 wire [63:0] sd_img_size;
 wire [7:0]  sd_img_mounted;
 reg         sd_ready;
-   
+
 sd_card #(
     .CLK_DIV(3'd1)                   // for 28 Mhz clock
 ) sd_card (
@@ -288,7 +379,7 @@ hid hid (
 
         // input local db9 port events to be sent to MCU. Changes also trigger
         // an interrupt, so the MCU doesn't have to poll for joystick events
-        .db9_port( 6'b000000 ),
+        .db9_port( db9_joy ),
         .irq( hid_int ),
         .iack( hid_iack ),
 
@@ -317,13 +408,17 @@ sysctrl sysctrl (
 		.system_reset(osd_reset),
 		.system_floppy_drives(osd_floppy_drives),
 		.system_floppy_turbo(osd_floppy_turbo),
+		.system_floppy_wrprot(osd_floppy_wrprot),
 		.system_ide_enable(osd_ide_enable),
 	    .system_chipset(osd_chipset),
 		.system_video_mode(osd_video_mode),
+		.system_video_wide(osd_video_wide),
 		.system_video_filter(osd_video_filter),
 		.system_video_scanlines(osd_video_scanlines),
 		.system_chipmem(osd_chipmem),
 		.system_slowmem(osd_slowmem),
+		.system_fastmem(osd_fastmem),
+		.system_joy_swap(osd_joy_swap),
 				 
         .int_out_n(spi_intn),
         .int_in( { 4'b0000, sdc_int, 1'b0, hid_int, 1'b0 }),
@@ -364,6 +459,11 @@ osd_u8g2 osd_u8g2 (
         .b_out(video_blue)
 );   
 
+// map to internal lcd
+assign lcd_r = {video_red, 2'b00};
+assign lcd_g = {video_green, 2'b00};
+assign lcd_b = {video_blue, 2'b00};
+   
 /* ---------------------- Minimig chipset ----------------------- */
 
 // two 15 bit audio channels
@@ -372,9 +472,36 @@ wire [14:0] audio_right;
 
 // map first HID/USB joystick into second amiga joystick port
 // wire in db9 joystick
-wire [7:0] joystick1 = hid_joy0;
-wire [7:0] joystick0 = hid_joy1;
- 
+wire [7:0] physical_port_1 = { 
+               hid_joy0[7], 
+               hid_joy0[6], 
+              (hid_joy0[5] | db9_joy[5]), 
+              (hid_joy0[4] | db9_joy[4]),
+              (hid_joy0[3] | db9_joy[3]), 
+              (hid_joy0[2] | db9_joy[2]),
+              (hid_joy0[1] | db9_joy[1]),
+              (hid_joy0[0] | db9_joy[0]) };   
+
+            // map second HID/USB joystick into second amiga joystick port
+            // wire in db9 joystick
+wire [7:0] physical_port_2 = { 
+               hid_joy1[7], 
+               hid_joy1[6], 
+              (hid_joy1[5] | db9_joy2[5]),
+              (hid_joy1[4] | db9_joy2[4]),
+              (hid_joy1[3] | db9_joy2[3]), 
+              (hid_joy1[2] | db9_joy2[2]),
+              (hid_joy1[1] | db9_joy2[1]),
+              (hid_joy1[0] | db9_joy2[0]) }; 
+              
+wire [7:0] joystick0;
+wire [7:0] joystick1;
+
+// Swap Joysticks 
+
+assign joystick0 = osd_joy_swap ? physical_port_1 : physical_port_2;
+assign joystick1 = osd_joy_swap ? physical_port_2 : physical_port_1;
+
 wire [23:1] cpu_a;
 wire cpu_as_n, cpu_lds_n, cpu_uds_n;
 wire cpu_rw, cpu_dtack_n;
@@ -390,6 +517,16 @@ wire [1:0]  ram_be;
 wire 	    ram_oe_n;
 wire		ram_refresh;   
    
+wire fastram_sel;
+wire [22:1] fastram_addr;
+wire fastram_lds;
+wire fastram_uds;
+wire [15:0] fastram_dout;
+wire [15:0] fastram_din;
+wire [1:0] fastram_be = {fastram_uds,fastram_lds};
+wire fastram_wr;
+wire fastram_ready;
+
 wire [15:0] sdram_dout;
 
 assign ram_din = sdram_dout;
@@ -397,10 +534,11 @@ assign ram_din = sdram_dout;
 // pack config values into minimig config
 wire [5:0] chipset_config = { 1'b0,osd_chipset,osd_video_mode,1'b0 };
 wire [7:0] memory_config = { 4'b0_000, osd_slowmem, osd_chipmem };   
-wire [3:0] floppy_config = { osd_floppy_drives, 1'b0, osd_floppy_turbo };
+wire [2:0] fastram_config = { 1'b0, osd_fastmem };   
+wire [3:0] floppy_config = { osd_floppy_drives, osd_floppy_wrprot, osd_floppy_turbo };
 wire [3:0] video_config = { osd_video_filter, osd_video_scanlines };   
 wire [5:0] ide_config = { 5'b00000, osd_ide_enable };   
-   
+
 nanomig nanomig
 (
  .clk_sys(clk_28m),
@@ -414,6 +552,7 @@ nanomig nanomig
  .hdd_led(drv_leds[1]),
  
  .memory_config(memory_config),
+ .fastram_config(fastram_config),
  .chipset_config(chipset_config),
  .floppy_config(floppy_config),
  .video_config(video_config),
@@ -430,8 +569,8 @@ nanomig nanomig
  .audio_right(audio_right),
 
  // uart interface 
- .uart_rx(midi_in),
- .uart_tx(midi_out),
+ .uart_rx(1'b0),
+ .uart_tx(),
  
  // keyboard & mouse				 
  .mouse_buttons(mouse_buttons), // mouse buttons
@@ -463,7 +602,16 @@ nanomig nanomig
  ._ram_we(ram_we_n),        // sram write enable
  ._ram_oe(ram_oe_n),        // sram output enable
  .chip48(48'd0),
- .refresh(ram_refresh)
+ .refresh(ram_refresh),
+
+ .fastram_sel(fastram_sel),
+ .fastram_addr(fastram_addr),
+ .fastram_lds(fastram_lds),
+ .fastram_uds(fastram_uds),
+ .fastram_dout(fastram_dout),
+ .fastram_din(fastram_din),
+ .fastram_wr(fastram_wr),
+ .fastram_ready(fastram_ready)
 );
 
 wire           flash_ready;  
@@ -473,7 +621,7 @@ reg            start_rom_copy;
 reg            mem_ready_D;
 
 // geneate a start_rom_copy signal once flash and SDRAM are initialized
-always @(posedge clk_28m or negedge pll_lock) begin
+always @(posedge clk_85m or negedge pll_lock) begin
    if(!pll_lock) begin
       start_rom_copy <= 1'b0;
       mem_ready_D <= 1'b0;
@@ -493,32 +641,30 @@ wire [15:0] flash_dout;
 reg [15:0]  flash_doutD;
 reg		    flash_cs;  
 reg [31:0]  word_count;
-reg [2:0]   state;
+reg [4:0]   state;
 wire        flash_data_strobe;
 wire        flash_busy;   
 
-// once the copy counter has run to zero, all rom has been copied
-wire		rom_done = (word_count == 0);
+assign		rom_done = (word_count == 0);
 
 reg [21:0]  flash_ram_addr;   
 reg         flash_ram_write;
 reg [5:0]   flash_cnt;  
 
-always @(posedge clk_28m or negedge mem_ready) begin
+always @(posedge clk_85m or negedge mem_ready) begin
     if(!mem_ready) begin
        flash_addr <= 22'h300000;          // 6MB flash offset (word address)
-	                                      // flash driver this results in the flash address being 0x600000
        flash_ram_addr <= { 4'hf, 18'h0 }; // write into 512k sdram segment used for kick rom
        word_count <= 22'h40001;           // 512k bytes ROM data = 256k words
 
-       state <= 3'h0;
+       state <= 5'h0;
        flash_ram_write <= 1'b0;
        flash_cs <= 1'b0;        
        flash_cnt <= 6'd0;
     end else begin
-        if((start_rom_copy || state == 7) && (word_count != 0)) begin
+        if((start_rom_copy || state == 23) && (word_count != 0)) begin
             flash_cs <= 1'b1;
-            flash_cnt <= 6'd15; // >= 30 @ 32MHz
+            flash_cnt <= 6'd45; // >= 45 @ 85MHz
         end else begin
             if(flash_cnt != 0) flash_cnt <= flash_cnt - 6'd1;
             if(flash_busy)     flash_cs <= 1'b0;
@@ -542,10 +688,10 @@ always @(posedge clk_28m or negedge mem_ready) begin
         end
 
         // advance ram write state
-        if(state != 0)  state <= state + 3'd1;
-        if(state == 1)  flash_ram_write <= 1'b1;
-        if(state == 6)  flash_ram_write <= 1'b0;
-        if(state == 7)  flash_ram_addr <= flash_ram_addr + 22'd1;
+        if(state != 0)  state <= state + 5'd1;
+        if(state == 3)  flash_ram_write <= 1'b1;
+        if(state == 18) flash_ram_write <= 1'b0;
+        if(state == 21) flash_ram_addr <= flash_ram_addr + 22'd1;
     end
 end
 
@@ -575,8 +721,6 @@ wire [1:0]  sdram_be      = rom_done?ram_be:2'b00;
 wire		sdram_we      = rom_done?sdram_rw:flash_ram_write; 
 
 sdram sdram (
-  	.sd_clk     ( O_sdram_clk   ), // sd clock
-	.sd_cke     ( O_sdram_cke   ), // clock enable
 	.sd_data    ( IO_sdram_dq   ), // 32 bit bidirectional data bus
 	.sd_addr    ( O_sdram_addr  ), // 11 bit multiplexed address bus
 	.sd_dqm     ( O_sdram_dqm   ), // two byte masks
@@ -587,7 +731,7 @@ sdram sdram (
 	.sd_cas     ( O_sdram_cas_n ), // columns address select
 
 	// cpu/chipset interface
-	.clk        ( clk_71m       ), // sdram is accessed at 71MHz
+	.clk        ( clk_85m       ), // sdram is accessed at 85MHz
 	.reset_n    ( pll_lock      ), // init signal after FPGA config to initialize RAM
 
 	.ready      ( sdram_ready   ), // ram is ready and has been initialized
@@ -598,18 +742,27 @@ sdram sdram (
 	.addr       ( sdram_addr    ), // 22 bit word address
 	.ds         ( sdram_be      ), // upper/lower data strobe
 	.cs         ( sdram_cs      ), // cpu/chipset requests read/wrie
-	.we         ( sdram_we      )  // cpu/chipset requests write
+	.we         ( sdram_we      ), // cpu/chipset requests write
+			 
+	.p2_din        ( fastram_din     ), // data input from chipset/cpu
+	.p2_dout       ( fastram_dout    ),
+	.p2_addr       ( fastram_addr    ), // 22 bit word address
+	.p2_ds         ( fastram_be      ), // upper/lower data strobe
+	.p2_cs         ( fastram_sel     ), // cpu/chipset requests read/wrie
+	.p2_we         ( fastram_wr      ),  // cpu/chipset requests write
+	.p2_ack        ( fastram_ready   )
 );
 
-// run the flash a 71MHz. This is only used at power-up to copy kickstart
+// run the flash a 85MHz. This is only used at power-up to copy kickstart
 // from flash to sdram
-assign mspi_clk = ~clk_71m;   
-flash flash (
-    .clk       ( clk_71m     ),
-    .resetn    ( pll_lock    ),
+assign mspi_clk = clk_85m_shifted;
+
+flash #(.READ_DELAY(0)) flash (
+    .clk       ( clk_85m     ),
+    .resetn    ( !(!pll_lock || bl616_jtagsel) ),
     .ready     ( flash_ready ),
 
-    .address   ( flash_addr  ),
+    .address   ( {1'b0, flash_addr} ),
     .cs        ( flash_cs    ),
     .dout      ( flash_dout  ),
 	.busy      ( flash_busy  ),
@@ -630,9 +783,84 @@ video_analyzer video_analyzer (
     .vs          ( vs_n      ),
     .pal         ( vpal      ),
     .short_frame ( short_frame ),
+    .wide_screen ( osd_video_wide ),
     .interlace   ( interlace ),
     .vreset      ( vreset    )
 );
+
+assign lcd_clk = clk_pixel;
+assign lcd_hs = hs_n;   // no syncs on this lcd
+assign lcd_vs = vs_n;
+assign lcd_bl = !cpu_reset;   // enable display backlight once cpu is out of reset
+
+reg [9:0] hcnt;   // max 1023
+reg [9:0] vcnt;   // max 626
+
+// generate the 800x480 pixel display enable signal 
+assign lcd_en = (hcnt < 10'd800) && (vcnt < 10'd480);
+
+always @(posedge clk_pixel) begin
+   reg       last_vs_n, last_hs_n;
+
+   last_hs_n <= hs_n;   
+
+   // rising edge/end of hsync
+   if(hs_n && !last_hs_n) begin
+      hcnt <= 10'd980;
+
+      last_vs_n <= vs_n;   
+      if(vs_n && !last_vs_n) begin
+         vcnt <= 10'd946;                
+      end else
+        vcnt <= vcnt + 10'd1;    
+   end else
+      hcnt <= hcnt + 10'd1;    
+end
+/* ------------------- audio processing --------------- */
+
+// MAX98357A
+   
+// EN is actually the /SD_MODE of the MAX98357A and driving it high selects
+// left channel only. For stereo mixing there would have to be a "large" 
+// resistor as a pullup which isn't there on the TN20k
+
+assign pa_en = !cpu_reset;   // simply enable amplifier with left channel
+
+reg i2s_clk;
+reg [7:0] i2s_clk_cnt;
+always @(posedge clk_28m) begin
+    if(i2s_clk_cnt < 28375160 / (24000*32) / 2 - 1)
+        i2s_clk_cnt <= i2s_clk_cnt + 8'd1;
+    else begin
+        i2s_clk_cnt <= 8'd0;
+        i2s_clk <= ~i2s_clk;
+    end
+end
+
+// sign expand and add both channels
+wire [15:0] audio_mix = { audio_left[14], audio_left} + { audio_right[14], audio_right };
+   
+// shift audio down to reduce amp output volume to a sane range
+localparam AUDIO_SHIFT = 2;   
+wire [15:0] audio_scaled = { { AUDIO_SHIFT+1{audio_mix[15]}}, audio_mix[14:AUDIO_SHIFT] };   
+   
+// count 32 bits, 16 left and 16 right channel. MAX samples
+// on rising edge
+reg [15:0] audio;
+reg [4:0] audio_bit_cnt;
+always @(posedge i2s_clk) begin
+   if(cpu_reset) audio_bit_cnt <= 5'd0;
+   else          audio_bit_cnt <= audio_bit_cnt + 5'd1;
+
+   // latch data so it's stable during transmission
+   if(audio_bit_cnt == 5'd31)
+	 audio <= audio_scaled;   
+end
+
+// generate i2s signals
+assign i2s_bclk = !i2s_clk;
+assign i2s_lrck = cpu_reset?1'b0:audio_bit_cnt[4];
+assign i2s_din = cpu_reset?1'b0:audio[15-audio_bit_cnt[3:0]];
 
 /* -------------------- HDMI video and audio -------------------- */
 
@@ -670,6 +898,7 @@ hdmi #(
 
   .pal_mode(vpal),
   .short_frame ( short_frame ),
+  .wide_screen ( osd_video_wide ),
   .interlace(interlace),
   .reset(vreset),    // signal to synchronize HDMI
 
