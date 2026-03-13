@@ -243,8 +243,8 @@ assign pmod_companion_intn = spi_intn;
 // by default the internal SPI is being used. Once there is
 // a select from the external spi, then the connection is
 // being switched
-always @(posedge clk) begin
-    if(!pll_lock)
+always @(posedge clk_28m or negedge pll_lock) begin
+    if(!pll_lock || bl616_jtagsel)
         spi_ext = 1'b0;
     else begin
         // spi_ext is activated once the m0s pins 2 (ss or csn) is
@@ -760,7 +760,7 @@ sdram sdram (
 
 // run the flash a 85MHz. This is only used at power-up to copy kickstart
 // from flash to sdram
-assign mspi_clk = !clk_85m;   
+assign mspi_clk = clk_85m_shifted; // !clk_85m;   
 flash #(.READ_DELAY(0)) flash (
     .clk       ( clk_85m     ),
     .resetn    ( !(!pll_lock || bl616_jtagsel) ),
