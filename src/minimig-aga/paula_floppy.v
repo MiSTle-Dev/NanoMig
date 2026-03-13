@@ -142,7 +142,7 @@ reg         trackrd;		// read track (command to host)
 wire        _dsktrack0;		// disk heads are over track 0
 wire        dsktracklast;       // disk heads are over last track
 
-wire [15:0] fifo_in;		// fifo data in
+wire [15:0] fifo_in /* verilator public */;  // fifo data in
 wire [15:0] fifo_out /* verilator public */; // fifo data out as sent to CPU
 wire        fifo_wr;		// fifo write enable
 reg         fifo_wr_del;	// fifo write enable delayed
@@ -737,7 +737,7 @@ assign lenzero = (dsklen[13:0]==0);
 //--------------------------------------------------------------------------------------
 //disk data read path
 wire	busrd /* verilator public */;	// bus read
-wire	buswr;				// bus write
+wire	buswr /* verilator public */;	// bus write
 reg	trackrdok;			// track read enable
 
 //disk buffer bus read address decode
@@ -816,7 +816,7 @@ always @(posedge clk) begin
 		 if(cpu_wr_cnt == 23) begin
 		    // check if header checksum is valid
 		    if(dbyte != wr_sector_csum[15:8]) begin
-		       $display("paula_floppy.v: header checksum failure %x != %x", dbyte, wr_sector_csum[7:0]);
+		       $display("paula_floppy.v: header checksum failure %x != %x", dbyte, wr_sector_csum[15:8]);
 		       cpu_wr_state <= 4'd0;  // error, return to idle state		   
 		    end else begin
 		       // header ok, verify track number

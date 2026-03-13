@@ -204,7 +204,7 @@ wire       osd_floppy_wrprot;
 wire       osd_ide_enable;
 wire [1:0] osd_chipset;         // 0=OCS-A500, 1=OCS-A1000, 2=ECS
 wire       osd_video_mode;      // PAL (0=PAL, 1=NTSC)
-wire       osd_video_wide;      // 0=normal, 1=wide screen (jailbars)
+wire [1:0] osd_video_screen;    // 0=normal, 1=overscan, 2=wide screen (jailbars)
 wire [1:0] osd_video_filter;
 wire [1:0] osd_video_scanlines;
 wire [2:0] osd_volume;          // Mute=0, 1=25%, 2=50%, 3=75%, 4=100%
@@ -413,7 +413,7 @@ sysctrl sysctrl (
 		.system_ide_enable(osd_ide_enable),
 	    .system_chipset(osd_chipset),
 		.system_video_mode(osd_video_mode),
-		.system_video_wide(osd_video_wide),
+		.system_video_screen(osd_video_screen),
 		.system_video_filter(osd_video_filter),
 		.system_video_scanlines(osd_video_scanlines),
 		.system_chipmem(osd_chipmem),
@@ -785,7 +785,7 @@ video_analyzer video_analyzer (
     .vs          ( vs_n      ),
     .pal         ( vpal      ),
     .short_frame ( short_frame ),
-    .wide_screen ( osd_video_wide ),
+    .screen      ( osd_video_screen ),
     .interlace   ( interlace ),
     .vreset      ( vreset    )
 );
@@ -932,7 +932,7 @@ hdmi #(
 
   .pal_mode(vpal),
   .short_frame ( short_frame ),
-  .wide_screen ( osd_video_wide ),
+  .screen ( osd_video_screen ),
   .interlace(interlace),
   .reset(vreset),    // signal to synchronize HDMI
 

@@ -10,7 +10,7 @@ module video_analyzer
  input		  clk,
  input		  hs,
  input		  vs,
- input		  wide_screen, // wide screen jailbars enabled
+ input [1:0]      screen, // standard, overscan or wide screen jailbars enabled
  output reg       pal,         // pal mode detected
  output reg       short_frame, // short frame has two lines less
  output reg       interlace,   // interlace modes have one line less
@@ -20,7 +20,7 @@ module video_analyzer
 
 // generate a reset signal in the upper left corner of active video used
 // to synchonize the HDMI video generation to the Amiga
-reg wide_screenD;
+reg [1:0] screenD;
 reg vsD, hsD;
 reg [12:0] hcnt;    // signal ranges 0..2047
 reg [12:0] hcntL;
@@ -29,9 +29,9 @@ reg [10:0] vcntL;
 reg changed;
 
 always @(posedge clk) begin
-    // resync HDMI whenever wide screen setting changes
-    wide_screenD <= wide_screen;   
-    if(wide_screenD != wide_screen)
+    // resync HDMI whenever screen setting changes
+    screenD <= screen;   
+    if(screenD != screen)
         changed <= 1'b1;   
    
     // ---- hsync processing -----
@@ -89,8 +89,9 @@ always @(posedge clk) begin
    
     vreset <= 1'b0;
     // account for back porches to adjust image position within the
-    // HDMI frame
-    if( hcnt == (120-(wide_screen?32:0)) && vcnt == 36 && changed) begin
+    // HDMI frame. Center screen according to screen type standard (0),
+    // overscan (1) or wide (2)
+    if( hcnt == ((screen==2'd2)?88:(screen==2'd1)?120:160) && vcnt == 46 && changed) begin
         vreset <= 1'b1;
         changed <= 1'b0;
     end
