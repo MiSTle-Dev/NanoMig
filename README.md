@@ -32,12 +32,13 @@ Planned features:
 
 These youtube shorts mainly document the progress:
 
+  * [NanoMig #11: Tiny FPGA, big screen](https://youtube.com/shorts/DdKW_RedTvs)
   * [NanoMig #10: World of Commodore Amiga Demo on Tang Primer 25k](https://youtube.com/shorts/XdLlrg1wgko)
   * [NanoMig #9: Amiga speedball 2 on Tang Mega 138k Pro](https://youtube.com/shorts/NHFjJwGAOZ0)
-  * [NanoMig #8: Booting from virtual Harddisk](https://youtube.com/shorts/9LJ0tsSZb60)
 
 <details><summary>More ...</summary>
 <ul>
+  <li><a href="https://youtube.com/shorts/9LJ0tsSZb60">NanoMig #8: Booting from virtual Harddisk</a></li>
   <li><a href="https://youtube.com/shorts/vbYURdxtEAQ">NanoMig #7: Tiniest Amiga running Gods</a></li>
   <li><a href="https://youtube.com/shorts/uFKjddN-WSA">NanoMig #6: First signs of life with the 68ec020</a></li>
   <li><a href="https://youtube.com/shorts/PSqerpTvJrw">NanoMig #5: Cheap FPGA Amiga finally runs Planet Rocklobster Demo</a></li>
