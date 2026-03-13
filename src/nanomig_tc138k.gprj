@@ -3,7 +3,7 @@
 <Project>
     <Template>FPGA</Template>
     <Version>5</Version>
-    <Device name="GW5AST-138B" pn="GW5AST-LV138PG484AC1/I0">gw5ast138b-011</Device>
+    <Device name="GW5AST-138C" pn="GW5AST-LV138PG484AC1/I0">gw5ast138c-007</Device>
     <FileList>
         <File path="fx68k/fx68k.sv" type="file.verilog" enable="1"/>
         <File path="fx68k/fx68kAlu.sv" type="file.verilog" enable="1"/>

@@ -10,6 +10,9 @@ IO_PORT "spi_dir" PULL_MODE=NONE DRIVE=8 IO_TYPE=LVCMOS33 BANK_VCCIO=3.3;
 IO_LOC "spi_irqn" C3; // UART TX
 IO_PORT "spi_irqn" PULL_MODE=NONE DRIVE=8 IO_TYPE=LVCMOS33 BANK_VCCIO=3.3;
 
+IO_LOC "bl616_jtagsel" B3; // former BL616 UART output and FPGA input pin
+IO_PORT "bl616_jtagsel" PULL_MODE=UP IO_TYPE=LVCMOS33 BANK_VCCIO=3.3;
+
 NET_LOC "jtagseln" V_JTAGSELN;
 
 IO_LOC "clk" E2;        // 50Mhz

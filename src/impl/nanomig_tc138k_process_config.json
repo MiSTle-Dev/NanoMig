@@ -1,6 +1,6 @@
 {
  "BACKGROUND_PROGRAMMING" : "off",
- "COMPRESS" : true,
+ "COMPRESS" : false,
  "CPU" : true,
  "CRC_CHECK" : true,
  "Clock_Route_Order" : 0,
@@ -90,6 +90,6 @@
  "VHDL_Standard" : "VHDL_Std_1993",
  "Verilog_Standard" : "Vlg_Std_Sysv2017",
  "WAKE_UP" : "0",
- "show_all_warnings" : false,
+ "show_all_warnings" : true,
  "turn_off_bg" : false
 }
