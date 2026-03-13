@@ -114,7 +114,7 @@ wire       osd_floppy_wrprot;
 wire       osd_ide_enable;
 wire [1:0] osd_chipset;         // 0=OCS-A500, 1=OCS-A1000, 2=ECS
 wire       osd_video_mode;      // PAL (0=PAL, 1=NTSC)
-wire       osd_video_wide;      // 0=normal, 1=wide screen (jailbars)
+wire [1:0] osd_video_screen;    // 0=normal, 1=overscan, 2=wide screen (jailbars)
 wire [1:0] osd_video_filter;
 wire [1:0] osd_video_scanlines;
 wire       osd_joy_swap;        // 0=off, 1=on
@@ -648,7 +648,7 @@ video_analyzer video_analyzer (
     .vs        ( vs_n      ),
     .pal       ( vpal      ),
     .short_frame ( short_frame ),
-    .wide_screen ( 1'b0 ),
+    .screen    ( 2'd1 ),
     .interlace ( interlace ),
     .vreset    ( vreset    )
 );

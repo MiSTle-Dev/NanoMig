@@ -33,7 +33,7 @@ module sysctrl (
   output reg	    system_floppy_turbo,
   output reg [1:0]  system_chipset,
   output reg	    system_video_mode,
-  output reg	    system_video_wide,
+  output reg [1:0]  system_video_screen,
   output reg	    system_ide_enable,
   output reg [1:0]  system_video_filter,
   output reg [1:0]  system_video_scanlines,
@@ -76,7 +76,7 @@ reg  [7:0] menu_rom_data;
 // generate hex e.g.: 
 // gzip -nc amiga.xml > amiga.xml.gz
 // xxd -c1 -p amiga.xml.gz > amiga_xml.hex
-reg [7:0] amiga_xml[1024];
+reg [7:0] amiga_xml[1536];
 initial $readmemh("amiga_xml.hex", amiga_xml);
    
 always @(posedge clk) 
@@ -105,7 +105,7 @@ always @(posedge clk) begin
       system_floppy_wrprot <= 1'b1;      
       system_chipset <= 2'd2;      
       system_video_mode <= 1'b0;      
-      system_video_wide <= 1'b0;      
+      system_video_screen <= 2'd0;      
       system_video_filter <= 2'd0;      
       system_video_scanlines <= 2'd0;      
       system_chipmem <= 2'd0;      
@@ -113,7 +113,7 @@ always @(posedge clk) begin
       system_fastmem <= 2'd0;      
       system_ide_enable <= 1'b0;
       system_joy_swap <= 1'b1;
-	  system_volume <= 3'b010;  
+      system_volume <= 3'b010;  
    end 
    else 
    begin // if (reset)
@@ -211,8 +211,8 @@ always @(posedge clk) begin
 		   if(id == "F") system_video_filter <= data_in[1:0];
 		   // Value "V": PAL(0) or NTSC(1) video
 		   if(id == "V") system_video_mode <= data_in[0];
-		   // Value "W": normal(0) or wide screen(1) video
-		   if(id == "W") system_video_wide <= data_in[0];
+		   // Value "W": standard(0), overscan(1) or wide screen(2) video
+		   if(id == "W") system_video_screen <= data_in[1:0];
 		   // Value "L": Scanlines off(0) or on(1)
 		   if(id == "L") system_video_scanlines <= data_in[1:0];
 		   // Value "Y": Chipmem 512k(0), 1M(1), 1.5M(2) or 2M(2)
