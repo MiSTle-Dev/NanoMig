@@ -91,7 +91,7 @@ always @(posedge clk) begin
     // account for back porches to adjust image position within the
     // HDMI frame. Center screen according to screen type standard (0),
     // overscan (1) or wide (2)
-    if( hcnt == ((screen==2'd2)?88:(screen==2'd1)?120:160) && vcnt == 46 && changed) begin
+    if( hcnt == ((screen==2'd2)?88:(screen==2'd1)?120:162) && vcnt == 46 && changed) begin
         vreset <= 1'b1;
         changed <= 1'b0;
     end
