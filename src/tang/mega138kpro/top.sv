@@ -849,6 +849,9 @@ always @(posedge clk_pixel) begin
 end
 /* ------------------- audio processing --------------- */
 
+reg [14:0] scaled_audio_left;
+reg [14:0] scaled_audio_right;
+
 // MAX98357A
    
 // EN is actually the /SD_MODE of the MAX98357A and driving it high selects
@@ -869,7 +872,7 @@ always @(posedge clk_28m) begin
 end
 
 // sign expand and add both channels
-wire [15:0] audio_mix = { audio_left[14], audio_left} + { audio_right[14], audio_right };
+wire [15:0] audio_mix = { scaled_audio_left[14], scaled_audio_left} + { scaled_audio_right[14], scaled_audio_right };
    
 // shift audio down to reduce amp output volume to a sane range
 localparam AUDIO_SHIFT = 2;   
@@ -897,8 +900,6 @@ assign i2s_din = cpu_reset?1'b0:audio[15-audio_bit_cnt[3:0]];
 
 // latch audio, so it's stable during 48khz transfer
 reg [15:0] audio_reg [2]; 
-reg [14:0] scaled_audio_left;
-reg [14:0] scaled_audio_right;
 
 // generate 48khz audio clock
 reg clk_audio;
@@ -940,7 +941,6 @@ always @(posedge clk_pixel) begin
         endcase
 
 	   audio_reg <= { { 1'b0, ~scaled_audio_left[14],scaled_audio_left[13:0]}, {1'b0, ~scaled_audio_right[14],scaled_audio_right[13:0]}};	
-
     end
 end
    
