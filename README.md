@@ -25,7 +25,7 @@ Current state:
   * [Fully simulated](sim)
 
 Planned features:
-  * Accelerated 68020 support (may not fit)
+  * Accelerated 68020 support (may fit)
   * AGA support (may not fit)
 
 ## Videos
