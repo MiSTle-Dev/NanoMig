@@ -1,7 +1,8 @@
 IO_LOC "clk" V22;        // 50Mhz
 IO_PORT "clk" PULL_MODE=NONE DRIVE=OFF BANK_VCCIO=3.3;
 
-// F4 = daughter board reset
+IO_LOC "key_som" F4; // daughter board reset
+IO_PORT "key_som" IO_TYPE=LVCMOS15 PULL_MODE=NONE DRIVE=OFF BANK_VCCIO=1.5;
 
 IO_LOC "reset_n" AA13;        // actually S0 on the board
 IO_PORT "reset_n" IO_TYPE=LVCMOS33 PULL_MODE=UP DRIVE=OFF BANK_VCCIO=3.3;

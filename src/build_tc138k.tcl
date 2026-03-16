@@ -1,5 +1,4 @@
-# last sucessful build Gowin 1.9.10.03
-set_device GW5AST-LV138PG484AC1/I0 -device_version B
+set_device GW5AST-LV138PG484AC1/I0 -device_version C
 
 add_file nanomig.v
 add_file minimig-aga/amiga_clk.v
