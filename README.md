@@ -73,7 +73,7 @@ The necessary binaries can be found in the [project releases](https://github.com
   * Use ADF-Opus to create and modify ADF images under Windows [ADFOpus2025](https://github.com/chironb/ADFOpus2025)
 
 ## Credits
-Many thanks to **Alastair M. Robinson** ([robinsonb5](https://github.com/robinsonb5)) for his contributions to the NanoMig, in particular **Fastram** and **68020** cpu! 
+Many thanks to **Alastair M. Robinson** ([robinsonb5](https://github.com/robinsonb5)) for his contributions to the **NanoMig**, in particular **Fastram** and **68020** cpu! 
 
 ## LED UI
 
