@@ -83,8 +83,8 @@ Many thanks to **Alastair M. Robinson** ([robinsonb5](https://github.com/robinso
 | 1 | F.DISK        | x     | x     | x   |x         |x|
 | 2 | H.DISK 1      | x     | -     |   - |x         |-|
 | 3 | H.DISK 2      | x     | -     |   - |x         |-|
-| 4 | SD-CARD       | x     | -     |   - |x         |-|
-| 5 |               | x     | -     |   - |x         |-|
+| 4 | SD-READ       | x     | -     |   - |x         |-|
+| 5 | SD-WRITE      | x     | -     |   - |x         |-|
 
 
 ## Amiga specific key mappings
