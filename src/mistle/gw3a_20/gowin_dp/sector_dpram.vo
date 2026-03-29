@@ -1,0 +1,100 @@
+//Copyright (C)2014-2026 Gowin Semiconductor Corporation.
+//All rights reserved.
+//File Title: Post-PnR Verilog Simulation Model file
+//Tool Version: V1.9.12.02
+//Created Time: Sun Mar 29 17:35:18 2026
+
+`timescale 100 ps/100 ps
+module sector_dpram(
+	clka,
+	ada,
+	dina,
+	cea,
+	ocea,
+	wrea,
+	reseta,
+	clkb,
+	adb,
+	dinb,
+	ceb,
+	oceb,
+	wreb,
+	resetb,
+	douta,
+	doutb
+);
+input clka;
+input [8:0] ada;
+input [7:0] dina;
+input cea;
+input ocea;
+input wrea;
+input reseta;
+input clkb;
+input [8:0] adb;
+input [7:0] dinb;
+input ceb;
+input oceb;
+input wreb;
+input resetb;
+output [7:0] douta;
+output [7:0] doutb;
+wire GND;
+wire VCC;
+wire [8:0] ada;
+wire [8:0] adb;
+wire cea;
+wire ceb;
+wire clka;
+wire clkb;
+wire [7:0] dina;
+wire [7:0] dinb;
+wire [7:0] douta;
+wire [7:0] doutb;
+wire ocea;
+wire oceb;
+wire reseta;
+wire resetb;
+wire wrea;
+wire wreb;
+wire [15:8] \u_dp/DOA ;
+wire [15:8] \u_dp/DOB ;
+VCC VCC_cZ (
+  .V(VCC)
+);
+GND GND_cZ (
+  .G(GND)
+);
+GSR GSR (
+	.GSRI(VCC)
+);
+DP8K \u_dp/mem_mem_0_0_s  (
+	.CLKA(clka),
+	.OCEA(GND),
+	.CEA(cea),
+	.RESETA(reseta),
+	.WREA(wrea),
+	.CLKB(clkb),
+	.OCEB(GND),
+	.CEB(ceb),
+	.RESETB(resetb),
+	.WREB(wreb),
+	.BLKSELA({GND, GND, GND}),
+	.BLKSELB({GND, GND, GND}),
+	.DIA({GND, GND, GND, GND, GND, GND, GND, GND, dina[7:0]}),
+	.DIB({GND, GND, GND, GND, GND, GND, GND, GND, dinb[7:0]}),
+	.ADA({GND, ada[8:0], GND, GND, GND}),
+	.ADB({GND, adb[8:0], GND, GND, GND}),
+	.DOA({\u_dp/DOA [15:8], douta[7:0]}),
+	.DOB({\u_dp/DOB [15:8], doutb[7:0]})
+);
+defparam \u_dp/mem_mem_0_0_s .READ_MODE0=1'b0;
+defparam \u_dp/mem_mem_0_0_s .READ_MODE1=1'b0;
+defparam \u_dp/mem_mem_0_0_s .WRITE_MODE0=2'b00;
+defparam \u_dp/mem_mem_0_0_s .WRITE_MODE1=2'b00;
+defparam \u_dp/mem_mem_0_0_s .BIT_WIDTH_0=8;
+defparam \u_dp/mem_mem_0_0_s .BIT_WIDTH_1=8;
+defparam \u_dp/mem_mem_0_0_s .RESET_MODE="SYNC";
+defparam \u_dp/mem_mem_0_0_s .BLK_SEL_0=3'b000;
+defparam \u_dp/mem_mem_0_0_s .BLK_SEL_1=3'b000;
+endmodule

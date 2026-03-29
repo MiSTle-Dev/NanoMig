@@ -1,0 +1,317 @@
+//Copyright (C)2014-2026 Gowin Semiconductor Corporation.
+//All rights reserved.
+//File Title: Post-PnR Verilog Simulation Model file
+//Tool Version: V1.9.12.02
+//Created Time: Sun Mar 29 17:34:16 2026
+
+`timescale 100 ps/100 ps
+module ide_dpram(
+	clka,
+	ada,
+	dina,
+	cea,
+	ocea,
+	wrea,
+	reseta,
+	clkb,
+	adb,
+	dinb,
+	ceb,
+	oceb,
+	wreb,
+	resetb,
+	douta,
+	doutb
+);
+input clka;
+input [11:0] ada;
+input [15:0] dina;
+input cea;
+input ocea;
+input wrea;
+input reseta;
+input clkb;
+input [11:0] adb;
+input [15:0] dinb;
+input ceb;
+input oceb;
+input wreb;
+input resetb;
+output [15:0] douta;
+output [15:0] doutb;
+wire GND;
+wire VCC;
+wire [11:0] ada;
+wire [11:0] adb;
+wire cea;
+wire ceb;
+wire clka;
+wire clkb;
+wire [15:0] dina;
+wire [15:0] dinb;
+wire [15:0] douta;
+wire [15:0] doutb;
+wire ocea;
+wire oceb;
+wire reseta;
+wire resetb;
+wire wrea;
+wire wreb;
+wire [15:2] \u_dp/DOA ;
+wire [15:2] \u_dp/DOB ;
+wire [15:2] \u_dp/DOA_0 ;
+wire [15:2] \u_dp/DOB_0 ;
+wire [15:2] \u_dp/DOA_1 ;
+wire [15:2] \u_dp/DOB_1 ;
+wire [15:2] \u_dp/DOA_2 ;
+wire [15:2] \u_dp/DOB_2 ;
+wire [15:2] \u_dp/DOA_3 ;
+wire [15:2] \u_dp/DOB_3 ;
+wire [15:2] \u_dp/DOA_4 ;
+wire [15:2] \u_dp/DOB_4 ;
+wire [15:2] \u_dp/DOA_5 ;
+wire [15:2] \u_dp/DOB_5 ;
+wire [15:2] \u_dp/DOA_6 ;
+wire [15:2] \u_dp/DOB_6 ;
+VCC VCC_cZ (
+  .V(VCC)
+);
+GND GND_cZ (
+  .G(GND)
+);
+GSR GSR (
+	.GSRI(VCC)
+);
+DP8K \u_dp/mem_mem_0_0_s  (
+	.CLKA(clka),
+	.OCEA(GND),
+	.CEA(cea),
+	.RESETA(reseta),
+	.WREA(wrea),
+	.CLKB(clkb),
+	.OCEB(GND),
+	.CEB(ceb),
+	.RESETB(resetb),
+	.WREB(wreb),
+	.BLKSELA({GND, GND, GND}),
+	.BLKSELB({GND, GND, GND}),
+	.DIA({GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, dina[1:0]}),
+	.DIB({GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, dinb[1:0]}),
+	.ADA({ada[11:0], GND}),
+	.ADB({adb[11:0], GND}),
+	.DOA({\u_dp/DOA [15:2], douta[1:0]}),
+	.DOB({\u_dp/DOB [15:2], doutb[1:0]})
+);
+defparam \u_dp/mem_mem_0_0_s .READ_MODE0=1'b0;
+defparam \u_dp/mem_mem_0_0_s .READ_MODE1=1'b0;
+defparam \u_dp/mem_mem_0_0_s .WRITE_MODE0=2'b00;
+defparam \u_dp/mem_mem_0_0_s .WRITE_MODE1=2'b00;
+defparam \u_dp/mem_mem_0_0_s .BIT_WIDTH_0=2;
+defparam \u_dp/mem_mem_0_0_s .BIT_WIDTH_1=2;
+defparam \u_dp/mem_mem_0_0_s .RESET_MODE="SYNC";
+defparam \u_dp/mem_mem_0_0_s .BLK_SEL_0=3'b000;
+defparam \u_dp/mem_mem_0_0_s .BLK_SEL_1=3'b000;
+DP8K \u_dp/mem_mem_0_1_s  (
+	.CLKA(clka),
+	.OCEA(GND),
+	.CEA(cea),
+	.RESETA(reseta),
+	.WREA(wrea),
+	.CLKB(clkb),
+	.OCEB(GND),
+	.CEB(ceb),
+	.RESETB(resetb),
+	.WREB(wreb),
+	.BLKSELA({GND, GND, GND}),
+	.BLKSELB({GND, GND, GND}),
+	.DIA({GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, dina[3:2]}),
+	.DIB({GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, dinb[3:2]}),
+	.ADA({ada[11:0], GND}),
+	.ADB({adb[11:0], GND}),
+	.DOA({\u_dp/DOA_0 [15:2], douta[3:2]}),
+	.DOB({\u_dp/DOB_0 [15:2], doutb[3:2]})
+);
+defparam \u_dp/mem_mem_0_1_s .READ_MODE0=1'b0;
+defparam \u_dp/mem_mem_0_1_s .READ_MODE1=1'b0;
+defparam \u_dp/mem_mem_0_1_s .WRITE_MODE0=2'b00;
+defparam \u_dp/mem_mem_0_1_s .WRITE_MODE1=2'b00;
+defparam \u_dp/mem_mem_0_1_s .BIT_WIDTH_0=2;
+defparam \u_dp/mem_mem_0_1_s .BIT_WIDTH_1=2;
+defparam \u_dp/mem_mem_0_1_s .RESET_MODE="SYNC";
+defparam \u_dp/mem_mem_0_1_s .BLK_SEL_0=3'b000;
+defparam \u_dp/mem_mem_0_1_s .BLK_SEL_1=3'b000;
+DP8K \u_dp/mem_mem_0_2_s  (
+	.CLKA(clka),
+	.OCEA(GND),
+	.CEA(cea),
+	.RESETA(reseta),
+	.WREA(wrea),
+	.CLKB(clkb),
+	.OCEB(GND),
+	.CEB(ceb),
+	.RESETB(resetb),
+	.WREB(wreb),
+	.BLKSELA({GND, GND, GND}),
+	.BLKSELB({GND, GND, GND}),
+	.DIA({GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, dina[5:4]}),
+	.DIB({GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, dinb[5:4]}),
+	.ADA({ada[11:0], GND}),
+	.ADB({adb[11:0], GND}),
+	.DOA({\u_dp/DOA_1 [15:2], douta[5:4]}),
+	.DOB({\u_dp/DOB_1 [15:2], doutb[5:4]})
+);
+defparam \u_dp/mem_mem_0_2_s .READ_MODE0=1'b0;
+defparam \u_dp/mem_mem_0_2_s .READ_MODE1=1'b0;
+defparam \u_dp/mem_mem_0_2_s .WRITE_MODE0=2'b00;
+defparam \u_dp/mem_mem_0_2_s .WRITE_MODE1=2'b00;
+defparam \u_dp/mem_mem_0_2_s .BIT_WIDTH_0=2;
+defparam \u_dp/mem_mem_0_2_s .BIT_WIDTH_1=2;
+defparam \u_dp/mem_mem_0_2_s .RESET_MODE="SYNC";
+defparam \u_dp/mem_mem_0_2_s .BLK_SEL_0=3'b000;
+defparam \u_dp/mem_mem_0_2_s .BLK_SEL_1=3'b000;
+DP8K \u_dp/mem_mem_0_3_s  (
+	.CLKA(clka),
+	.OCEA(GND),
+	.CEA(cea),
+	.RESETA(reseta),
+	.WREA(wrea),
+	.CLKB(clkb),
+	.OCEB(GND),
+	.CEB(ceb),
+	.RESETB(resetb),
+	.WREB(wreb),
+	.BLKSELA({GND, GND, GND}),
+	.BLKSELB({GND, GND, GND}),
+	.DIA({GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, dina[7:6]}),
+	.DIB({GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, dinb[7:6]}),
+	.ADA({ada[11:0], GND}),
+	.ADB({adb[11:0], GND}),
+	.DOA({\u_dp/DOA_2 [15:2], douta[7:6]}),
+	.DOB({\u_dp/DOB_2 [15:2], doutb[7:6]})
+);
+defparam \u_dp/mem_mem_0_3_s .READ_MODE0=1'b0;
+defparam \u_dp/mem_mem_0_3_s .READ_MODE1=1'b0;
+defparam \u_dp/mem_mem_0_3_s .WRITE_MODE0=2'b00;
+defparam \u_dp/mem_mem_0_3_s .WRITE_MODE1=2'b00;
+defparam \u_dp/mem_mem_0_3_s .BIT_WIDTH_0=2;
+defparam \u_dp/mem_mem_0_3_s .BIT_WIDTH_1=2;
+defparam \u_dp/mem_mem_0_3_s .RESET_MODE="SYNC";
+defparam \u_dp/mem_mem_0_3_s .BLK_SEL_0=3'b000;
+defparam \u_dp/mem_mem_0_3_s .BLK_SEL_1=3'b000;
+DP8K \u_dp/mem_mem_0_4_s  (
+	.CLKA(clka),
+	.OCEA(GND),
+	.CEA(cea),
+	.RESETA(reseta),
+	.WREA(wrea),
+	.CLKB(clkb),
+	.OCEB(GND),
+	.CEB(ceb),
+	.RESETB(resetb),
+	.WREB(wreb),
+	.BLKSELA({GND, GND, GND}),
+	.BLKSELB({GND, GND, GND}),
+	.DIA({GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, dina[9:8]}),
+	.DIB({GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, dinb[9:8]}),
+	.ADA({ada[11:0], GND}),
+	.ADB({adb[11:0], GND}),
+	.DOA({\u_dp/DOA_3 [15:2], douta[9:8]}),
+	.DOB({\u_dp/DOB_3 [15:2], doutb[9:8]})
+);
+defparam \u_dp/mem_mem_0_4_s .READ_MODE0=1'b0;
+defparam \u_dp/mem_mem_0_4_s .READ_MODE1=1'b0;
+defparam \u_dp/mem_mem_0_4_s .WRITE_MODE0=2'b00;
+defparam \u_dp/mem_mem_0_4_s .WRITE_MODE1=2'b00;
+defparam \u_dp/mem_mem_0_4_s .BIT_WIDTH_0=2;
+defparam \u_dp/mem_mem_0_4_s .BIT_WIDTH_1=2;
+defparam \u_dp/mem_mem_0_4_s .RESET_MODE="SYNC";
+defparam \u_dp/mem_mem_0_4_s .BLK_SEL_0=3'b000;
+defparam \u_dp/mem_mem_0_4_s .BLK_SEL_1=3'b000;
+DP8K \u_dp/mem_mem_0_5_s  (
+	.CLKA(clka),
+	.OCEA(GND),
+	.CEA(cea),
+	.RESETA(reseta),
+	.WREA(wrea),
+	.CLKB(clkb),
+	.OCEB(GND),
+	.CEB(ceb),
+	.RESETB(resetb),
+	.WREB(wreb),
+	.BLKSELA({GND, GND, GND}),
+	.BLKSELB({GND, GND, GND}),
+	.DIA({GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, dina[11:10]}),
+	.DIB({GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, dinb[11:10]}),
+	.ADA({ada[11:0], GND}),
+	.ADB({adb[11:0], GND}),
+	.DOA({\u_dp/DOA_4 [15:2], douta[11:10]}),
+	.DOB({\u_dp/DOB_4 [15:2], doutb[11:10]})
+);
+defparam \u_dp/mem_mem_0_5_s .READ_MODE0=1'b0;
+defparam \u_dp/mem_mem_0_5_s .READ_MODE1=1'b0;
+defparam \u_dp/mem_mem_0_5_s .WRITE_MODE0=2'b00;
+defparam \u_dp/mem_mem_0_5_s .WRITE_MODE1=2'b00;
+defparam \u_dp/mem_mem_0_5_s .BIT_WIDTH_0=2;
+defparam \u_dp/mem_mem_0_5_s .BIT_WIDTH_1=2;
+defparam \u_dp/mem_mem_0_5_s .RESET_MODE="SYNC";
+defparam \u_dp/mem_mem_0_5_s .BLK_SEL_0=3'b000;
+defparam \u_dp/mem_mem_0_5_s .BLK_SEL_1=3'b000;
+DP8K \u_dp/mem_mem_0_6_s  (
+	.CLKA(clka),
+	.OCEA(GND),
+	.CEA(cea),
+	.RESETA(reseta),
+	.WREA(wrea),
+	.CLKB(clkb),
+	.OCEB(GND),
+	.CEB(ceb),
+	.RESETB(resetb),
+	.WREB(wreb),
+	.BLKSELA({GND, GND, GND}),
+	.BLKSELB({GND, GND, GND}),
+	.DIA({GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, dina[13:12]}),
+	.DIB({GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, dinb[13:12]}),
+	.ADA({ada[11:0], GND}),
+	.ADB({adb[11:0], GND}),
+	.DOA({\u_dp/DOA_5 [15:2], douta[13:12]}),
+	.DOB({\u_dp/DOB_5 [15:2], doutb[13:12]})
+);
+defparam \u_dp/mem_mem_0_6_s .READ_MODE0=1'b0;
+defparam \u_dp/mem_mem_0_6_s .READ_MODE1=1'b0;
+defparam \u_dp/mem_mem_0_6_s .WRITE_MODE0=2'b00;
+defparam \u_dp/mem_mem_0_6_s .WRITE_MODE1=2'b00;
+defparam \u_dp/mem_mem_0_6_s .BIT_WIDTH_0=2;
+defparam \u_dp/mem_mem_0_6_s .BIT_WIDTH_1=2;
+defparam \u_dp/mem_mem_0_6_s .RESET_MODE="SYNC";
+defparam \u_dp/mem_mem_0_6_s .BLK_SEL_0=3'b000;
+defparam \u_dp/mem_mem_0_6_s .BLK_SEL_1=3'b000;
+DP8K \u_dp/mem_mem_0_7_s  (
+	.CLKA(clka),
+	.OCEA(GND),
+	.CEA(cea),
+	.RESETA(reseta),
+	.WREA(wrea),
+	.CLKB(clkb),
+	.OCEB(GND),
+	.CEB(ceb),
+	.RESETB(resetb),
+	.WREB(wreb),
+	.BLKSELA({GND, GND, GND}),
+	.BLKSELB({GND, GND, GND}),
+	.DIA({GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, dina[15:14]}),
+	.DIB({GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, dinb[15:14]}),
+	.ADA({ada[11:0], GND}),
+	.ADB({adb[11:0], GND}),
+	.DOA({\u_dp/DOA_6 [15:2], douta[15:14]}),
+	.DOB({\u_dp/DOB_6 [15:2], doutb[15:14]})
+);
+defparam \u_dp/mem_mem_0_7_s .READ_MODE0=1'b0;
+defparam \u_dp/mem_mem_0_7_s .READ_MODE1=1'b0;
+defparam \u_dp/mem_mem_0_7_s .WRITE_MODE0=2'b00;
+defparam \u_dp/mem_mem_0_7_s .WRITE_MODE1=2'b00;
+defparam \u_dp/mem_mem_0_7_s .BIT_WIDTH_0=2;
+defparam \u_dp/mem_mem_0_7_s .BIT_WIDTH_1=2;
+defparam \u_dp/mem_mem_0_7_s .RESET_MODE="SYNC";
+defparam \u_dp/mem_mem_0_7_s .BLK_SEL_0=3'b000;
+defparam \u_dp/mem_mem_0_7_s .BLK_SEL_1=3'b000;
+endmodule

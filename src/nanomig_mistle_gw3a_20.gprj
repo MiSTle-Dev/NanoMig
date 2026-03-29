@@ -1,0 +1,99 @@
+<?xml version="1" encoding="UTF-8"?>
+<!DOCTYPE gowin-fpga-project>
+<Project>
+    <Template>FPGA</Template>
+    <Version>5</Version>
+    <Device name="GW3A-20A" pn="GW3A-LV20LQ144C1/I0">gw3a20a-010</Device>
+    <FileList>
+        <File path="fx68k/fx68k.sv" type="file.verilog" enable="1"/>
+        <File path="fx68k/fx68kAlu.sv" type="file.verilog" enable="1"/>
+        <File path="fx68k/uaddrPla.sv" type="file.verilog" enable="1"/>
+        <File path="hdmi/audio_clock_regeneration_packet.sv" type="file.verilog" enable="1"/>
+        <File path="hdmi/audio_info_frame.sv" type="file.verilog" enable="1"/>
+        <File path="hdmi/audio_sample_packet.sv" type="file.verilog" enable="1"/>
+        <File path="hdmi/auxiliary_video_information_info_frame.sv" type="file.verilog" enable="1"/>
+        <File path="hdmi/hdmi.sv" type="file.verilog" enable="1"/>
+        <File path="hdmi/packet_assembler.sv" type="file.verilog" enable="1"/>
+        <File path="hdmi/packet_picker.sv" type="file.verilog" enable="1"/>
+        <File path="hdmi/serializer.sv" type="file.verilog" enable="1"/>
+        <File path="hdmi/source_product_description_info_frame.sv" type="file.verilog" enable="1"/>
+        <File path="hdmi/tmds_channel.sv" type="file.verilog" enable="1"/>
+        <File path="minimig-aga/agnus.v" type="file.verilog" enable="1"/>
+        <File path="minimig-aga/agnus_audiodma.v" type="file.verilog" enable="1"/>
+        <File path="minimig-aga/agnus_beamcounter.v" type="file.verilog" enable="1"/>
+        <File path="minimig-aga/agnus_bitplanedma.v" type="file.verilog" enable="1"/>
+        <File path="minimig-aga/agnus_blitter.v" type="file.verilog" enable="1"/>
+        <File path="minimig-aga/agnus_blitter_adrgen.v" type="file.verilog" enable="1"/>
+        <File path="minimig-aga/agnus_blitter_barrelshifter.v" type="file.verilog" enable="1"/>
+        <File path="minimig-aga/agnus_blitter_fill.v" type="file.verilog" enable="1"/>
+        <File path="minimig-aga/agnus_blitter_minterm.v" type="file.verilog" enable="1"/>
+        <File path="minimig-aga/agnus_copper.v" type="file.verilog" enable="1"/>
+        <File path="minimig-aga/agnus_diskdma.v" type="file.verilog" enable="1"/>
+        <File path="minimig-aga/agnus_refresh.v" type="file.verilog" enable="1"/>
+        <File path="minimig-aga/agnus_spritedma.v" type="file.verilog" enable="1"/>
+        <File path="minimig-aga/amiga_clk.v" type="file.verilog" enable="1"/>
+        <File path="minimig-aga/cia_int.v" type="file.verilog" enable="1"/>
+        <File path="minimig-aga/cia_timera.v" type="file.verilog" enable="1"/>
+        <File path="minimig-aga/cia_timerb.v" type="file.verilog" enable="1"/>
+        <File path="minimig-aga/cia_timerd.v" type="file.verilog" enable="1"/>
+        <File path="minimig-aga/ciaa.v" type="file.verilog" enable="1"/>
+        <File path="minimig-aga/ciab.v" type="file.verilog" enable="1"/>
+        <File path="minimig-aga/cpu_wrapper.v" type="file.verilog" enable="1"/>
+        <File path="minimig-aga/denise.v" type="file.verilog" enable="1"/>
+        <File path="minimig-aga/denise_bitplane_shifter.v" type="file.verilog" enable="1"/>
+        <File path="minimig-aga/denise_bitplanes.v" type="file.verilog" enable="1"/>
+        <File path="minimig-aga/denise_collision.v" type="file.verilog" enable="1"/>
+        <File path="minimig-aga/denise_colortable.v" type="file.verilog" enable="1"/>
+        <File path="minimig-aga/denise_colortable_ram_mf.v" type="file.verilog" enable="1"/>
+        <File path="minimig-aga/denise_hamgenerator.v" type="file.verilog" enable="1"/>
+        <File path="minimig-aga/denise_playfields.v" type="file.verilog" enable="1"/>
+        <File path="minimig-aga/denise_spritepriority.v" type="file.verilog" enable="1"/>
+        <File path="minimig-aga/denise_sprites.v" type="file.verilog" enable="1"/>
+        <File path="minimig-aga/denise_sprites_shifter.v" type="file.verilog" enable="1"/>
+        <File path="minimig-aga/gary.v" type="file.verilog" enable="1"/>
+        <File path="minimig-aga/gayle.v" type="file.verilog" enable="1"/>
+        <File path="minimig-aga/ide.v" type="file.verilog" enable="1"/>
+        <File path="minimig-aga/minimig.v" type="file.verilog" enable="1"/>
+        <File path="minimig-aga/minimig_bankmapper.v" type="file.verilog" enable="1"/>
+        <File path="minimig-aga/minimig_m68k_bridge.v" type="file.verilog" enable="1"/>
+        <File path="minimig-aga/minimig_sram_bridge.v" type="file.verilog" enable="1"/>
+        <File path="minimig-aga/minimig_syscontrol.v" type="file.verilog" enable="1"/>
+        <File path="minimig-aga/paula.v" type="file.verilog" enable="1"/>
+        <File path="minimig-aga/paula_audio.v" type="file.verilog" enable="1"/>
+        <File path="minimig-aga/paula_audio_channel.v" type="file.verilog" enable="1"/>
+        <File path="minimig-aga/paula_audio_mixer.v" type="file.verilog" enable="1"/>
+        <File path="minimig-aga/paula_audio_volume.v" type="file.verilog" enable="1"/>
+        <File path="minimig-aga/paula_floppy.v" type="file.verilog" enable="1"/>
+        <File path="minimig-aga/paula_floppy_fifo.v" type="file.verilog" enable="1"/>
+        <File path="minimig-aga/paula_intcontroller.v" type="file.verilog" enable="1"/>
+        <File path="minimig-aga/paula_uart.v" type="file.verilog" enable="1"/>
+        <File path="minimig-aga/userio.v" type="file.verilog" enable="1"/>
+        <File path="minimig/Amber.v" type="file.verilog" enable="1"/>
+        <File path="misc/amiga_keymap.v" type="file.verilog" enable="1"/>
+        <File path="misc/flash_dspi.v" type="file.verilog" enable="1"/>
+        <File path="misc/hid.v" type="file.verilog" enable="1"/>
+        <File path="misc/mcu_spi.v" type="file.verilog" enable="1"/>
+        <File path="misc/osd_u8g2.v" type="file.verilog" enable="1"/>
+        <File path="misc/sd_card.v" type="file.verilog" enable="1"/>
+        <File path="misc/sd_rw.v" type="file.verilog" enable="1"/>
+        <File path="misc/sdcmd_ctrl.v" type="file.verilog" enable="1"/>
+        <File path="misc/sdram.sv" type="file.verilog" enable="1"/>
+        <File path="misc/sysctrl.v" type="file.verilog" enable="1"/>
+        <File path="misc/video_analyzer.v" type="file.verilog" enable="1"/>
+        <File path="misc/ws2812.v" type="file.verilog" enable="1"/>
+        <File path="mistle/gw3a_20/gowin_dp/ide_dpram.v" type="file.verilog" enable="1"/>
+        <File path="mistle/gw3a_20/gowin_dp/sector_dpram.v" type="file.verilog" enable="1"/>
+        <File path="mistle/gw3a_20/gowin_pll/pll_142m.v" type="file.verilog" enable="1"/>
+        <File path="mistle/gw3a_20/top.sv" type="file.verilog" enable="1"/>
+        <File path="nanomig.v" type="file.verilog" enable="1"/>
+        <File path="tang/primer25k/gowin_clkdiv/gowin_clkdiv.v" type="file.verilog" enable="1"/>
+        <File path="tg68k/TG68K.vhd" type="file.vhdl" enable="1"/>
+        <File path="tg68k/TG68K_ALU.vhd" type="file.vhdl" enable="1"/>
+        <File path="tg68k/TG68K_Pack.vhd" type="file.vhdl" enable="1"/>
+        <File path="tg68k/TG68KdotC_Kernel.vhd" type="file.vhdl" enable="1"/>
+        <File path="mistle/gw3a_20/nanomig.cst" type="file.cst" enable="1"/>
+        <File path="mistle/gw3a_20/nanomig.sdc" type="file.sdc" enable="1"/>
+        <File path="fx68k/microrom.mem" type="file.other" enable="1"/>
+        <File path="fx68k/nanorom.mem" type="file.other" enable="1"/>
+    </FileList>
+</Project>
