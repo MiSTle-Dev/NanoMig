@@ -50,6 +50,9 @@ module top(
   // MIDI/UART
   input			midi_in,
   output		midi_out,
+
+  // BUZZER  	
+  output		buzzer,
 		   
   // SD card slot
   output		sd_clk,
