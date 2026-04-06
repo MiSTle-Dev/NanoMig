@@ -289,9 +289,7 @@ fx68k cpu_inst_o
 	.pwrUp(~reset),
 `endif
 	.oRESETn(reset_out_o),
-`ifndef VERILATOR
 	.HALTn(1),
-`endif
 	.eRWn(wr_o),
 	.ASn(as_o),
 	.LDSn(lds_o),
