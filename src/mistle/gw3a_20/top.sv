@@ -1,5 +1,5 @@
 /*
-    top.sv - Minimig on GW3A-LV20-LQ144-C0
+    top.sv - Minimig on GW3A-LV20-LQ144-C0/I1
 */ 
 
 `define GOWIN
@@ -10,7 +10,8 @@ module top(
   input			reset_n, // S2
   input			user_n, // S1
 
-  output [2:0]	leds,
+  output [5:0]	leds,
+  output		ws2812,
 
   // spi flash interface
   output		mspi_cs,
@@ -20,7 +21,7 @@ module top(
   inout			mspi_wp,
   inout			mspi_do,
 
-  // MiSTer SDRAM module
+  // 256MBit*16 SDRAM
   output		O_sdram_clk,
   output		O_sdram_cs_n, // chip select
   output		O_sdram_cas_n, // columns address select
@@ -31,15 +32,26 @@ module top(
   output [1:0]	O_sdram_ba, // two banks
   output [1:0]	O_sdram_dqm, // 16/2
 
-  // give explicit connections for pmod0 as it's being used for the
-  // FPGA Companion and this allows for clock buffering. Clock glitches
-  // were observed when using inouts for the companion
+  // FPGA Companion
   input			pmod_companion_din,
   output		pmod_companion_dout,
   input			pmod_companion_clk,
   input			pmod_companion_ss,
   output		pmod_companion_intn,
+  input			pmod_companion_spare,
 
+  // debug monitoring
+  output		mon_tx,
+  input			mon_rx,
+		   
+  // MIDI/UART
+  input			midi_in,
+  output		midi_out,
+
+  // DB9 Joysticks
+  input [5:0]	joya,
+  input [5:0]	joyb,
+		   
   // SD card slot
   output		sd_clk,
   inout			sd_cmd, // MOSI
@@ -52,28 +64,31 @@ module top(
   output [2:0]	tmds_d_p
 );
 
+// the monitoring UART is currently unused, so just wire
+// them together
+assign mon_tx = mon_rx;
+     
 // physcial dsub9 joystick & mouse port 1 is unused
-wire [5:0] db9_joy = { 6'b000000 };
-
-// physcial dsub9 joystick port 2 ís unused
-wire [5:0] db9_joy2 = { 6'b000000 };
+wire [5:0]	db9_joy = joya;
    
-wire [1:0]	drv_leds;
+// physcial dsub9 joystick port 2 ís unused
+wire [5:0] db9_joy2 = joyb;
+   
 // wire floppy and hdd drive leds into a single one
 // led 1 is the red part of the CFG RGB led
-assign leds[2] =  1'b1;  
-assign leds[1] =  drv_leds[1] || drv_leds[0]; 
+assign leds[5] = |sd_wr;
+assign leds[4] = |sd_rd;
 
 // ============================== clock generation ===========================
    
 // Clocks are derived from 50Mhz
-// HDMI clock:  142 MHz
-// Pixel clock: 28.4 MHz (HDMI/5)
-// SDRAM and flash clock: 88.75 MHz, as close as possible to 85Mhz
-// Amiga clock: 7.1 (Pixel/4)
+// HDMI clock:  141.666 MHz
+// Pixel clock: 28.333 MHz (HDMI/5)
+// SDRAM and flash clock: 85 MHz
+// Amiga clock: 7.08333 (Pixel/4)
    
-// -> The resulting effective Amiga clock is in between the NTSC's 7.15909 and the
-// PAL's 7.09379 Mhz
+// -> The resulting effective Amiga clock slightly below NTSC's 7.15909 and
+// close to PAL's 7.09379 Mhz
 
 `define PIXEL_CLOCK 28400000
 
@@ -85,7 +100,6 @@ pll_142m pll_hdmi (
     .clkout0(clk_pixel_x5),
     .clkout1(clk_85m),
     .clkout2(clk_85m_shifted),   // 270deg phase shifted
-//    .mdclk(clk),
     .lock(pll_lock),
     .clkin(clk)
 );
@@ -143,7 +157,16 @@ assign pmod_companion_intn = spi_intn;
 wire spi_io_din = pmod_companion_din;
 wire spi_io_ss = pmod_companion_ss;
 wire spi_io_clk = pmod_companion_clk;
-   
+
+// connect to ws2812 led
+wire [23:0] ws2812_color;
+ws2812 ws2812_inst (
+    .clk(clk_28m),
+    .reset(!pll_lock),
+    .color(ws2812_color),
+    .data(ws2812)
+);
+
 // interface to FPGA Companion
 wire       mcu_sys_strobe;        // mcu message byte valid for sysctrl
 wire       mcu_hid_strobe;        // -"- hid
@@ -311,7 +334,7 @@ sysctrl sysctrl (
 
         .buttons( {!user_n, !reset_n } ),
         .leds(),
-        .color()
+        .color(ws2812_color)
 );
    
 // digital 12 bit video
@@ -428,8 +451,8 @@ nanomig nanomig
  .clk7n_en(clk7n_en),
 
  .pwr_led(leds[0]),
- .fdd_led(drv_leds[0]),
- .hdd_led(drv_leds[1]),
+ .fdd_led(leds[1]),
+ .hdd_led(leds[2]),
  
  .memory_config(memory_config),
  .fastram_config(fastram_config),
@@ -449,8 +472,8 @@ nanomig nanomig
  .audio_right(audio_right),
 
  // uart interface 
- .uart_rx(),
- .uart_tx(),
+ .uart_rx(midi_in),
+ .uart_tx(midi_out),
  
  // keyboard & mouse				 
  .mouse_buttons(mouse_buttons), // mouse buttons
@@ -527,6 +550,8 @@ wire        flash_busy;
 
 // once the copy counter has run to zero, all rom has been copied
 wire		rom_done = (word_count == 0);
+
+assign leds[3] = !rom_done;  
 
 reg [21:0]  flash_ram_addr;   
 reg         flash_ram_write;
