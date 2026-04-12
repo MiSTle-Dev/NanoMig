@@ -14,7 +14,8 @@ Current state:
   * Amiga 500 and Amiga 1000 modes
   * Kick ROM stored in flash ROM
   * Up to 2MB chip, 4MB fast and 1.5MB slow RAM
-  * OCS and ECS chipset (no AGA!)
+  * Accelerated 68020 support (in the works)
+  * OCS and ECS chipset (no AGA on TN20K!)
   * Up to four virtual floppy drives
   * Floppy disk write support
   * HDMI video and audio, PAL and NTSC
@@ -25,8 +26,10 @@ Current state:
   * [Fully simulated](sim)
 
 Planned features:
-  * Accelerated 68020 support (may fit)
-  * AGA support (may not fit)
+
+  * AGA support (is planned for the Arora III FPGA series e.g. GW3A-20)
+  * Kickstart switcher (Kick 1.3 / 3.1 / 3.2)
+  * Drive Sounds for FDD & HDD (harware addon / buzzer)
 
 ## Videos
 
