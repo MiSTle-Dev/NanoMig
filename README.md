@@ -28,7 +28,7 @@ Current state:
 Planned features:
 
   * AGA support (is planned for the Arora III FPGA series e.g. GW3A-20)
-  * Kickstart switcher (Kick 1.3 / 3.1 / 3.2)
+  * Kickstart switcher (1.3 / 3.1 / 3.2 / DiagRom)
   * Drive Sounds for FDD & HDD (harware addon / buzzer)
 
 ## Videos
