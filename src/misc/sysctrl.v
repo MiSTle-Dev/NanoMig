@@ -43,7 +43,8 @@ module sysctrl (
   output reg [1:0]  system_slowmem,
   output reg [1:0]  system_fastmem,
   output reg	    system_joy_swap,
-  output reg [2:0]  system_volume
+  output reg [2:0]  system_volume,
+  output reg	    system_stereo_mix
 
 );
 
@@ -118,6 +119,7 @@ always @(posedge clk) begin
       system_ide_enable <= 1'b0;
       system_joy_swap <= 1'b1;
       system_volume <= 3'b010;  
+	  system_stereo_mix <= 1'b1;
    end 
    else 
    begin // if (reset)
@@ -231,6 +233,8 @@ always @(posedge clk) begin
 		   if(id == "J") system_joy_swap <= data_in[0];
 		   // Value "A": Volume Mute(0), 25%(1), 50%(2), 75%(3), 100%(4)
 		   if(id == "A") system_volume <= data_in[2:0];	
+		   // value "M": Stereo Mix disabled(0) or enabled(1) 			
+		   if(id == "M") system_stereo_mix <= data_in[0];
                 end
             end
 
