@@ -80,6 +80,14 @@ The necessary binaries can be found in the [project releases](https://github.com
 ## Credits
 Many thanks to **Alastair M. Robinson** ([robinsonb5](https://github.com/robinsonb5)) for his contributions to the **NanoMig**, in particular **Fastram** and **68020** cpu! 
 
+## Build setting (Tang Nano 20K only!)
+The core needs to be able to react on bl616 jtagsel Signal (all boards except tn20k).  
+Only for the TN20K: **Use JTAG as regular IO** must be unselected in Gowin EDA Configuration!
+
+<img width="802" height="532" alt="tn20k - stay as jtag" src="https://github.com/user-attachments/assets/a73b90a6-c713-49ec-a52e-bca0546b2a64" />
+
+
+
 ## LED UI
 
 | LED | function    | TN20K | TP25K |TM60K|TM138K Pro|Console60K/138k|
