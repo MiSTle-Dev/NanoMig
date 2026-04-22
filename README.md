@@ -31,6 +31,12 @@ Planned features:
   * Kickstart switcher (1.3 / 3.1 / 3.2 / DiagRom)
   * Drive Sounds for FDD & HDD (hardware addon / buzzer)
 
+Outlook:
+
+  * RTG implementation
+  * WIFI support
+  * Flickerfixer
+
 ## Videos
 
 These youtube shorts mainly document the progress:
