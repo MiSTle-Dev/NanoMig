@@ -878,13 +878,22 @@ assign i2s_din = cpu_reset?1'b0:audio[15-audio_bit_cnt[3:0]];
 /* -------------------- HDMI video and audio -------------------- */
 
 // latch audio, so it's stable during 48khz transfer
-reg [15:0] audio_reg [2]; 
-reg [14:0] scaled_audio_left;
-reg [14:0] scaled_audio_right;
+reg [15:0] audio_reg [2]; // 16 bit signed audio for HDMI
+
+// Sign-extend inputs to 16-bit BEFORE mixing – intermediate sum
+// cannot overflow, result always fits back in 15 bit.
+wire signed [15:0] audio_left_s  = {{1{audio_left[14]}},  audio_left};
+wire signed [15:0] audio_right_s = {{1{audio_right[14]}}, audio_right};
+
+reg signed [14:0] mixed_audio_left;
+reg signed [14:0] mixed_audio_right;
+reg signed [14:0] scaled_audio_left;
+reg signed [14:0] scaled_audio_right;
 
 // generate 48khz audio clock
 reg clk_audio;
 reg [8:0] aclk_cnt;
+
 always @(posedge clk_pixel) begin
     // divisor = pixel clock / 48000 / 2 - 1
     if(aclk_cnt < `PIXEL_CLOCK / 48000 / 2 -1)
@@ -893,35 +902,59 @@ always @(posedge clk_pixel) begin
        aclk_cnt <= 9'd0;
        clk_audio <= ~clk_audio;
 
-   // Scale values and Assign scaled values to the HDMI registers
+        // --- Stereo Mix (75/25)-------------------------------------------
+        // 16-bit signed wires prevent any overflow; the result
+        // always fits in 15 bit and is truncated safely on assignment. 
+	    case (osd_stereo_mix)
+            1'b0: begin   // no mix
+                mixed_audio_left  <= audio_left;
+                mixed_audio_right <= audio_right;
+            end
+            default: begin  // 75 / 25 blend
+                mixed_audio_left  <= (audio_left_s  - (audio_left_s  >>> 2))
+                                   + (audio_right_s >>> 2);
+                mixed_audio_right <= (audio_right_s - (audio_right_s >>> 2))
+                                   + (audio_left_s  >>> 2);
+            end
+        endcase
+
+    // --- Volume scaling ----------------------------------------
+        // mixed_audio_* are reg signed [14:0], so >>> is always
+        // arithmetic – no $signed() wrapper required.
         case (osd_volume) 
             3'b100: begin // 100%
-                scaled_audio_left  <= audio_left;
-                scaled_audio_right <= audio_right;
+                scaled_audio_left  <= mixed_audio_left;
+                scaled_audio_right <= mixed_audio_right;
             end
             3'b011: begin // 75%
-                scaled_audio_left  <= ($signed(audio_left)  >>> 1) + ($signed(audio_left)  >>> 2);
-                scaled_audio_right <= ($signed(audio_right) >>> 1) + ($signed(audio_right) >>> 2);
+                scaled_audio_left  <= (mixed_audio_left  >>> 1) + (mixed_audio_left  >>> 2);
+                scaled_audio_right <= (mixed_audio_right >>> 1) + (mixed_audio_right >>> 2);
             end
             3'b010: begin // 50%
-                scaled_audio_left  <= $signed(audio_left)  >>> 1;
-                scaled_audio_right <= $signed(audio_right) >>> 1;
+                scaled_audio_left  <= mixed_audio_left  >>> 1;
+                scaled_audio_right <= mixed_audio_right >>> 1;
             end
             3'b001: begin // 25%
-                scaled_audio_left  <= $signed(audio_left)  >>> 2;
-                scaled_audio_right <= $signed(audio_right) >>> 2;
+                scaled_audio_left  <= mixed_audio_left  >>> 2;
+                scaled_audio_right <= mixed_audio_right >>> 2;
             end
             3'b000: begin // Mute
                 scaled_audio_left  <= 15'd0;
                 scaled_audio_right <= 15'd0;
             end
-            default: begin
-                scaled_audio_left  <= $signed(audio_left)  >>> 1;
-                scaled_audio_right <= $signed(audio_right) >>> 1;
+            default: begin // fallback 50 %
+                scaled_audio_left  <= mixed_audio_left  >>> 1;
+                scaled_audio_right <= mixed_audio_right >>> 1;
             end
         endcase
 
-	   audio_reg <= { { 1'b0, ~scaled_audio_left[14],scaled_audio_left[13:0]}, {1'b0, ~scaled_audio_right[14],scaled_audio_right[13:0]}};	
+        // --- HDMI audio register ----------------------------------
+        // Convert signed two's complement → offset binary:
+        // flip sign bit (bit 14).  Bit 15 = 0 (15-bit audio in 16-bit slot).
+        // Explicit per-element assignment avoids unpacked-array ambiguity.
+        audio_reg[0] <= {1'b0, ~scaled_audio_left[14],  scaled_audio_left[13:0]};
+        audio_reg[1] <= {1'b0, ~scaled_audio_right[14], scaled_audio_right[13:0]};	
+
     end
 end
    

@@ -103,16 +103,20 @@
         <listentry label="75%" value="3"/>
         <listentry label="100%" value="4"/>
       </list>	
-      <list label="Scanlines:" id="L" default="0">
-	<listentry label="None" value="0"/>
-	<listentry label="Dim" value="1"/>
-	<listentry label="Black" value="2"/>
-      </list>
-      <list label="Filter:" id="F" default="0">
-	<listentry label="None" value="0"/>
-	<listentry label="Horizontal" value="1"/>
-	<listentry label="Vertical" value="2"/>
-	<listentry label="Hor+Ver" value="3"/>
+	<list label="Stereo Mix:" id="M" default="1">
+		<listentry label="Disabled" value="0"/>
+        <listentry label="Enabled" value="1"/>
+    </list>
+    <list label="Scanlines:" id="L" default="0">
+		<listentry label="None" value="0"/>
+		<listentry label="Dim" value="1"/>
+		<listentry label="Black" value="2"/>
+     </list>
+     <list label="Filter:" id="F" default="0">
+		<listentry label="None" value="0"/>
+		<listentry label="Horizontal" value="1"/>
+		<listentry label="Vertical" value="2"/>
+		<listentry label="Hor+Ver" value="3"/>
       </list>
       <list label="Screen:" id="W" default="0">
 	<listentry label="Standard" value="0"/>
