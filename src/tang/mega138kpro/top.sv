@@ -255,6 +255,7 @@ wire [1:0] osd_video_filter;
 wire [1:0] osd_video_scanlines;
 wire       osd_joy_swap;        // 0=off, 1=on
 wire [2:0] osd_volume;          // Mute=0, 1=25%, 2=50%, 3=75%, 4=100%
+wire       osd_stereo_mix;      // 0=off, 1=on
 
 // generate a reset for some time after rom has been initialized
 reg [15:0] reset_cnt;
@@ -301,9 +302,9 @@ always @(posedge clk) begin
 end
 
 // filter companion SPI clock
-wire [15:0] pmod_companion_clk_D = { pmod_companion_clk_D[14:0], pmod_companion_clk } /* synthesis syn_keep=1 */ /* synthesis syn_dont_touch=1 */;
-wire pmod_companion_clk_F = ( pmod_companion_clk && pmod_companion_clk_D != 16'h0000) ||
-	                        (!pmod_companion_clk && pmod_companion_clk_D == 16'hffff);
+wire [31:0] pmod_companion_clk_D = { pmod_companion_clk_D[30:0], pmod_companion_clk } /* synthesis syn_keep=1 */ /* synthesis syn_dont_touch=1 */;
+wire pmod_companion_clk_F = ( pmod_companion_clk_F && pmod_companion_clk_D != 32'h00000000) ||
+	                        (!pmod_companion_clk_F && pmod_companion_clk_D == 32'hffffffff) /* synthesis syn_keep=1 */ /* synthesis syn_dont_touch=1 */;
 
 // switch between internal SPI connected to the on-board bl616
 // or to the external one possibly connected to a FPGA Companion
@@ -480,6 +481,7 @@ sysctrl sysctrl (
 		.system_fastmem(osd_fastmem),
         .system_joy_swap(osd_joy_swap),
         .system_volume(osd_volume),
+        .system_stereo_mix(osd_stereo_mix),
 				 
         .int_out_n(spi_intn),
         .int_in( { 4'b0000, sdc_int, 1'b0, hid_int, 1'b0 }),
@@ -578,6 +580,7 @@ nanomig nanomig
 (
  .clk_sys(clk_28m),
  .reset(cpu_reset),
+ .por(!pll_lock),
 
  .clk7_en(clk7_en),
  .clk7n_en(clk7n_en),

@@ -211,6 +211,8 @@ wire [1:0] osd_video_filter;
 wire [1:0] osd_video_scanlines;
 wire       osd_joy_swap;        // 0=off, 1=on
 wire [2:0] osd_volume;          // Mute=0, 1=25%, 2=50%, 3=75%, 4=100%
+wire       osd_stereo_mix;      // 0=off, 1=on
+
 wire       rom_done;
 
 // generate a reset for some time after rom has been initialized
@@ -428,6 +430,7 @@ sysctrl sysctrl (
 		.system_fastmem(osd_fastmem),
         .system_joy_swap(osd_joy_swap),
         .system_volume(osd_volume),
+        .system_stereo_mix(osd_stereo_mix),
 				 
         .int_out_n(spi_intn),
         .int_in( { 4'b0000, sdc_int, 1'b0, hid_int, 1'b0 }),
@@ -553,6 +556,7 @@ nanomig nanomig
 (
  .clk_sys(clk_28m),
  .reset(cpu_reset),
+ .por(!pll_lock),
 
  .clk7_en(clk7_en),
  .clk7n_en(clk7n_en),

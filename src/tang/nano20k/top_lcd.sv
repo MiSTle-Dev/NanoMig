@@ -405,6 +405,7 @@ nanomig nanomig
 (
  .clk_sys(clk_28m),
  .reset(cpu_reset),
+ .por(!pll_lock),
 
  .clk7_en(clk7_en),
  .clk7n_en(clk7n_en),

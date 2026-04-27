@@ -242,8 +242,6 @@ module minimig
 	output [7:0]  red,
 	output [7:0]  green,
 	output [7:0]  blue,
-	output [1:0]  ar,
-	output [2:0]  scanline,
 	output	      ce_pix,
 	output [1:0]  res,
 	output [8:0]  htotal, //video line length (140ns units)
@@ -253,7 +251,6 @@ module minimig
 	output [14:0] rdata, // right DAC data
 	output [8:0]  ldata_okk, // left DAC data  (PWM volume)
 	output [8:0]  rdata_okk, // right DAC data (PWM volume)
-	output [1:0]  aud_mix,
 
 `ifdef ENABLE_TOCCATA
 	// Toccata audio
@@ -267,7 +264,6 @@ module minimig
 	input [1:0]   cpucfg,
 	input [2:0]   cachecfg,
 	output [6:0]  memcfg,
-	output	      bootrom, // enable bootrom magic in gary.v
 	output	      ide_ena,
 
 	output	      ide_fast,
@@ -814,7 +810,7 @@ gary GARY1
 	.reset(reset),
 	.clk(clk),
 	.rom_readonly(rom_readonly),
-	.bootrom(bootrom)
+	.bootrom(1'b0)
 );
 
 gayle GAYLE1

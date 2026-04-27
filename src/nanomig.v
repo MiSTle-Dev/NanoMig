@@ -11,6 +11,7 @@
 module nanomig (
    input	 clk_sys,
    input	 reset,
+   input	 por,
 
    output	 clk7_en,
    output	 clk7n_en,
@@ -95,7 +96,6 @@ wire uart_dsr;
 wire uart_dtr;
 wire field1;
 wire lace;
-wire fx;
 
 reg reset_d;
 always @(posedge clk_sys, posedge reset) begin
@@ -115,29 +115,17 @@ wire       c1;
 wire       c3;
 wire       cck;
 wire [9:0] eclk;
-// `define TEST_PHI_GEN
-   
-`ifdef TEST_PHI_GEN
-reg [1:0]   mclkdiv;   
-always @(posedge clk_sys) begin
-   mclkdiv <= mclkdiv + 2'd1;  
-end   
-`endif // TEST_PHI_GEN
    
 amiga_clk amiga_clk
 (
-`ifdef TEST_PHI_GEN
-        .clk_28   ( mclkdiv[1] ), // input  clock c1 ( 28.687500MHz)
-`else
         .clk_28   ( clk_sys    ), // input  clock c1 ( 28.687500MHz)
-`endif
         .clk7_en  ( clk7_en    ), // output clock 7 enable (on 28MHz clock domain)
         .clk7n_en ( clk7n_en   ), // 7MHz negedge output clock enable (on 28MHz clock domain)
         .c1       ( c1         ), // clk28m clock domain signal synchronous with clk signal
         .c3       ( c3         ), // clk28m clock domain signal synchronous with clk signal delayed by 90 degrees
         .cck      ( cck        ), // colour clock output (3.54 MHz)
         .eclk     ( eclk       ), // 0.709379 MHz clock enable output (clk domain pulse)
-        .reset_n  ( ~reset     )
+        .reset_n  ( ~por       )
 );
 
 // TODO: cpu_ph1 and cpu_ph2 are derived from a 114Mhz clock in original
@@ -145,7 +133,6 @@ amiga_clk amiga_clk
 // cpu_ph1 is valid before clk7_en and cpu_ph2 is after clk7_en
 // so order is: cpu_ph1, clk7_en, cpu_ph2, clk7n_en
 reg  cpu_ph1, cpu_ph2;
-`ifndef TEST_PHI_GEN
 always @(posedge clk_sys) begin
    if (~cpu_rst) begin
       cpu_ph1 <= 1'b0;
@@ -157,36 +144,6 @@ always @(posedge clk_sys) begin
       cpu_ph2 <=  !c1 && !c3;
    end
 end
-   
-`else   
-reg  cyc;
-always @(posedge clk_sys) begin
-	reg [3:0] div;
-	reg       c1d;
-
-	div <= div + 1'd1;
-	 
-	c1d <= c1;
-	if (~c1d & c1) div <= 3;
-	
-	if (~cpu_rst) begin
-		cyc <= 0;
-		cpu_ph1 <= 0;
-		cpu_ph2 <= 0;
-	end
-	else begin
-		cyc <= !div[1:0];
-		if (div[1] & ~div[0]) begin
-			cpu_ph1 <= 0;
-			cpu_ph2 <= 0;
-			case (div[3:2])
-				0: cpu_ph2 <= 1;
-				2: cpu_ph1 <= 1;
-			endcase
-		end
-	end
-end
-`endif
 
 wire  [1:0] cpu_state;
 // wire        cpu_nrst_out;
@@ -211,6 +168,15 @@ wire [1:0] cpucfg = 2'b00;     // 68020=11
 wire [2:0] cachecfg = 3'b000;  // no turbo chip and kick, no caches   
 // wire [2:0] cachecfg = 3'b010;  // permanent turbo kick
 
+// make the power led actually dim like on a real amiga
+wire	   pwr_led_bright;
+reg [1:0]  pwr_led_cnt;
+
+assign pwr_led = pwr_led_bright?1'b1:!pwr_led_cnt;
+   
+always @(negedge clk_sys)
+  pwr_led_cnt <= pwr_led_cnt + 2'd1;
+   
 // -------------- fast(er) ram interface used in turbo mode --------------
 
 // This implements a direct path for the CPU to access ram. This can be used
@@ -1175,7 +1141,7 @@ minimig minimig
 	.kbd_mouse_data (kbd_mouse_data ), // mouse direction data, keycodes
 	.kbd_mouse_type (kbd_mouse_type ), // type of data
 	.kms_level    (kbd_mouse_level  ),
-	.pwr_led      (pwr_led          ), // power led
+	.pwr_led      (pwr_led_bright   ), // power led
 	.fdd_led      (fdd_led          ),
 	.hdd_led      (hdd_led          ),
 	.rtc          (RTC              ),
@@ -1190,9 +1156,6 @@ minimig minimig
 	.blue         (blue             ), // blue
 	.hblank       (hbl              ),
 	.vblank       (vbl              ),
-	.ar           (                 ),
-	.scanline     (fx               ),
-	//.ce_pix     (ce_pix           ),
 	.res          (res              ),
         .htotal       (htotal           ),
 
@@ -1202,13 +1165,10 @@ minimig minimig
 	.ldata_okk    (                 ), // 9bit
 	.rdata_okk    (                 ), // 9bit
 
-	.aud_mix      (                 ),
-
 	//user i/o
 	.cpucfg       (cpucfg ), // CPU config
 	.cachecfg     (cachecfg ), // Cache config
 	.memcfg       ( ), // memory config
-	.bootrom      ( ), // bootrom mode. Needed here to tell tg68k to also mirror the 256k Kickstart 
 
         // sd card interface for floppy disk emulation
         .sdc_img_mounted    ( sdc_img_mounted[3:0]  ),
