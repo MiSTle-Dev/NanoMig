@@ -68,6 +68,7 @@
 	<listentry label="Off" value="0"/>
 	<listentry label="On" value="1"/>
       </list>
+      <image label="Kickstart" index="0" none_str="&lt;flash&gt;" none_icn="003c7e3c7e3c7e3c" ext="rom" default="kick.rom" action="reset_hide"/>
     </menu>
     <menu label="Storage">
       <list label="Drives:" id="D" default="0">
@@ -92,8 +93,8 @@
 	<listentry label="Disabled" value="0"/>
 	<listentry label="Enabled" value="1"/>
       </list>
-      <fileselector label="Harddisk DH0:" ext="hdf" index="4" default="dh0.hdf"/>
-      <fileselector label="Harddisk DH1:" ext="hdf" index="5" default="dh1.hdf"/>
+      <fileselector label="Harddisk DH0:" ext="hdf" index="4" default="dh0.hdf" action="reset"/>
+      <fileselector label="Harddisk DH1:" ext="hdf" index="5" default="dh1.hdf" action="reset"/>
     </menu>
     <menu label="Settings">
       <list label="Volume:" id="A" default="2">

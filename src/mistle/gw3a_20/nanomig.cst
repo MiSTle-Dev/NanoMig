@@ -1,10 +1,10 @@
 IO_LOC "clk" 75;        // 50Mhz
 IO_PORT "clk" PULL_MODE=NONE DRIVE=OFF BANK_VCCIO=3.3;
 
-IO_LOC "reset_n" 4;        // actually key0 on the board
+IO_LOC "reset_n" 21;        // was 4, actually key0 on the board
 IO_PORT "reset_n" IO_TYPE=LVCMOS33 PULL_MODE=UP DRIVE=OFF;
 
-IO_LOC "user_n" 96;        // key1
+IO_LOC "user_n" 29;        // was 96, key1
 IO_PORT "user_n" IO_TYPE=LVCMOS33 PULL_MODE=UP DRIVE=OFF;
 
 // monitoring IO/UART

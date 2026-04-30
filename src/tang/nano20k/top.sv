@@ -51,9 +51,9 @@ module top(
   input			midi_in,
   output		midi_out,
 
-  // BUZZER  	
+  // BUZZER
   output		buzzer,
-		   
+
   // SD card slot
   output		sd_clk,
   inout			sd_cmd, // MOSI
@@ -135,10 +135,12 @@ wire       osd_joy_swap;        // 0=off, 1=on
 wire [2:0] osd_volume;          // Mute=0, 1=25%, 2=50%, 3=75%, 4=100%
 wire       osd_stereo_mix;      // 0=off, 1=on
 
+wire	   rom_download_in_progress;
+
 // generate a reset for some time after rom has been initialized
 reg [15:0] reset_cnt;
 always @(negedge clk_28m) begin
-    if(!pll_lock || !rom_done || reset || osd_reset || kbd_reset)
+    if(!pll_lock || !rom_done || reset || osd_reset || kbd_reset || rom_download_in_progress)
         reset_cnt <= 16'hffff;
     else if(reset_cnt != 0)
         reset_cnt = reset_cnt - 16'd1;
@@ -253,8 +255,107 @@ wire [63:0] sd_img_size;
 wire [7:0]  sd_img_mounted;
 reg         sd_ready;
 
+// state machine handling kickstart upload from Companion
+reg [2:0]	 kick_upload_state = 3'd0;
+reg		     kick_is_256k; 
+assign	     rom_download_in_progress = kick_upload_state >= 3'd1 && kick_upload_state <= 3'd3;
+   
+wire		 rom_data_available;   
+wire [7:0]	 rom_data;
+reg		     rom_data_strobe;
+reg		     rom_data_byte_toggle;
+   
+reg [7:0]	 rom_data_lowbyte;   
+reg [15:0]	 rom_data_word;   
+reg [18:1]	 rom_data_addr;   
+reg		     rom_data_word_we;
+
+wire [2:0]   rom_selected;           // Index 0-7 of image selected by companion
+wire		 rom_selection_strobe;   // image is being selected
+wire		 kickrom_size_valid = (sd_img_size == 64'd524288 || sd_img_size == 64'd262144);
+wire		 rom_accepted = (rom_selection_strobe && rom_selected == 3'd0) && kickrom_size_valid;
+
+wire [18:1]	 rom_data_addr_max = ((kick_is_256k?'d262144:'d524288)/2)-1;
+
+// The ROM uploader receives ROM data from the Companion and writes it into
+// the area of sdram that is reserved for kickstart rom  
+always @(posedge clk_28m, negedge pll_lock) begin
+   if(!pll_lock) begin
+      kick_upload_state <= 3'd0;
+      rom_data_word_we <= 1'b0;
+	  kick_is_256k <= 1'b0;	  
+   end else begin
+      rom_data_strobe <= 1'b0;		 
+      if(clk7_en && rom_data_word_we) begin
+		 rom_data_word_we <= 1'b0;
+		 if(rom_data_addr != rom_data_addr_max)
+      	   rom_data_addr <= rom_data_addr + 18'd1;   
+      end
+
+      case(kick_upload_state)
+		3'd0: begin
+		   // FPGA Companion wants to upload a rom to slot 0 with 256k or 512k size
+		   if(rom_selection_strobe) begin
+			  // At this point rom_selected could be used to handle the different
+			  // rom images appropriately. The Amiga/NanoMig only supports one rom image			  
+			  if(rom_accepted) begin
+				 $display("nanomig_rb.v: Request kickstart upload, size = %0d", sd_img_size);
+				 kick_upload_state <= 3'd1;
+				 kick_is_256k <= (sd_img_size == 64'd262144);
+				 rom_data_byte_toggle <= 1'b0;
+				 rom_data_addr <= 18'd0;
+			  end else
+				$display("nanomig_tb.v: Kickstart upload rejected, size = %0d", sd_img_size);
+		   end
+		end
+		
+		3'd1: begin
+		   // sync to amiga 7 Mhz clock
+		   if(clk7n_en)
+			 kick_upload_state <= 3'd2;
+		end
+		
+		3'd2: begin
+		   // transfer kickstart from sd card fifo
+		   // (byte) data is being read on both 7Mhz edges, so 16 bit data is ready
+		   // every positive 7 Mhz edge
+		   if(rom_data_available) begin
+			  // odd byte on falling edge
+			  if(clk7n_en && !rom_data_byte_toggle) begin		 
+				 rom_data_lowbyte <= rom_data;
+				 rom_data_strobe <= 1'b1;  // notify SD card driver that byte has been read
+				 rom_data_byte_toggle <= 1'b1;				 
+			  end
+			  // even byte on rising edge
+			  if(clk7_en && rom_data_byte_toggle) begin
+				 rom_data_word <= { rom_data_lowbyte, rom_data };				 
+				 rom_data_strobe <= 1'b1;  // notify SD card driver that byte has been read
+				 rom_data_word_we <= 1'b1; // 16 bit data is ready
+				 rom_data_byte_toggle <= 1'b0;				 
+				 
+				 // check if kickstart is complete
+				 if(rom_data_addr == rom_data_addr_max)
+				   kick_upload_state <= 3'd3;
+			  end
+		   end	   
+		end // case: 3'd2
+		
+		3'd3:
+		  if(clk7_en) begin
+			 $display("nanomig_tb.v: ROM upload complete");		    
+			 kick_upload_state <= 3'd4;
+		  end
+		
+		3'd4:
+		  kick_upload_state <= 3'd0;
+		
+      endcase	 
+   end   
+end   
+
 sd_card #(
-    .CLK_DIV(3'd0)                   // for 28 Mhz clock
+    .CLK_DIV(3'd0),                  // for 28 Mhz clock
+    .IMAGE_FIFO_BITS(9)              // ROM transfer fifo size = 512
 ) sd_card (
     .rstn(pll_lock),                 // rstn active-low, 1:working, 0:reset
     .clk(clk_28m),                   // clock
@@ -275,6 +376,14 @@ sd_card #(
     .image_mounted(sd_img_mounted),
     .image_size(sd_img_size),           // length of image file
 
+    // rom download interface
+    .rom_image_selected(rom_selected),  // image_size is valid for this
+    .rom_image_selection_strobe(rom_selection_strobe),
+    .rom_image_accepted(rom_accepted),
+    .rom_image_data_available(rom_data_available),
+    .rom_image_data(rom_data),
+    .rom_image_data_strobe(rom_data_strobe),
+		   
     // interrupt to signal communication request
     .irq(sdc_int),
     .iack(sdc_iack),
@@ -581,16 +690,16 @@ wire        flash_busy;
 // once the copy counter has run to zero, all rom has been copied
 wire		rom_done = (word_count == 0);
 
-assign leds[3] = !rom_done;  
+assign leds[3] = !rom_done || rom_download_in_progress;  
    
-reg [21:0]  flash_ram_addr;   
+reg [17:0]  flash_ram_addr;   
 reg         flash_ram_write;
 reg [5:0]   flash_cnt;  
 
 always @(posedge clk_85m or negedge mem_ready) begin
     if(!mem_ready) begin
        flash_addr <= 22'h200000;          // 4MB flash offset (word address)
-       flash_ram_addr <= { 4'hf, 18'h0 }; // write into 512k sdram segment used for kick rom
+       flash_ram_addr <= 18'h0;           // write into 512k sdram segment used for kick rom
        word_count <= 22'h40001;           // 512k bytes ROM data = 256k words
 
        state <= 3'h0;
@@ -627,7 +736,7 @@ always @(posedge clk_85m or negedge mem_ready) begin
         if(state != 0)  state <= state + 3'd1;
         if(state == 3)  flash_ram_write <= 1'b1;
         if(state == 18)  flash_ram_write <= 1'b0;
-        if(state == 21)  flash_ram_addr <= flash_ram_addr + 22'd1;
+        if(state == 21)  flash_ram_addr <= flash_ram_addr + 18'd1;
     end
 end
 
@@ -645,16 +754,53 @@ always @(posedge clk_28m)
 wire        sdram_access  = (!ram_oe_n || !ram_we_n);  
 wire	    sdram_rw      = !ram_we_n;
    
-wire		sdram_cs      = rom_done?sdram_access:flash_ram_write;
 
-wire        sdram_sync    = rom_done?!cyc:flash_ram_write;
+// multiplex ram input to the three sources
+//  1. the minimig addressing ram during regular operation 
+//  2. flash rom being copied to ram after core load
+//  3. flash rom download to ram initiated by the companion    
    
-wire		sdram_refresh = rom_done?ram_refresh:1'b0;
+wire		sdram_cs      = 
+			!rom_done?flash_ram_write:
+			rom_download_in_progress?rom_data_word_we:
+			sdram_access;   
+
+wire        sdram_sync    = 
+			!rom_done?flash_ram_write:
+			!cyc;  // rom_download also runs in sync with clk7/cyc
    
-wire [21:0] sdram_addr    = rom_done?ram_a[22:1]:flash_ram_addr;
-wire [15:0] sdram_din     = rom_done?ram_dout:flash_doutD;
-wire [1:0]  sdram_be      = rom_done?ram_be:2'b00;
-wire		sdram_we      = rom_done?sdram_rw:flash_ram_write; 
+wire		sdram_refresh = 
+			!rom_done?1'b0:
+			rom_download_in_progress?1'b0:
+			ram_refresh;
+
+wire [15:0] sdram_din     = 
+			!rom_done?flash_doutD:                   // initial rom download from flash
+			rom_download_in_progress?rom_data_word:  // rom download from sd card
+			ram_dout;                                // regular operation
+   
+wire [1:0]  sdram_be      =
+			!rom_done?2'b00:                         // flash download always does word access
+			rom_download_in_progress?2'b00:          //          -"-
+			ram_be;                                  // byte enable during regular operation is via ds[1:0]
+
+// check if the sdram access goes into the ram segments used to store kickrom and if
+// a 256k kick has been downloaded
+wire		 minimig_is_accessing_rom = ram_a[22:19] == 4'b1111;
+wire		 minimig_is_accessing_256k_rom = kick_is_256k && minimig_is_accessing_rom;   
+
+wire		sdram_we      = 
+			!rom_done?flash_ram_write:               // flash download write enable			
+			rom_download_in_progress?rom_data_word_we:
+			// the following test is needed as the rom kick area is also accessible to the
+			// minimig through the fastram area at $780000
+			(sdram_rw && !minimig_is_accessing_rom); // regular ram write as requested by the cpu or chipset
+
+wire [21:0] sdram_addr    = 
+			!rom_done?{4'b1111, flash_ram_addr}:                // initial rom download from flash
+			rom_download_in_progress?{4'b1111, rom_data_addr}:  // rom download from sd card
+			minimig_is_accessing_256k_rom?{ram_a[22:19],1'b0,ram_a[17:1]}:  // regular rom access into 256k kickstart
+			ram_a[22:1];                                        // regular operation
 
 assign O_sdram_clk = clk_85m_shifted;   
 assign O_sdram_cke = 1'b1;  // clock enable

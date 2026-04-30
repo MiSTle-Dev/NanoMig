@@ -700,6 +700,12 @@ video_analyzer video_analyzer (
 
 // latch audio, so it's stable during 48khz transfer
 reg [15:0] audio_reg [2]; 
+
+// Sign-extend inputs to 16-bit BEFORE mixing – intermediate sum
+// cannot overflow, result always fits back in 15 bit.
+wire signed [15:0] audio_left_s  = {{1{audio_left[14]}},  audio_left};
+wire signed [15:0] audio_right_s = {{1{audio_right[14]}}, audio_right};
+
 reg signed [14:0] mixed_audio_left;
 reg signed [14:0] mixed_audio_right;
 reg [14:0] scaled_audio_left;
