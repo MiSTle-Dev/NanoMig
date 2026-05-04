@@ -138,6 +138,7 @@ wire sdram_ready;
 wire [23:0] ws2812_color;
 ws2812 ws2812_inst (
     .clk(clk_28m),
+	.reset(!pll_lock),
     .color(ws2812_color),
     .data(ws2812)
 );
@@ -441,6 +442,7 @@ nanomig nanomig
  .kbd_mouse_type(kbd_mouse_type),  
  .kbd_mouse_data(kbd_mouse_data),
  .joystick0(joystick),
+ .joystick1(8'h00),
 				 
  // sd card interface for floppy disk emulation
  .sdc_img_size(sd_img_size),
@@ -694,7 +696,6 @@ end
 assign pa_en = !cpu_reset;   // simply enable amplifier with left channel
 
 // latch audio, so it's stable during 48khz transfer
-reg [15:0] audio_reg [2]; 
 reg [14:0] scaled_audio_left;
 reg [14:0] scaled_audio_right;
 
@@ -707,7 +708,7 @@ always @(posedge clk_28m) begin
         aclk_cnt <= 8'd0;
         clk_audio <= ~clk_audio;
 
-   // Scale values and Assign scaled values to the HDMI registers
+	    // Scale values and Assign scaled values to the HDMI registers
         case (osd_volume) 
             3'b100: begin // 100%
                 scaled_audio_left  <= audio_left;
@@ -734,14 +735,12 @@ always @(posedge clk_28m) begin
                 scaled_audio_right <= $signed(audio_right) >>> 1;
             end
         endcase
-
-	   audio_reg <= { { 1'b0, ~scaled_audio_left[14],scaled_audio_left[13:0]}, {1'b0, ~scaled_audio_right[14],scaled_audio_right[13:0]}};	
     end
 end
 
 // sign expand and add both channels
-wire [15:0] audio_mix = { audio_reg[0][14], audio_reg[0]} + { audio_reg[1][14], audio_reg[1] };
-   
+wire [15:0] audio_mix = { scaled_audio_left[14], scaled_audio_left} + { scaled_audio_right[14], scaled_audio_right };
+
 // shift audio down to reduce amp output volume to a sane range
 localparam AUDIO_SHIFT = 3;   
 wire [15:0] audio_scaled = { { AUDIO_SHIFT+1{audio_mix[15]}}, audio_mix[14:AUDIO_SHIFT] };   
