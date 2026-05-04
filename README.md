@@ -16,6 +16,7 @@ Current state:
   * Up to 2MB chip, 4MB fast and 1.5MB slow RAM
   * Accelerated 68020 support (in the works)
   * OCS and ECS chipset (no AGA on TN20K!)
+  * ROM loader (Kickstart 1.3 / 3.1 / 3.2 / DiagRom)
   * Up to four virtual floppy drives
   * Floppy disk write support
   * HDMI video and audio, PAL and NTSC
@@ -28,7 +29,6 @@ Current state:
 Planned features:
 
   * AGA support (is planned for the Arora III FPGA series e.g. GW3A-20)
-  * Kickstart switcher (1.3 / 3.1 / 3.2 / DiagRom)
   * Drive Sounds for FDD & HDD (hardware addon / buzzer)
 
 Outlook:
