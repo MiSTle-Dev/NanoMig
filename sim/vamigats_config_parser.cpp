@@ -1,4 +1,4 @@
-#include "ini_parser.h"
+#include "vamigats_config_parser.h"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -9,8 +9,8 @@ int g_vAmigaTS_screenshot_wait_time_seconds_offset = 0;
 std::string g_vAmigaTS_screenshot_name = "";
 std::string g_vAmigaTS_screenshot_dir = ".";
 
-// Function to check and replace "_ocs.adf" or "_ecs.adf" with ".adf"
-void check_and_replace_adf_path(vAmigaTSConfig &config) {
+// Function to normalize vAmigaTS chipset-specific ADF names to the copied ADF path
+void normalize_vamigats_adf_path(vAmigaTSConfig &config) {
     size_t ocs_pos = config.adf_path.find("_ocs.adf");
     if (ocs_pos != std::string::npos) {
         config.adf_path.replace(ocs_pos, 8, ".adf");
@@ -21,18 +21,18 @@ void check_and_replace_adf_path(vAmigaTSConfig &config) {
         config.adf_path.replace(ecs_pos, 8, ".adf");
     }
 }
-// Function to parse command-line arguments
-vAmigaTSConfig parse_command_line_args(int argc, char **argv) {
+// Function to parse vAmigaTS loader command-line arguments
+vAmigaTSConfig parse_vamigats_command_line_args(int argc, char **argv) {
     vAmigaTSConfig config; // Create a local instance of vAmigaTSConfig
 
     for (int arg_pos = 1; arg_pos < argc; arg_pos++) {
         std::string arg = argv[arg_pos];
 
-        // Check if the argument starts with "ini="
-        if (arg.rfind("ini=", 0) == 0) {
-            std::string config_file = arg.substr(4);
+        // Check for the vAmigaTS config-file argument
+        if (arg.rfind("vamigats_config=", 0) == 0) {
+            std::string config_file = arg.substr(16);
             std::cout << "Config file detected: " << config_file << std::endl;
-            parse_ini_file(config_file, config); // Pass the config object
+            parse_vamigats_config_file(config_file, config); // Pass the config object
         } 
         // Check if the argument starts with "screenshot_dir="
         else if (arg.rfind("screenshot_dir=", 0) == 0) {
@@ -44,11 +44,11 @@ vAmigaTSConfig parse_command_line_args(int argc, char **argv) {
     return config; // Return the populated config object
 }
 
-// Function to parse the INI file
-void parse_ini_file(const std::string &file_path, vAmigaTSConfig &config) {
+// Function to parse a vAmigaTS config script
+void parse_vamigats_config_file(const std::string &file_path, vAmigaTSConfig &config) {
     std::ifstream file(file_path);
     if (!file.is_open()) {
-        std::cerr << "Failed to open .ini file: " << file_path << std::endl;
+        std::cerr << "Failed to open vAmigaTS config file: " << file_path << std::endl;
         return;
     }
 	config.config_file_name = file_path;
@@ -75,7 +75,7 @@ void parse_ini_file(const std::string &file_path, vAmigaTSConfig &config) {
                 }
             } else if (subcommand == "run") {
                 iss >> config.adf_path;
-                check_and_replace_adf_path(config); // Call the function after setting adf_path
+                normalize_vamigats_adf_path(config); // Call the function after setting adf_path
             }
         } else if (command == "cpu") {
             std::string subcommand;

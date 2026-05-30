@@ -2,7 +2,7 @@
 
 The tests from the [vAmiga Test Suite](https://github.com/dirkwhoffmann/vAmigaTS) can be used to validate the accuracy of the NanoMig Verilator simulation. 
 
-For this purpose the parameters from the INI files of the vAmiga Test Suite are used to configure the NanoMig Verilator simulation. Screenshots of the NanoMig Verilator simulation are taken for comparison against the reference images provided by the vAmiga Test Suite.
+For this purpose the parameters from the vAmiga Test Suite config scripts are used to configure the NanoMig Verilator simulation. Screenshots of the NanoMig Verilator simulation are taken for comparison against the reference images provided by the vAmiga Test Suite.
 
 ## Benefit
 
@@ -48,6 +48,6 @@ This project uses a `Makefile` to automate the process of collecting tests and r
 	 
 
 ## Todo
-- Take into account CPU revision mentioned in INI files
-- Take into account the amount of RAM mentioned in INI files
-- Test handling of directories with multiple INI files
+- Take into account CPU revision mentioned in vAmigaTS config scripts
+- Take into account the amount of RAM mentioned in vAmigaTS config scripts
+- Test handling of directories with multiple config scripts

@@ -22,11 +22,11 @@ extern int g_vAmigaTS_screenshot_wait_time_seconds_offset;
 extern std::string g_vAmigaTS_screenshot_name;
 extern std::string g_vAmigaTS_screenshot_dir;
 
-// Function to check and replace "_ocs.adf" or "_ecs.adf" with ".adf"
-void check_and_replace_adf_path(vAmigaTSConfig &config);
+// Function to normalize vAmigaTS chipset-specific ADF names to the copied ADF path
+void normalize_vamigats_adf_path(vAmigaTSConfig &config);
 
-// Function to parse command-line arguments
-vAmigaTSConfig parse_command_line_args(int argc, char **argv);
+// Function to parse vAmigaTS loader command-line arguments
+vAmigaTSConfig parse_vamigats_command_line_args(int argc, char **argv);
 
-// Function to parse the INI file
-void parse_ini_file(const std::string &file_path, vAmigaTSConfig &config);
+// Function to parse a vAmigaTS config script
+void parse_vamigats_config_file(const std::string &file_path, vAmigaTSConfig &config);
