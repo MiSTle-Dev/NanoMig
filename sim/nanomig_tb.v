@@ -27,6 +27,7 @@ module nanomig_tb
 
    input [7:0]	 memory_config,
    input [2:0]	 fastram_config,
+   input [5:0]	 chipset_config,
    input [3:0]	 floppy_config,
    input [5:0]	 ide_config,
    
@@ -121,6 +122,7 @@ nanomig nanomig (
 
 		 .memory_config(memory_config),
 		 .fastram_config(fastram_config),
+		 .chipset_config(chipset_config),
 		 .floppy_config(floppy_config),
 		 .ide_config(ide_config),
 		 

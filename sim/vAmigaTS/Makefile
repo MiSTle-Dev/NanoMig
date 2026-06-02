@@ -16,24 +16,34 @@ KICK_PATH=../kick13.rom
 SRC_DIR ?= $(FALLBACK_DIR)
 
 TMP_DIR=/tmp
+SCRIPT_TMP_DIR=$(TMP_DIR)/nanomig_vamigats_scripts
 PARENT_DIR=..
 
-# Run make for each .ini file in the parent directory
+# Run make for each vAmigaTS config script (.ini/.retrosh) in the parent directory
 run_all: collect_files
 	@mkdir -p $(SCREENSHOT_DIR)  # Ensure the screenshots directory exists
-	@echo "Running simulations for each .ini file..."
-	@for ini in $(TMP_DIR)/*.ini; do \
-		echo "Found .ini file: $$ini"; \
-#		(cd $(PARENT_DIR) && make run INI=$$ini); \
-		(cd $(PARENT_DIR) && $(SIMULATION_CMD) INI=$$ini SCREENSHOT_DIR=$(SCREENSHOT_DIR)); \
+	@echo "Running simulations for each .ini/.retrosh file..."
+	@scripts=$$(find $(SCRIPT_TMP_DIR) -maxdepth 1 \( -name "*.ini" -o -name "*.retrosh" \) -print | sort); \
+	if [ -z "$$scripts" ]; then \
+		echo "No .ini or .retrosh files found in $(SRC_DIR). Refusing to run default config."; \
+		exit 1; \
+	fi; \
+	for script in $$scripts; do \
+		echo "Found config script: $$script"; \
+		(cd $(PARENT_DIR) && $(SIMULATION_CMD) VAMIGATS_CONFIG=$$script SCREENSHOT_DIR=$(SCREENSHOT_DIR)); \
 	done
-	
-# Collect all .ini and .adf files from the specified directory
+
+# Collect all .ini, .retrosh and .adf files from the specified directory
 collect_files:
-	@echo "Collecting .ini and .adf files from $(SRC_DIR)..."
+	@echo "Collecting .ini, .retrosh and .adf files from $(SRC_DIR)..."
 	@mkdir -p $(TMP_DIR)  # Ensure the temporary directory exists
-	@-find $(SRC_DIR) -name "*.ini" -exec cp {} $(TMP_DIR) \; || echo "No .ini files found."
+	@mkdir -p $(SCRIPT_TMP_DIR)  # Ensure the temporary script directory exists
+	@rm -f $(SCRIPT_TMP_DIR)/*.ini $(SCRIPT_TMP_DIR)/*.retrosh
+	@-find $(SRC_DIR) -name "*.ini" -exec cp {} $(SCRIPT_TMP_DIR) \; || echo "No .ini files found."
+	@-find $(SRC_DIR) -name "*.retrosh" -exec cp {} $(SCRIPT_TMP_DIR) \; || echo "No .retrosh files found."
 	@-find $(SRC_DIR) -name "*.adf" -exec cp {} $(TMP_DIR) \; || echo "No .adf files found."
+	@echo "Scripts collected in $(SCRIPT_TMP_DIR):"
+	@ls $(SCRIPT_TMP_DIR)
 	@echo "Files collected in $(TMP_DIR):"
 	@echo "Copying kick13.rom to $(TMP_DIR)..."
 	@cp $(KICK_PATH) $(TMP_DIR) || echo "$(KICK_PATH) not found."

@@ -15,6 +15,9 @@
 #include <SDL.h>
 #include <SDL_image.h>
 
+#include <string>
+
+#include "vamigats_config_parser.h"
 #include "Vnanomig_tb.h"
 #include "Vnanomig_tb_nanomig_tb.h"
 
@@ -39,6 +42,9 @@
 Vnanomig_tb *tb;
 static VerilatedFstC *trace;
 double simulation_time;
+extern const char *file_image[8];
+void hexdump(void *data, int size);
+void hexdiff(void *data, void *cmp, int size);
 
 #define TICKLEN   (0.5/28375160)
 #include "sd_card_config.h"       // for TICKLEN
@@ -294,6 +300,13 @@ void capture_video(void) {
 	  char name[32];
 	  sprintf(name, "screenshots/frame%04d.png", frame);
 	  save_texture(sdl_renderer, sdl_texture, name);
+
+	  if (!g_vAmigaTS_screenshot_name.empty() &&
+	      simulation_time > g_vAmigaTS_screenshot_wait_time_seconds + g_vAmigaTS_screenshot_wait_time_seconds_offset) {
+	    std::string full_screenshot_name = g_vAmigaTS_screenshot_dir + "/" + g_vAmigaTS_screenshot_name + ".png";
+	    save_texture(sdl_renderer, sdl_texture, full_screenshot_name.c_str());
+	    exit(0);
+	  }
 	}
       }
 	
@@ -325,9 +338,9 @@ static uint64_t GetTickCountMs() {
 
 unsigned short ram[8*512*1024];  // 8 Megabytes
 
-void load_kick(void) {
-  printf("Loading kick into last 512k of 8MB ram\n");
-  FILE *fd = fopen(KICK, "rb");
+void load_kick(const std::string &path) {
+  printf("Loading kick into last 512k of 8MB ram from %s\n", path.c_str());
+  FILE *fd = fopen(path.c_str(), "rb");
   if(!fd) { perror("load kick"); exit(-1); }
   
   int len = fread(ram+(0x780000/2), 1024, 512, fd);
@@ -672,6 +685,14 @@ void tick(int c) {
 }
 
 int main(int argc, char **argv) {
+  vAmigaTSConfig config = parse_vamigats_command_line_args(argc, argv);
+  if (!config.config_file_name.empty()) {
+    g_vAmigaTS_screenshot_wait_time_seconds = config.screenshot_wait_time_seconds;
+    g_vAmigaTS_screenshot_wait_time_seconds_offset = config.screenshot_wait_time_seconds_offset;
+    g_vAmigaTS_screenshot_name = config.screenshot_name;
+    g_vAmigaTS_screenshot_dir = config.screenshot_dir;
+  }
+
   // Initialize Verilators variables
   Verilated::commandArgs(argc, argv);
   // Verilated::debug(1);
@@ -681,7 +702,7 @@ int main(int argc, char **argv) {
   trace->spTrace()->set_time_resolution("1ps");
   simulation_time = 0;
   
-  load_kick();
+  load_kick(config.config_file_name.empty() ? KICK : config.rom_path);
 
   init_video();
 
@@ -691,10 +712,13 @@ int main(int argc, char **argv) {
   trace->open("nanomig.fst");
 
   sd_init();
+  if (!config.config_file_name.empty()) file_image[0] = config.adf_path.c_str();
   
   tb->reset = 1;
   tb->memory_config = 0x00; // 0x00=512k, 0x01=1M, 0x0f=3.5M
   tb->fastram_config = 0;   // 0=none, 1=2MB, 2=4MB
+  tb->chipset_config = (!config.config_file_name.empty() &&
+			(config.chipset == "ECS" || config.chipset == "PLUS")) ? 0x08 : 0x00;
   tb->floppy_config = 0x5;  // 1 = one fast drive, 5 = two fast drives
   tb->ide_config = 0x0;     // 0=no drive, 7=two drives
 
