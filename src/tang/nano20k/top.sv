@@ -580,8 +580,14 @@ wire [5:0] chipset_config = { 1'b0,osd_chipset,osd_video_mode,1'b0 };
 wire [7:0] memory_config = { 4'b0_000, osd_slowmem, osd_chipmem };   
 wire [2:0] fastram_config = { 1'b0, osd_fastmem };   
 wire [3:0] floppy_config = { osd_floppy_drives, osd_floppy_wrprot, osd_floppy_turbo };
-wire [3:0] video_config = { osd_video_filter, osd_video_scanlines };   
-wire [5:0] ide_config = { 5'b10000, osd_ide_enable };   
+wire [3:0] video_config = { osd_video_filter, osd_video_scanlines }; 
+	
+`ifdef ENABLE_FX68K
+	wire [5:0] ide_config = { 5'b00000, osd_ide_enable }; 
+`endif
+`ifdef ENABLE_TG68K	
+	wire [5:0] ide_config = { 5'b10000, osd_ide_enable };   
+`endif
    
 nanomig nanomig
 (
