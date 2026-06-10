@@ -8,6 +8,9 @@
    or a single copy of e.g. a 512k diag rom
      openFPGALoader --external-flash -o 0x400000 DiagROM
 */
+
+// `define ENABLE_FX68K
+`define ENABLE_TG68K
  
 module top(
   input			clk,
@@ -578,7 +581,7 @@ wire [7:0] memory_config = { 4'b0_000, osd_slowmem, osd_chipmem };
 wire [2:0] fastram_config = { 1'b0, osd_fastmem };   
 wire [3:0] floppy_config = { osd_floppy_drives, osd_floppy_wrprot, osd_floppy_turbo };
 wire [3:0] video_config = { osd_video_filter, osd_video_scanlines };   
-wire [5:0] ide_config = { 5'b00000, osd_ide_enable };   
+wire [5:0] ide_config = { 5'b10000, osd_ide_enable };   
    
 nanomig nanomig
 (
