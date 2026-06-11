@@ -12,7 +12,7 @@
 // FX68K is set by default 
 // to enable TG68K-020 uncomment: `define ENABLE_TG68K
 
-`define ENABLE_TG68K
+// `define ENABLE_TG68K
  
 module top(
   input			clk,
