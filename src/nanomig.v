@@ -166,7 +166,7 @@ wire [23:1] chip_addr;
 
 wire	    ovl;
    
-wire [1:0] cpucfg = 2'b00;     // 68020=11
+wire [1:0] cpucfg = 2'b11;     // 68000=00, 68020=11
 // cache bits: dcache, kick, chip
 // wire [2:0] cachecfg = { 1'b0, ~ovl, 1'b0 };
 wire [2:0] cachecfg = 3'b000;  // no turbo chip and kick, no caches   
@@ -210,17 +210,28 @@ always @(negedge clk_sys)
 reg	    ram_cs_triggerD;
 always @(posedge clk_sys)
   ram_cs_triggerD <= ram_cs_trigger;   
-   
+
 // neg/clk7
-reg frr_d=1'b0;
-always @(posedge clk_sys) begin
-   if(!cpu_rst)
-      ram_ready<=1'b0;
-   else if(!ram_sel)
-      ram_ready<=1'b0;
-   else if(fastram_ready!=frr_d)
-      ram_ready<=1'b1;
-   frr_d <= fastram_ready;
+    `ifdef ENABLE_TG68K  
+        reg frr_d=1'b0;
+        always @(posedge clk_sys) begin
+        ram_ready<=1'b0;
+        if(clk7_en) begin
+            if(fastram_ready!=frr_d)
+                ram_ready<=1'b1;
+            frr_d <= fastram_ready;
+        end
+	`else
+		reg frr_d=1'b0;
+        always @(posedge clk_sys) begin
+        if(!cpu_rst)
+            ram_ready<=1'b0;
+        else if(!ram_sel)
+            ram_ready<=1'b0;
+        else if(fastram_ready!=frr_d)
+            ram_ready<=1'b1;
+        frr_d <= fastram_ready;	
+    `endif
 end
    
 cpu_wrapper cpu_wrapper
@@ -270,16 +281,29 @@ cpu_wrapper cpu_wrapper
 	.cacr         (cpu_cacr        ),
 	.nmi_addr     (cpu_nmi_addr    )
 );
-   
-reg ram_sel_d;
-always @(posedge clk_sys) begin
-   if( cpu_ph2) begin
-		if(!ram_sel_d)
-			fastram_sel <= ram_sel;
-		ram_sel_d <= ram_sel;
+
+`ifdef ENABLE_TG68K
+	reg ram_sel_d;
+	reg ram_ready_d;
+	always @(posedge clk_sys) begin
+		ram_ready_d <= ram_ready;
+	if( clk7n_en) begin
+			if(ram_sel && !ram_ready_d)
+				fastram_sel <= 1'b1;
+		end
+	if( fastram_ready != frr_d ) fastram_sel <= 1'b0;   
 	end
-   if( fastram_ready != frr_d ) fastram_sel <= 1'b0;   
-end
+`else
+	reg ram_sel_d;
+	always @(posedge clk_sys) begin
+	if( cpu_ph2) begin
+			if(!ram_sel_d)
+				fastram_sel <= ram_sel;
+			ram_sel_d <= ram_sel;
+		end
+	if( fastram_ready != frr_d ) fastram_sel <= 1'b0;   
+	end			
+`endif			
 
 assign fastram_addr = ram_addr;
 assign fastram_lds = ram_lds;
