@@ -108,8 +108,8 @@ always @(posedge clk_sys, posedge reset) begin
         reg rs;
 
         if(reset) begin
-	        reset_s <= '1;
-	        reset_d <= '1;	   
+            reset_s <= 8'd1;
+            reset_d <= 1'b1;
         end else begin
                 reset_s <= reset_s << 1;
                 rs <= |reset_s;

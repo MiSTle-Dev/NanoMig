@@ -28,8 +28,8 @@ module sysctrl (
 
   output reg	    jtagsel, // FPGA Companion requests activation of JTAG
 
-  // values that can be configured by the user		
-  output reg	    system_reset,
+  // values that can be configured by the user
+  output 		    system_reset,
   output reg [1:0]  system_floppy_drives,
   output reg	    system_floppy_wrprot,
   output reg	    system_floppy_turbo,
@@ -70,7 +70,7 @@ assign int_out_n = (int_in != 8'h00 || sys_int)?1'b0:1'b1;
 
 // by default system is in reset
 reg main_reset = 1'b1;   
-assign system_reset = main_reset;  
+assign system_reset = main_reset;
 
 reg [31:0] main_reset_timeout;   
 
