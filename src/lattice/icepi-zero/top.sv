@@ -77,21 +77,29 @@ wire spi_dat  = gpio[25];
 wire [15:0] spi_sclk_D = { spi_sclk_D[14:0], gpio[24] } /* synthesis syn_keep=1 */ /* synthesis syn_dont_touch=1 */;
 wire spi_sclk = ( spi_sclk && spi_sclk_D != 16'h0000) ||
                 (!spi_sclk && spi_sclk_D == 16'hffff) /* synthesis syn_keep=1 */ /* synthesis syn_dont_touch=1 */;
-
+// wire spi_sclk = gpio[24];  // no filter
+      
 // physcial dsub9 joystick & mouse port 1 and 2
 wire [5:0] db9_joy0 = { !js0[5], !js0[0], !js0[2], !js0[1], !js0[4], !js0[3] };   
 wire [5:0] db9_joy1 = { !js1[5], !js1[0], !js1[2], !js1[1], !js1[4], !js1[3] }; 
    
 assign leds[4] = |{sd_wr,sd_rd};
 
+// mirror leds 0-2 to gpio 13-15
+assign gpio[15:13] = leds[2:0];   
+
+// map ws2812 to gpio 12
+wire	   ws2812;
+assign gpio[12] = ws2812;   
+   
 // ============================== clock generation ===========================
    
-// HDMI clock:  140 MHz
-// Pixel clock: 28 MHz (HDMI/5)
-// SDRAM and flash clock: 84 MHz
-// Amiga clock: 7.0 (Pixel/4)
+// HDMI clock:  141.6666 MHz
+// Pixel clock: 28.33333 MHz (HDMI/5)
+// SDRAM and flash clock: 85 MHz
+// Amiga clock: 7.083333 (Pixel/4)
    
-`define PIXEL_CLOCK 2800000 // should be 28375160
+`define PIXEL_CLOCK 28_333_333 // should be 28375160
 
 wire clk_pixel_x5;   
 wire pll_lock;   
@@ -149,6 +157,15 @@ end
 wire cpu_reset = reset_cnt != 0;
 
 wire sdram_ready;
+
+// connect to ws2812 led
+wire [23:0] ws2812_color;
+ws2812 ws2812_inst (
+    .clk(clk_28m),
+    .reset(!pll_lock),
+    .color(ws2812_color),
+    .data(ws2812)
+);
 
 // -------------------------- M0S MCU interface -----------------------
 // intn and dout are outputs driven by the FPGA to the MCU

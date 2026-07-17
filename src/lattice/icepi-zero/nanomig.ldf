@@ -21,6 +21,9 @@
         <Source name="../../misc/sysctrl.v" type="Verilog" type_short="Verilog">
             <Options/>
         </Source>
+        <Source name="../../misc/ws2812.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
         <Source name="../../misc/amiga_keymap.v" type="Verilog" type_short="Verilog">
             <Options/>
         </Source>
