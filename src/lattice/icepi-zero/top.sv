@@ -137,7 +137,7 @@ wire [1:0] osd_chipset;         // 0=OCS-A500, 1=OCS-A1000, 2=ECS
 wire       osd_video_mode;      // PAL (0=PAL, 1=NTSC)
 wire [1:0] osd_video_screen;    // 0=standard, 1=overscan, 2=wide screen (jailbars)
 wire [1:0] osd_video_filter;
-wire [1:0] osd_video_scanlines;
+wire [1:0] osd_video_scanlines; // 0=off, 1=dim, 2=black, 3=balanced
 wire       osd_joy_swap;        // 0=off, 1=on
 wire [2:0] osd_volume;          // Mute=0, 1=25%, 2=50%, 3=75%, 4=100%
 wire       osd_stereo_mix;      // 0=off, 1=on
@@ -160,7 +160,7 @@ wire sdram_ready;
 
 // connect to ws2812 led
 wire [23:0] ws2812_color;
-ws2812 ws2812_inst (
+ws2812 #(.CLK_FRE(`PIXEL_CLOCK)) ws2812_inst (
     .clk(clk_28m),
     .reset(!pll_lock),
     .color(ws2812_color),
