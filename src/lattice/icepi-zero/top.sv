@@ -61,24 +61,28 @@ wire [3:0] tmds;
 assign gpdi_dp = { tmds[0], tmds[3], tmds[2], tmds[1] };
 
 // map joysticks onto GPIO 0 to 11
-assign gpio[5:0] = 6'hzz;
+assign gpio[5:0] = 6'bzzzzzz;
 wire [5:0] js0 = gpio[5:0];
-assign gpio[11:6] = 6'hzz;
+assign gpio[11:6] = 6'bzzzzzz;
 wire [5:0] js1 = gpio[11:6];
 
-// map companion onto GPIO 21 to 25
+// map companion onto GPIO 21 to 25 ...
+// ... and GPIO 18 instead of GPIO 23 due to a stupid oversight on the carrier
 wire spi_dir;
 wire spi_irqn;
-assign gpio[25:21] = { 3'bzzz, spi_irqn, spi_dir };
-wire spi_csn  = gpio[23];
+assign {gpio[25:24], gpio[18], gpio[22:21]} = { 3'bzzz, spi_irqn, spi_dir };
+wire spi_csn  = gpio[18];
 wire spi_dat  = gpio[25];
 
+`ifdef NO_FILTER
+wire spi_sclk = gpio[24];  // no filter
+`else
 // filter companion SPI clock
 wire [15:0] spi_sclk_D = { spi_sclk_D[14:0], gpio[24] } /* synthesis syn_keep=1 */ /* synthesis syn_dont_touch=1 */;
 wire spi_sclk = ( spi_sclk && spi_sclk_D != 16'h0000) ||
                 (!spi_sclk && spi_sclk_D == 16'hffff) /* synthesis syn_keep=1 */ /* synthesis syn_dont_touch=1 */;
-// wire spi_sclk = gpio[24];  // no filter
-      
+`endif
+
 // physcial dsub9 joystick & mouse port 1 and 2
 wire [5:0] db9_joy0 = { !js0[5], !js0[0], !js0[2], !js0[1], !js0[4], !js0[3] };   
 wire [5:0] db9_joy1 = { !js1[5], !js1[0], !js1[2], !js1[1], !js1[4], !js1[3] }; 
@@ -519,20 +523,16 @@ wire [7:0] physical_port_1 = {
 wire [7:0] physical_port_2 = { 
                hid_joy1[7], 
                hid_joy1[6], 
-			  (hid_joy1[5] | db9_joy1[5]),
+	      (hid_joy1[5] | db9_joy1[5]),
               (hid_joy1[4] | db9_joy1[4]),
               (hid_joy1[3] | db9_joy1[3]), 
               (hid_joy1[2] | db9_joy1[2]),
               (hid_joy1[1] | db9_joy1[1]),
               (hid_joy1[0] | db9_joy1[0]) }; 
               
-wire [7:0] joystick0;
-wire [7:0] joystick1;
-
 // Swap Joysticks 
-
-assign joystick0 = osd_joy_swap ? physical_port_1 : physical_port_2;
-assign joystick1 = osd_joy_swap ? physical_port_2 : physical_port_1;
+wire [7:0] joystick0 = osd_joy_swap ? physical_port_1 : physical_port_2;
+wire [7:0] joystick1 = osd_joy_swap ? physical_port_2 : physical_port_1;
 
 wire [23:1] cpu_a;
 wire cpu_as_n, cpu_lds_n, cpu_uds_n;

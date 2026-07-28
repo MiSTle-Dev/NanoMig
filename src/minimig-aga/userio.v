@@ -85,8 +85,12 @@ wire         _mright;       // right mouse buttons
 reg           joy1enable;   // joystick 1 enable (mouse/joy switch)
 wire         test_load;     // load test value to mouse counter
 wire  [15:0] test_data;     // mouse counter test value
-reg          cd32pad;
-reg          joy_swap;
+
+// these have been configurable historically. They are currently disabled but may
+// become used, again
+wire         cd32pad = 1'b0;
+wire         joy_swap = 1'b0;
+wire         joy_ana_en = 1'b0;
 
 //--------------------------------------------------------------------------------------
 //--------------------------------------------------------------------------------------
@@ -100,7 +104,6 @@ always @ (posedge clk) begin
 	end
 end
 
-reg        joy_ana_en;
 reg [15:0] ajoy1,ajoy2;
 
 always @(posedge clk) begin
