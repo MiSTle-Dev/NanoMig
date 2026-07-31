@@ -67,7 +67,6 @@ always @(negedge spi_io_clk or posedge spi_io_ss) begin
 end // always @ (negedge spi_io_clk or posedge spi_io_ss)
    
 // bring received byte into local clock domain
-
   
 reg spi_in_strobe;
 reg [7:0] spi_target;
@@ -76,12 +75,11 @@ assign mcu_hid_strobe = spi_in_strobe && spi_target == 8'd1;
 assign mcu_osd_strobe = spi_in_strobe && spi_target == 8'd2; 
 assign mcu_sdc_strobe = spi_in_strobe && spi_target == 8'd3; 
 
+reg [3:0] spi_in_cnt;
 reg [7:0] spi_in_data;
 assign mcu_start = spi_in_cnt == 2;  
 assign mcu_dout = spi_in_data;
      
-reg [3:0] spi_in_cnt;
-
 always @(posedge clk) begin
    reg [1:0] spi_data_in_readyD;
    spi_data_in_readyD <= { spi_data_in_readyD[0], spi_data_in_ready };

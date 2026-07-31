@@ -1,6 +1,8 @@
 `ifndef LATTICE
-  // TODO: GOWIN should be set globally by all top levels that need it
-  `define GOWIN
+`ifndef TMDS_BY_LOGIC
+// TODO: GOWIN should be set globally by all top levels that need it
+ `define GOWIN
+`endif
 `endif
 
 module serializer #(

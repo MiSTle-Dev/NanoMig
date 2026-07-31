@@ -1,0 +1,1 @@
+Pin_in   "clk"  Loc = "IO_SB_A8" | SCHMITT_TRIGGER=true;

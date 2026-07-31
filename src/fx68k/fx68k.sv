@@ -1174,6 +1174,7 @@ localparam REG_DT = 17;
 	reg [15:0] regs68L[ 18];
 	reg [15:0] regs68H[ 18];
 
+`ifndef YOSYS	
 // synthesis translate off
 	/*
 		It is bad practice to initialize simulation registers that the hardware doesn't.
@@ -1183,18 +1184,17 @@ localparam REG_DT = 17;
 		But the simulator doesn't realize (it can't) that the same value is substracting from itself,
 		and that the result should be zero even when it's 'X - 'X.
 	*/
-	
 	initial begin
 		for( int i = 0; i < 18; i++) begin
 			regs68L[i] <= '0;
 			regs68H[i] <= '0;
 		end
 	end
-	
 	// For simulation display only
 	wire [31:0] SSP = { regs68H[REG_SSP], regs68L[REG_SSP]};
 	
 // synthesis translate on
+`endif	
 	
 
 	wire [15:0] aluOut;

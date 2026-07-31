@@ -93,11 +93,23 @@ module cpu_wrapper
 
 wire cpu_req = (cpustate != 1);
 
-assign ramsel       = cpu_req & ~sel_nmi_vector & (sel_zram | sel_chipram | sel_kickram | sel_dd | sel_rtg);
-assign ramshared    = sel_dd;
-
+wire	sel_nmi_vector;
+   
 // NMI
+reg  [31:0] vbr;
 always @(posedge clk) nmi_addr <= vbr + 32'h7c;
+
+reg  [31:0] cpu_addr;
+reg  [15:0] cpu_dout;
+reg         wr;
+reg         uds_in;
+reg         lds_in;
+
+reg       z2ram_ena;
+reg [4:0] z3ram_base0;
+reg [3:0] z3ram_base1;
+reg       z3ram_ena0;
+reg       z3ram_ena1;
 
 wire sel_z3ram0 = (cpu_addr[31:27] == z3ram_base0) && z3ram_ena0;
 wire sel_z3ram1 = (cpu_addr[31:28] == z3ram_base1) && z3ram_ena1;
@@ -107,13 +119,18 @@ wire sel_dd     = (cpu_addr[31:16] == 16'h00DD) && (cpu_addr[15:13] == 'b010);
 wire sel_rtg    = (cpu_addr[31:24] == 8'h02);
 
 // don't sel_kickram when writing
+wire	cchip;   
+wire	ckick;   
 wire sel_kickram   = !cpu_addr[31:24] && (&cpu_addr[23:19] || (cpu_addr[23:19] == 5'b11100)) && ckick && wr;	// $f8xxxx, e0xxxx
 wire sel_kicklower = !cpu_addr[31:24] && (cpu_addr[23:18] == 6'b111110);
 wire sel_chipram   = !cpu_addr[31:21] && cchip; 		             //$000000 - $1FFFFF
 
+assign ramsel       = cpu_req & ~sel_nmi_vector & (sel_zram | sel_chipram | sel_kickram | sel_dd | sel_rtg);
+assign ramshared    = sel_dd;
+
 // we route everything hrtmon related through cart.v (needs a couple of signals to
 // decide what to do, would not be good style to replicate that here). 
-wire sel_nmi_vector = (cpu_addr[31:2] == nmi_addr[31:2]) && (cpustate == 2);
+assign sel_nmi_vector = (cpu_addr[31:2] == nmi_addr[31:2]) && (cpustate == 2);
 
 wire [15:0] ramdat;
 
@@ -146,14 +163,20 @@ assign fastchip_lds = lds_in;
 assign fastchip_uds = uds_in;
 assign fastchip_rnw = wr;
 
-reg  [31:0] cpu_addr;
-reg  [15:0] cpu_dout;
-wire [15:0] cpu_din = ramsel ? ramdat : fastchip_selack ? fastchip_dout : {sel_autoconfig ? autocfg_data : chip_data[15:12], chip_data[11:0]};
-reg         wr;
-reg         uds_in;
-reg         lds_in;
+wire	    sel_autoconfig;   
+reg [1:0] autocfg_card;
+reg [3:0] autocfg_data;
 reg  [15:0] chip_data;
-reg  [31:0] vbr;
+wire [15:0] cpu_din = ramsel ? ramdat : fastchip_selack ? fastchip_dout : {sel_autoconfig ? autocfg_data : chip_data[15:12], chip_data[11:0]};
+
+wire [15:0] cpu_dout_o;
+wire [23:1] cpu_addr_o;
+wire  [2:0] fc_o;
+wire        wr_o;
+wire        as_o;
+wire        uds_o;
+wire        lds_o;
+wire        reset_out_o;
 
 always @* begin
 `ifdef CPU_SWITCHABLE
@@ -271,15 +294,6 @@ cpu_inst_p
 );
 `endif
 
-wire [15:0] cpu_dout_o;
-wire [23:1] cpu_addr_o;
-wire  [2:0] fc_o;
-wire        wr_o;
-wire        as_o;
-wire        uds_o;
-wire        lds_o;
-wire        reset_out_o;
-
 `ifdef ENABLE_FX68K
 fx68k cpu_inst_o
 (
@@ -319,12 +333,13 @@ fx68k cpu_inst_o
 );
 `endif
 
-wire cchip = turbochip_d & (!cpustate | dcache_d);
-wire ckick = turbokick_d & (!cpustate | dcache_d);
-
 reg turbochip_d;
 reg turbokick_d;
 reg dcache_d;
+
+assign cchip = turbochip_d & (!cpustate | dcache_d);
+assign ckick = turbokick_d & (!cpustate | dcache_d);
+
 always @(posedge clk) begin
 	if (~reset | ~reset_out) begin
 		turbochip_d <= 0;
@@ -341,7 +356,6 @@ end
 wire cfg_z3 = fastramcfg[2] & cpucfg[1];
 reg       ac_toccata;
 
-reg [3:0] autocfg_data;
 always @(*) begin
 	autocfg_data = 4'b1111;
 
@@ -397,14 +411,8 @@ always @(*) begin
 	end
 end
 
-wire sel_autoconfig = fastramcfg && chip_addr[23:16] == 8'b11101000 && autocfg_card; //$E80000 - $E8FFFF
+assign sel_autoconfig = fastramcfg && chip_addr[23:16] == 8'b11101000 && autocfg_card; //$E80000 - $E8FFFF
 
-reg [1:0] autocfg_card;
-reg       z2ram_ena;
-reg [4:0] z3ram_base0;
-reg [3:0] z3ram_base1;
-reg       z3ram_ena0;
-reg       z3ram_ena1;
 always @(posedge clk) begin
 	reg old_uds;
 	old_uds <= chip_uds;
@@ -449,6 +457,8 @@ always @(posedge clk) begin
 end
 
 reg       chipreq;
+reg  [2:0] ipl_i;
+
 always @(posedge clk) begin
 	chipreq <= cpu_req & ~ramsel & ~fastchip_selack;
 	cpu_ipl <= ipl_i;
@@ -461,7 +471,6 @@ always @(posedge clk) begin
 end
 
 reg [15:0] chipdout_i;
-reg  [2:0] ipl_i;
 reg        c_as,c_rw,c_uds,c_lds;
 always @(negedge clk, negedge reset) begin
 	reg [1:0] stage;

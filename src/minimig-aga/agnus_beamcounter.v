@@ -101,6 +101,9 @@ parameter VBSTOP_NTSC_VAL = 9'd20;           // vertical blanking end (PAL 26 li
 
 //--------------------------------------------------------------------------------------
 
+reg long_frame; // 1 : long frame (313 lines); 0 : normal frame (312 lines)
+reg long_line;	 // long line signal for NTSC compatibility (actually long lines are not supported yet)
+
 //beamcounter read registers VPOSR and VHPOSR
 always @(*) begin
 	if (reg_address_in[8:1]==VPOSR[8:1] || reg_address_in[8:1]==VPOSW[8:1])
@@ -286,7 +289,6 @@ always @(cck) hpos[0] = cck;
 `endif
    
 //long line signal (not used, only for better NTSC compatibility)
-reg long_line;	 // long line signal for NTSC compatibility (actually long lines are not supported yet)
 always @(posedge clk) begin
 	if (clk7_en) begin
 		if (end_of_line)
@@ -319,6 +321,7 @@ assign eol = vpos_inc;
 
 //vertical position counter
 //vpos changes after hpos equals 3
+wire last_line;   
 always @(posedge clk) begin
 	if (clk7_en) begin
 		if (reg_address_in[8:1]==VPOSW[8:1])
@@ -334,7 +337,7 @@ always @(posedge clk) begin
 end
 
 // long_frame - long frame signal used in interlaced mode
-reg long_frame; // 1 : long frame (313 lines); 0 : normal frame (312 lines)
+wire end_of_frame;   
 always @(posedge clk) begin
 	if (clk7_en) begin
 		if (reset)
@@ -363,12 +366,12 @@ end
 
 //in non-interlaced display the last line is equal to vtotal or vtotal+1 (depends on long_frame)
 //in interlaced mode every second frame is vtotal+1 long
-wire last_line = long_frame ? extra_line : vpos_equ_vtotal;
+assign last_line = long_frame ? extra_line : vpos_equ_vtotal;
 
 assign field1 = ~long_frame;
 
 //generate end of frame signal
-wire end_of_frame = vpos_inc & last_line;
+assign end_of_frame = vpos_inc & last_line;
 
 //external signal assigment
 assign eof = end_of_frame;
