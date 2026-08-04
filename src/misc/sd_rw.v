@@ -172,8 +172,8 @@ begin
 end
 endtask
 
-always @ (posedge clk or negedge rstn)
-    if(~rstn) begin
+always @ (posedge clk)
+    if(!rstn) begin
         set_cmd(0,0,0,0);
         clkdiv      <= SLOWCLKDIV;
         sectoraddr  <= 0;
@@ -265,8 +265,8 @@ always @ (posedge clk or negedge rstn)
 
 integer i;   
    
-always @ (posedge clk or negedge rstn)
-    if(~rstn) begin
+always @ (posedge clk)
+    if(!rstn) begin
         outen   <= 1'b0;
         outaddr <= 0;
         outbyte <= 0;
