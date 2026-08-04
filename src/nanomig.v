@@ -419,112 +419,120 @@ reg [31:0] total_sectors[DRIVES];
 // TODO:
 // - make sure we know which drive we are currently initializing
 // - use seperate state for both disks
-   
 always @(posedge clk_sys) begin
    integer drv;
 
    for(drv = 0; drv < DRIVES; drv = drv+1) begin
       if (sdc_img_mounted[4+drv]) begin
-	 if( !sdc_img_size ) begin
-	    // image has been removed
-	    if(sdc_img_mounted[4+drv]) ide_drv_state[drv] <= IDE_DRV_STATE_NONE;
-	 end else begin  
-	    // image has just been mounted. Examine it further
-	    // by reading first sector.
-	    if(sdc_img_mounted[4+drv] && (ide_drv_state[drv] == IDE_DRV_STATE_NONE)) begin
-	       $display("HDD%0d: Total sector size: %0d", drv, sdc_img_size[40:9]);	       
-	       total_sectors[drv] <= sdc_img_size[40:9];	 
-	       ide_drv_state[drv] <= IDE_DRV_STATE_MNT;
-	    end
-	 end
+         if( !sdc_img_size ) begin
+            // image has been removed
+            if(sdc_img_mounted[4+drv]) ide_drv_state[drv] <= IDE_DRV_STATE_NONE;
+         end else begin
+            // image has just been mounted. Examine it further
+            // by reading first sector.
+            if(sdc_img_mounted[4+drv] && (ide_drv_state[drv] == IDE_DRV_STATE_NONE)) begin
+               $display("HDD%0d: Total sector size: %0d", drv, sdc_img_size[40:9]);
+               total_sectors[drv] <= sdc_img_size[40:9];
+               ide_drv_state[drv] <= IDE_DRV_STATE_MNT;
+            end
+         end
       end
-   
+
       // check if drive is in state IDE_DRV_STATE_MNT and no sd read is in progress
       if(!ide_sdc_rd && !sdc_busy) begin
-	 if(ide_drv_state[drv] == IDE_DRV_STATE_MNT) begin
-	    ide_sdc_sector <= 32'd0;
-	    ide_sdc_rd[drv] <= 1'b1;
-	 end
+         if(ide_drv_state[drv] == IDE_DRV_STATE_MNT) begin
+            ide_sdc_sector <= 32'd0;
+            ide_sdc_rd[drv] <= 1'b1;
+         end
       end
 
       // check if amiga wants to read a sector
       if(!sdc_busy && !ide_sdc_rd && ide_exec == IDE_EXEC_READ_SECTOR ) begin
-	 // this really only works with HW multipliers in the FPGA
-	 ide_sdc_sector <= (ide_cylinder * heads[ide_drv] + ide_head) * sectors[ide_drv] +
-                  ide_sector - 1;
+         // this really only works with HW multipliers in the FPGA
+         ide_sdc_sector <= (ide_cylinder * heads[ide_drv] + ide_head) * sectors[ide_drv] +
+                     ide_sector - 1;
 
-	 // TODO: check why this message comes twice, the test for !ide_sdc_rd
-	 // should prevent that
-	 $display("IDE%0d RD %0d/%0d/%0d -> %0d", ide_drv, 
-		  ide_cylinder, ide_head, ide_sector, 
-		  (ide_cylinder * heads[0] + ide_head) * sectors[0] +
-		  ide_sector - 1);
-	 
-	 ide_sdc_rd[ide_drv] <= 1'b1;
+         // TODO: check why this message comes twice, the test for !ide_sdc_rd
+         // should prevent that
+         $display("IDE%0d RD %0d/%0d/%0d -> %0d", ide_drv,
+                  ide_cylinder, ide_head, ide_sector,
+                  (ide_cylinder * heads[0] + ide_head) * sectors[0] +
+                  ide_sector - 1);
+
+         ide_sdc_rd[ide_drv] <= 1'b1;
       end
 
       // check if amiga wants to write
       if (!sdc_busy && !ide_sdc_wr && ide_exec == IDE_EXEC_WRITE_SECTOR ) begin
-	 // this really only works with HW multipliers in the FPGA
-	 ide_sdc_sector <= (ide_cylinder * heads[ide_drv] + ide_head) * sectors[ide_drv] +
-                  ide_sector - 1;
-	 
-	 $display("IDE%0d WR %0d/%0d/%0d -> %0d", ide_drv, 
-		  ide_cylinder, ide_head, ide_sector, 
-		  (ide_cylinder * heads[0] + ide_head) * sectors[0] +
-		  ide_sector - 1);
-	 
-	 ide_sdc_wr[ide_drv] <= 1'b1;
+         // this really only works with HW multipliers in the FPGA
+         ide_sdc_sector <= (ide_cylinder * heads[ide_drv] + ide_head) * sectors[ide_drv] +
+                     ide_sector - 1;
+
+         $display("IDE%0d WR %0d/%0d/%0d -> %0d", ide_drv,
+                  ide_cylinder, ide_head, ide_sector,
+                  (ide_cylinder * heads[0] + ide_head) * sectors[0] +
+                  ide_sector - 1);
+
+         ide_sdc_wr[ide_drv] <= 1'b1;
       end
-      
+
       // sd card has accepted read request
       if ( ide_sdc_rd && sdc_busy ) begin
-	 ide_sdc_rd <= 2'b00;
+         ide_sdc_rd <= 2'b00;
 
-	 // parse rdb unless the amiga has requested this sector
-	 if( ide_exec != IDE_EXEC_READ_SECTOR )
-	    if( ide_sdc_rd[drv]) ide_drv_state[drv] <= IDE_DRV_STATE_PARSE;	 
+         // parse rdb unless the amiga has requested this sector
+         if( ide_exec != IDE_EXEC_READ_SECTOR )
+            if( ide_sdc_rd[drv]) ide_drv_state[drv] <= IDE_DRV_STATE_PARSE;
       end
 
       // sd card has accepted write request
       if ( ide_sdc_wr && sdc_busy ) begin
-	 ide_sdc_wr <= 2'b00;
+         ide_sdc_wr <= 2'b00;
 
-	 // ...	 
+      // ...
       end
 
       // parsing the rdb in sector 0 of the harddisk image
       // gives the cylinders, heads and sectors to be used
       if ( (ide_drv_state[drv] == IDE_DRV_STATE_PARSE) && sdc_byte_in_strobe ) begin
-	 case ( sdc_byte_addr )
-	   // check for 'RDSK' header and stop parsing if that fails
-	   0: if ( sdc_byte_in_data != "R") ide_drv_state[drv] <= IDE_DRV_STATE_NONE;
-	   1: if ( sdc_byte_in_data != "D") ide_drv_state[drv] <= IDE_DRV_STATE_NONE;
-	   2: if ( sdc_byte_in_data != "S") ide_drv_state[drv] <= IDE_DRV_STATE_NONE;
-	   3: if ( sdc_byte_in_data != "K") ide_drv_state[drv] <= IDE_DRV_STATE_NONE;
-	   
-	   // long word 16 contains cylinders
-	   16*4+2: cylinders[drv][15:8] <= sdc_byte_in_data;
-	   16*4+3: cylinders[drv][ 7:0] <= sdc_byte_in_data;
-	   // long word 17 contains sectors
-	   17*4+2: sectors[drv][15:8] <= sdc_byte_in_data;
-	   17*4+3: sectors[drv][ 7:0] <= sdc_byte_in_data;
-	   // long word 18 contains heads
-	   18*4+2: heads[drv][15:8] <= sdc_byte_in_data;
-	   18*4+3: heads[drv][ 7:0] <= sdc_byte_in_data;
+         case ( sdc_byte_addr )
+            // check for 'RDSK' header and stop parsing if that fails
+            0: if ( sdc_byte_in_data != "R") ide_drv_state[drv] <= IDE_DRV_STATE_NONE;
+            1: if ( sdc_byte_in_data != "D") ide_drv_state[drv] <= IDE_DRV_STATE_NONE;
+            2: if ( sdc_byte_in_data != "S") ide_drv_state[drv] <= IDE_DRV_STATE_NONE;
+            3: if ( sdc_byte_in_data != "K") ide_drv_state[drv] <= IDE_DRV_STATE_NONE;
 
-	   // TODO: emit "drive changed" signal and make sure ide config
-	   // is being updated
-	   511: begin
-	      ide_drv_state[drv] <= IDE_DRV_STATE_PRESENT;	   
-	      $display("IDE%0d CHS %0d/%0d/%0d", drv, cylinders[drv], heads[drv], sectors[drv]);   
-	   end
-	 endcase
+            // long word 16 contains cylinders
+            16*4+2: cylinders[drv][15:8] <= sdc_byte_in_data;
+            16*4+3: cylinders[drv][ 7:0] <= sdc_byte_in_data;
+            // long word 17 contains sectors
+            17*4+2: sectors[drv][15:8] <= sdc_byte_in_data;
+            17*4+3: sectors[drv][ 7:0] <= sdc_byte_in_data;
+            // long word 18 contains heads
+            18*4+2: heads[drv][15:8] <= sdc_byte_in_data;
+            18*4+3: heads[drv][ 7:0] <= sdc_byte_in_data;
+
+            // TODO: emit "drive changed" signal and make sure ide config
+            // is being updated
+            511: begin
+               ide_drv_state[drv] <= IDE_DRV_STATE_PRESENT;
+               $display("IDE%0d CHS %0d/%0d/%0d", drv, cylinders[drv], heads[drv], sectors[drv]);
+            end
+         endcase
+      end
+   end
+
+   // this is a minimal reset to ensure no drive is mounted
+   // on power-up while keeping logic usage low; adding reset logic
+   // to entire block considerably increases logic usage
+   if (por) begin
+      for(drv = 0; drv < DRIVES; drv = drv+1) begin
+          ide_drv_state[drv] <= IDE_DRV_STATE_NONE;
       end
    end
 end
-  
-always @(posedge clk_sys) begin
+
+always @(posedge clk_sys, posedge reset) begin
    if(reset) begin
       ide_busy <= 1'b0;      
       ide_exec <= IDE_EXEC_IDLE;
@@ -1326,3 +1334,4 @@ endmodule
 `ifndef LATTICE
   `default_nettype wire
 `endif
+// vim:ts=3 sw=3 tw=120 et
