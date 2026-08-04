@@ -96,8 +96,8 @@ localparam STATE_DONE     = 3'd7;
 assign busy = state != STATE_IDLE;
 assign done = state == STATE_DONE;   
    
-always @ (posedge clk)
-    if(!rstn) begin
+always @ (posedge clk or negedge rstn)
+    if(~rstn) begin
         {timeout, syntaxe} <= 0;
         sdclk <= 1'b0;
         {sdcmdoe, sdcmdout} <= 2'b11;  // drive cmd high while no command in progress

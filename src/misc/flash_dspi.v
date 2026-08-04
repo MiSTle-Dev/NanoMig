@@ -99,7 +99,7 @@ wire [1:0] dspi_in = mspi_din;
 wire [1:0] dspi_in = { mspi_do, mspi_di };  
 `endif
    
-always @(posedge clk) begin
+always @(posedge clk or negedge resetn) begin
    reg csD, csD2;
    
    if(!resetn) begin
