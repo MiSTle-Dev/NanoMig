@@ -2089,9 +2089,9 @@ PROCESS (clk, cpu, OP1out, OP2out, opcode, exe_condition, nextpass, micro_state,
 									ea_build_now <= '1';
 									write_back <='1';
 									set_exec(opcAND) <= '1';
-								IF cpu(0)='1' AND state="10" AND addrvalue='0' THEN
-									skipFetch <= '1';
-								END IF;
+									IF cpu(0)='1' AND state="10" AND addrvalue='0' THEN
+										skipFetch <= '1';
+									END IF;
 									IF setexecOPC='1' THEN
 										set(OP1out_zero) <= '1';
 									END IF;
@@ -3447,7 +3447,9 @@ PROCESS (clk, cpu, OP1out, OP2out, opcode, exe_condition, nextpass, micro_state,
 					IF exe_condition='1' THEN
 						TG68_PC_brw <= '1';	--pc+0000
 						next_micro_state <= nop;
-						skipFetch <= '1';	
+						if long_start='0' then
+							skipFetch <= '1'; -- AMR/GS - can't skip fetch for bra.l
+						end if;
 					END IF;
 					
 				WHEN bsr1 =>		--bsr short
@@ -3457,8 +3459,8 @@ PROCESS (clk, cpu, OP1out, OP2out, opcode, exe_condition, nextpass, micro_state,
 				WHEN bsr2 =>		--bsr
 					IF long_start='0' THEN	
 						TG68_PC_brw <= '1';	
+						skipFetch <= '1';	-- AMR - can't skip fetch for bsr.l
 					END IF;
-					skipFetch <= '1';	
 					set(longaktion) <= '1';
 					writePC <= '1';
 					setstate <= "11";
