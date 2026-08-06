@@ -225,7 +225,10 @@
         <Source name="../../minimig-aga/paula_audio_volume.v" type="Verilog" type_short="Verilog">
             <Options/>
         </Source>
-        <Source name="../../minimig-aga/paula_floppy.v" type="Verilog" type_short="Verilog">
+        <Source name="../../minimig-aga/paula_floppy.v" type="Verilog" type_short="Verilog" excluded="TRUE">
+            <Options/>
+        </Source>
+        <Source name="../../minimig-aga/paula_floppy_ebr.v" type="Verilog" type_short="Verilog">
             <Options/>
         </Source>
         <Source name="../../minimig-aga/paula_floppy_fifo.v" type="Verilog" type_short="Verilog">
@@ -268,6 +271,9 @@
             <Options/>
         </Source>
         <Source name="../colortable_ram.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../paula_floppy_dma_buf.v" type="Verilog" type_short="Verilog">
             <Options/>
         </Source>
         <Source name="nanomig.lpf" type="Logic Preference" type_short="LPF">
