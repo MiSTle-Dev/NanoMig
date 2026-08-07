@@ -29,7 +29,7 @@
 
 #include "Vnanomig_tb.h"
 
-//#define KICK "kick12.rom" 
+// #define KICK "kick12.rom" 
 #define KICK "kick13.rom" 
 // #define KICK "kick31.rom" 
 // #define KICK "DiagROM/DiagROM"
@@ -40,11 +40,13 @@ Vnanomig_tb *tb;
 static VerilatedFstC *trace;
 double simulation_time;
 
-#define TICKLEN   (0.5/28375160)
 #include "sd_card_config.h"       // for TICKLEN
+
+// #define TRACESTART   0
 
 // with kick 1.3 and 512k
 //#define TRACESTART   3.5    // first floppy read
+//#define TRACESTART   13.25    // floppy write test
 
 
 // with kick 3.1 and 512k
@@ -52,7 +54,6 @@ double simulation_time;
 //#define TRACESTART   3.2     // floppy read
 //#define TRACESTART   4.7     // "no floppy" image
 //#define TRACESTART   9.6       // IDE test write
-
 
 // specfiy simulation runtime and from which point in time a trace should
 // be written
@@ -486,7 +487,7 @@ void tick(int c) {
   
   tb->clk = c;
 
-  if(c /* && !tb->reset */ ) {
+  if(c) {
 
     static int cpu_reset = -1;
     if (tb->cpu_reset != cpu_reset) {
@@ -494,12 +495,18 @@ void tick(int c) {
       cpu_reset = tb->cpu_reset;
     }
     
-    // release reset after 10 ms of simulation time
-    if ( tb->reset && simulation_time > 0.005 && simulation_time < 0.0051) {
-      printf("%.3fms Releasing reset\n", simulation_time*1000);
-      tb->reset = 0;
+    // release or after 100 us of simulation time
+    if ( tb->por && simulation_time > 0.0001 && simulation_time < 0.00011) {
+      printf(YELLOW "%.3fms Releasing power on reset" END "\n", simulation_time*1000);
+      tb->por = 0;
     }
     
+    // release reset after 5 ms of simulation time
+    if ( tb->reset && simulation_time > 0.005 && simulation_time < 0.0051) {
+      printf(YELLOW "%.3fms Releasing reset" END "\n", simulation_time*1000);
+      tb->reset = 0;
+    }
+
     // check for power led
     static int pwr_led = -1;
     if(tb->pwr_led != pwr_led) {
@@ -692,6 +699,7 @@ int main(int argc, char **argv) {
 
   sd_init();
   
+  tb->por = 1;
   tb->reset = 1;
   tb->memory_config = 0x00; // 0x00=512k, 0x01=1M, 0x0f=3.5M
   tb->fastram_config = 0;   // 0=none, 1=2MB, 2=4MB

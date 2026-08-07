@@ -6,9 +6,19 @@ PRJ=nanomig
 
 OBJ_DIR=obj_dir
 
+# generic config defines
+DEFINES = -DINFER_DPRAM
+#DEFINES += -DENABLE_TG68K
+#DEFINES += -DNO_COMPANION -DIMAGE_SIZE=1048576 -DIMAGE_INDEX=0
+
 # the original fx68k won't simulate. Thus we use this special version for simulation
-FX68K_DIR=./fx68x_verilator
-FX68K_FILES= fx68k.sv fx68kAlu.sv uaddrPla.sv fx68k_MicroRom.v fx68k_NanoRom.v
+FX68K_DIR=./fx68k
+FX68K_FILES=fx68k.sv fx68kAlu.sv uaddrPla.sv
+
+#TG68K_DIR=../src/tg68k/verilog
+#TG68K_FILES=TG68K_ALU.v TG68KdotC_Kernel.v TG68K.v
+TG68K_DIR=.
+TG68K_FILES=TG68KdotC_Kernel.v
 
 # Minimig-AGA
 MINIMIG_DIR=../src/minimig-aga
@@ -22,15 +32,14 @@ MINIMIG_FILES+=../minimig/Amber.v userio.v
 TB=nanomig_tb
 
 MISC_DIR=../src/misc
-MISC_FILES=video_analyzer.v
-
-MISC_FILES+=sd_card.v sd_rw.v sdcmd_ctrl.v
+MISC_FILES=sd_card.v sd_rw.v sdcmd_ctrl.v
 
 VERILATOR_DIR=/usr/local/share/verilator/include
 VERILATOR_FILES=verilated.cpp verilated_vcd_c.cpp verilated_threads.cpp
 
-HDL_FILES=$(TB).v $(MINIMIG_FILES:%=$(MINIMIG_DIR)/%) $(FX68K_FILES:%=$(FX68K_DIR)/%) TG68KdotC_Kernel.v
+HDL_FILES=$(TB).v $(MINIMIG_FILES:%=$(MINIMIG_DIR)/%) $(FX68K_FILES:%=$(FX68K_DIR)/%)
 HDL_FILES+=$(MISC_FILES:%=$(MISC_DIR)/%) 
+HDL_FILES+=$(TG68K_FILES:%=$(TG68K_DIR)/%)
 
 EXTRA_CFLAGS = `sdl2-config --cflags`
 EXTRA_LDFLAGS = `sdl2-config --libs` -lSDL2_image
@@ -38,8 +47,15 @@ EXTRA_LDFLAGS = `sdl2-config --libs` -lSDL2_image
 all: $(PRJ)
 
 $(PRJ): $(TB).cpp sd_card.cpp sd_card_config.h ${HDL_FILES} Makefile
-	verilator -O3 -DINFER_DPRAM -Wno-fatal --no-timing --trace-fst --threads 1 --trace-underscore  -top-module $(PRJ)_tb $(VERILATOR_FLAGS) -cc ${HDL_FILES} --exe $(TB).cpp sd_card.cpp -o ../$(PRJ) -CFLAGS "${EXTRA_CFLAGS}" -LDFLAGS "${EXTRA_LDFLAGS}"
+	cp ../src/fx68k/*.mem .
+	verilator -O3 $(DEFINES) -Wno-fatal -Wno-BLKANDNBLK --no-timing --trace-fst --threads 1 --trace-underscore -I$(TG68K_DIR) -top-module $(PRJ)_tb $(VERILATOR_FLAGS) -cc ${HDL_FILES} --exe $(TB).cpp sd_card.cpp -o ../$(PRJ) -CFLAGS "${EXTRA_CFLAGS} ${DEFINES}" -LDFLAGS "${EXTRA_LDFLAGS}"
 	make -j -C ${OBJ_DIR} -f V$(PRJ)_tb.mk
+
+$(FX68K_DIR)/%.sv: ../src/fx68k/%.sv
+	rm -rf $(FX68K_DIR)
+	mkdir $(FX68K_DIR)
+	cp -a ../src/fx68k/*.sv $(FX68K_DIR)
+	patch -p1 < fx68k_sim.patch
 
 $(PRJ).fst: $(PRJ)
 	./$(PRJ)
@@ -51,4 +67,4 @@ wave: $(PRJ).fst
 	gtkwave $(PRJ).gtkw
 
 clean:
-	rm -rf obj_dir $(PRJ)
+	rm -rf obj_dir $(FX68K_DIR) *.mem $(PRJ)

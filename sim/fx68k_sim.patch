@@ -1,0 +1,147 @@
+diff -Naur ../src/fx68k/fx68kAlu.sv ./fx68k/fx68kAlu.sv
+--- ../src/fx68k/fx68kAlu.sv	2023-09-20 12:20:40.863449861 +0200
++++ ./fx68k/fx68kAlu.sv	2026-03-19 09:14:29.277556922 +0100
+@@ -310,7 +310,7 @@
+ 		ccrTemp[ ZF] = isByte ? ~(| result[7:0]) : ~(| result);
+ 		ccrTemp[ NF] = isByte ? result[7] : result[15];
+ 
+-		unique case( oper)
++		/*unique*/ case( oper)
+ 		
+ 		OP_EXT:
+ 			// Division overflow.
+@@ -534,23 +534,23 @@
+ 		5:   aluOp = OP_EXT;
+ 
+ 		default:
+-			unique case( 1'b1)
++			/*unique*/ case( 1'b1)
+ 				row[1]:
+-					unique case( col)
++					/*unique*/ case( col)
+ 					2: aluOp = OP_SUB;
+ 					3: aluOp = OP_SUBC;
+ 					4,6: aluOp = OP_SLAA;
+ 					endcase
+ 				
+ 				row[2]:
+-					unique case( col)
++					/*unique*/ case( col)
+ 					2: aluOp = OP_ADD;
+ 					3: aluOp = OP_ADDC;
+ 					4: aluOp = OP_ASR;
+ 					endcase
+ 
+ 				row[3]:
+-					unique case( col)
++					/*unique*/ case( col)
+ 					2: aluOp = OP_ADDX;
+ 					3: aluOp = isCorf ? OP_ABCD : OP_ADD;
+ 					4: aluOp = OP_ASL;
+@@ -561,14 +561,14 @@
+ 				
+ 				row[5],
+ 				row[6]:
+-					unique case( col)
++					/*unique*/ case( col)
+ 					2: aluOp = OP_SUB;
+ 					3: aluOp = OP_SUBC;
+ 					4: aluOp = OP_LSR;
+ 					endcase
+ 				
+ 				row[7]:					// MUL
+-					unique case( col)
++					/*unique*/ case( col)
+ 					2: aluOp = OP_SUB;
+ 					3: aluOp = OP_ADD;
+ 					4: aluOp = OP_ROXR;
+@@ -577,28 +577,28 @@
+ 				row[8]:
+ 					// OP_AND For EXT.L
+ 					// But would be more efficient to change ucode and use column 1 instead of col3 at ublock extr1!				
+-					unique case( col)
++					/*unique*/ case( col)
+ 					2: aluOp = OP_EXT;
+ 					3: aluOp = OP_AND;
+ 					4: aluOp = OP_ROXR;
+ 					endcase
+                
+ 				row[9]:
+-					unique case( col)
++					/*unique*/ case( col)
+ 					2: aluOp = OP_SUBX;
+ 					3: aluOp = OP_SBCD;
+ 					4: aluOp = OP_ROL;
+ 					endcase
+ 
+ 				row[10]:
+-					unique case( col)
++					/*unique*/ case( col)
+ 					2: aluOp = OP_SUBX;
+ 					3: aluOp = OP_SUBC;
+ 					4: aluOp = OP_ROR;
+ 					endcase
+                 
+ 				row[11]:
+-					unique case( col)
++					/*unique*/ case( col)
+ 					2: aluOp = OP_SUB0;
+ 					3: aluOp = OP_SUB0;
+ 					4: aluOp = OP_ROXL;
+diff -Naur ../src/fx68k/fx68k.sv ./fx68k/fx68k.sv
+--- ../src/fx68k/fx68k.sv	2023-08-21 07:33:14.146287885 +0200
++++ ./fx68k/fx68k.sv	2026-03-26 07:54:13.928424737 +0100
+@@ -1330,7 +1330,7 @@
+ 		{abhIdle, ablIdle, abdIdle} = '0;
+ 		{dbhIdle, dblIdle, dbdIdle} = '0;
+ 
+-		unique case( 1'b1)
++		/*unique*/ case( 1'b1)
+ 		ryl2Dbd:				dbdMux = regs68L[ actualRy];
+ 		rxl2Dbd:				dbdMux = regs68L[ actualRx];
+ 		Nanod.alue2Dbd:			dbdMux = alue;
+@@ -1340,7 +1340,7 @@
+ 		default: begin			dbdMux = 'X;	dbdIdle = 1'b1;				end
+ 		endcase
+ 	
+-		unique case( 1'b1)
++		/*unique*/ case( 1'b1)
+ 		rxl2Dbl:				dblMux = regs68L[ actualRx];
+ 		ryl2Dbl:				dblMux = regs68L[ actualRy];
+ 		Nanod.ftu2Dbl:			dblMux = ftu;
+@@ -1350,7 +1350,7 @@
+ 		default: begin			dblMux = 'X;	dblIdle = 1'b1;				end
+ 		endcase
+ 			
+-		unique case( 1'b1)
++		/*unique*/ case( 1'b1)
+ 		Nanod.rxh2dbh:			dbhMux = regs68H[ actualRx];
+ 		Nanod.ryh2dbh:			dbhMux = regs68H[ actualRy];
+ 		Nanod.au2Db:			dbhMux = auReg[31:16];
+@@ -1359,7 +1359,7 @@
+ 		default: begin			dbhMux = 'X;	dbhIdle = 1'b1;				end
+ 		endcase
+ 
+-		unique case( 1'b1)
++		/*unique*/ case( 1'b1)
+ 		ryl2Abd:				abdMux = regs68L[ actualRy];
+ 		rxl2Abd:				abdMux = regs68L[ actualRx];
+ 		Nanod.dbin2Abd:			abdMux = dbin;
+@@ -1367,7 +1367,7 @@
+ 		default: begin			abdMux = 'X;	abdIdle = 1'b1;				end
+ 		endcase
+ 
+-		unique case( 1'b1)
++		/*unique*/ case( 1'b1)
+ 		Pcl2Abl:				ablMux = PcL;
+ 		rxl2Abl:				ablMux = regs68L[ actualRx];
+ 		ryl2Abl:				ablMux = regs68L[ actualRy];
+@@ -1378,7 +1378,7 @@
+ 		default: begin			ablMux = 'X;	ablIdle = 1'b1;				end
+ 		endcase
+ 			
+-		unique case( 1'b1)		
++		/*unique*/ case( 1'b1)		
+ 		Pch2Abh:				abhMux = PcH;
+ 		Nanod.rxh2abh:			abhMux = regs68H[ actualRx];
+ 		Nanod.ryh2abh:			abhMux = regs68H[ actualRy];
