@@ -93,7 +93,9 @@ module gary
 	output       sel_cia_a, //select cia A
 	output       sel_cia_b, //select cia B
 	output       sel_rtg, //select rtg
+`ifdef ENABLE_RTC
 	output       sel_rtc, //select $DCxxxx
+`endif
 `ifndef DISABLE_IDE
 	output       sel_ide, //select $DAxxxx
 	output       sel_gayle, //select $DExxxx
@@ -173,7 +175,11 @@ assign t_sel_slow[2] = (cpu_address_in[23:19]==5'b1101_0) && &memory_config[3:2]
 assign sel_ide   = hdc_ena && cpu_address_in[23:16]==8'b1101_1010;        //IDE registers at $DA0000 - $DAFFFF	
 assign sel_gayle = hdc_ena && cpu_address_in[23:12]==12'b1101_1110_0001;  //GAYLE registers at $DE1000 - $DE1FFF
 `endif
+`ifdef ENABLE_RTC
 assign sel_rtc   = cpu_address_in[23:16]==8'b1101_1100;                   //RTC registers at $DC0000 - $DCFFFF
+`else
+wire sel_rtc = 1'b0;   // dummy for sel_reg
+`endif
 `ifndef DISABLE_IDE
 assign sel_reg   = cpu_address_in[23:21]==3'b110 ? ~(|t_sel_slow | sel_rtc | sel_ide | sel_gayle) : 1'b0;	//chip registers at $DF0000 - $DFFFFF
 `else

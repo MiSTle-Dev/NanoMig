@@ -28,8 +28,12 @@ module sysctrl (
 
   output reg	    jtagsel, // FPGA Companion requests activation of JTAG
 
+`ifdef ENABLE_RTC
+  output reg [11:0] rtc, // toggle bit, 3 bit index, 8 bit data
+`endif
+		
   // values that can be configured by the user
-  output 		    system_reset,
+  output	    system_reset,
   output reg [1:0]  system_floppy_drives,
   output reg	    system_floppy_wrprot,
   output reg	    system_floppy_turbo,
@@ -80,6 +84,8 @@ reg  [7:0] menu_rom_data;
 
 reg [7:0] amiga_xml[1536];
 initial $readmemh("amiga_xml.hex", amiga_xml);
+
+reg [7:0] rtc_cmd;   
    
 always @(posedge clk) 
      menu_rom_data <= amiga_xml[menu_rom_addr];
@@ -100,7 +106,8 @@ always @(posedge clk) begin
       coldboot <= 1'b1;      // reset is actually the power-on-reset
       sys_int <= 1'b1;       // coldboot interrupt
       jtagsel <= 1'b0;      
-
+      rtc <= 12'h000;
+      
       // OSD value defaults. These should be sane defaults, but the MCU
       // will very likely override these early
       system_floppy_drives <= 2'd0;
@@ -268,10 +275,30 @@ always @(posedge clk) begin
 	       menu_rom_addr <= menu_rom_addr + 12'd1;		  
 	    end
 
-           // CMD 9: jtagsel
+            // CMD 9: jtagsel
             if(command == 8'd9) begin
                if(state == 4'd0) jtagsel <= data_in[0];
 	    end
+	   
+`ifdef ENABLE_RTC
+            // CMD 10: RTC
+            if(command == 8'd10) begin
+               if(state == 4'd0) begin
+                  // first byte is the subcommand
+                  rtc_cmd <= data_in;
+               end else begin
+                  // ... further bytes are subcommand specific
+                  // subcommand 0: set time
+                  if(rtc_cmd == 8'd0) begin
+		     // byte 1 is the flags field (data source, dst), currently unused
+                     if(state >= 4'd2) begin
+			logic [2:0] rtc_index = state-3'd2;			
+			rtc <= { !rtc[11], rtc_index, data_in };
+		     end
+		  end
+	       end
+	    end
+`endif
          end
       end
    end

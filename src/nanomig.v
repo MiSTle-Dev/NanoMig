@@ -37,7 +37,7 @@ module nanomig (
    input [3:0]	 video_config,
 `ifndef DISABLE_IDE
    input [5:0]	 ide_config,
-   output	 	 hdd_led,
+   output	 hdd_led,
 `endif
 		
    output [14:0] audio_left, // left DAC data
@@ -54,6 +54,11 @@ module nanomig (
    // UART/RS232 for e.g. DiagROM or MIDI
    output	 uart_tx,
    input	 uart_rx,
+
+`ifdef ENABLE_RTC
+   // RTC time information as e.g. received via NTP
+   input [11:0]	 rtc,
+`endif
 		 
    // Interface MiSTeryNano sd card interface. This very simple connection allows the core
    // to request sectors from within a OSD selected image file
@@ -1130,7 +1135,7 @@ wire [15:0] JOY2 = 16'h0000;
 wire [15:0] JOY3 = 16'h0000;   
 wire [15:0] JOYA0 = 16'h0000;
 wire [15:0] JOYA1 = 16'h0000;
-wire [63:0] RTC = 64'h0;
+
 
 /* ======================================================================================== */
 /* =============================== internal ROM and RAM =================================== */
@@ -1258,8 +1263,9 @@ minimig minimig
 	.kms_level    (kbd_mouse_level  ),
 	.pwr_led      (pwr_led_bright   ), // power led
 	.fdd_led      (fdd_led          ),
-	.rtc          (RTC              ),
-
+`ifdef ENABLE_RTC
+	.rtc          (rtc              ),
+`endif
 	//video
 	._hsync       (hs_in            ), // horizontal sync
 	._vsync       (vs_in            ), // vertical sync

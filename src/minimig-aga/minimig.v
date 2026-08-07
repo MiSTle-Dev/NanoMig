@@ -209,8 +209,11 @@ module minimig
 	input [7:0]   kbd_mouse_data,
 	output	      pwr_led, // power led
 	output	      fdd_led, // disk activity LED, active when DMA is on
-	input [64:0]  rtc,
-
+ 
+`ifdef ENABLE_RTC
+	input [11:0]  rtc,
+`endif
+ 
 	input [7:0]   memory_config,
 	input [5:0]   chipset_config,
 	input [3:0]   floppy_config,
@@ -340,7 +343,9 @@ wire        sel_kick1mb;      // 1MB upper rom select
 wire        sel_kick256kmirror;// mirror f8-fb to fc-ff in a1k mode    
 wire        sel_cia;				//CIA address space
 wire        sel_reg;				//chip register select
+`ifdef ENABLE_RTC
 wire        sel_rtc;
+`endif
 wire        sel_cia_a;			//cia A select
 wire        sel_cia_b;			//cia B select
 `ifdef ENABLE_TOCCATA
@@ -831,7 +836,9 @@ gary GARY1
 	.sel_ide(sel_ide),
 	.sel_gayle(sel_gayle),
 `endif
+`ifdef ENABLE_RTC
 	.sel_rtc(sel_rtc),
+`endif
 `ifdef ENABLE_TOCCATA
 	.sel_toccata(sel_toccata),
 `endif
@@ -885,24 +892,143 @@ end
 //-------------------------------------------------------------------------------------
 
 `ifdef ENABLE_RTC
-wire [15:0] rtc_out = (sel_rtc && cpu_rd) ? {12'h000, rtc_reg[{cpu_address_out[5:2], 2'b00} +:4]} : 16'h0000;
 
-reg [63:0] rtc_reg;
+// 8 bit to 2*4 digit double dabble algorithm. The add-5 step
+// is omitted for the tens digit, allowing for the "digits" 10,11,...
+// which is needed for years > 99
+module bin2bcd (
+   input wire [7:0] bin, // 8-bit binary input (0..255)
+   output reg [7:0] bcd  // 2 BCD digits: {tens, ones}
+);
+   integer i;
+   
+   always @(*) begin
+      bcd = 8'h00;     // clear result
+      
+      for (i = 7; i >= 0; i = i - 1) begin
+         // "add 3" step: if any BCD digit >= 5, add 3 to it
+         if (bcd[3:0] >= 5) bcd[3:0] = bcd[3:0] + 4'd3;  // ones
+	 
+         // shift-left one bit, bringing in the next binary bit
+         bcd = {bcd[6:0], bin[i]};
+      end
+   end
+endmodule
+   
+reg [3:0] rtc_reg_0;  // seconds ones
+reg [3:0] rtc_reg_1;  // seconds tens
+reg [3:0] rtc_reg_2;  // minutes ones
+reg [3:0] rtc_reg_3;  // minutes tens
+reg [3:0] rtc_reg_4;  // hours ones
+reg [3:0] rtc_reg_5;  // hours tens
+reg [3:0] rtc_reg_6;  // days ones
+reg [3:0] rtc_reg_7;  // days tens
+reg [3:0] rtc_reg_8;  // months ones
+reg [3:0] rtc_reg_9;  // months tens
+reg [3:0] rtc_reg_A;  // years ones
+reg [3:0] rtc_reg_B;  // years tens
+reg [3:0] rtc_reg_C;  // weekday
+
+wire [15:0] rtc_out = !(sel_rtc && cpu_rd)?16'h0000:{12'h000, 
+	   (cpu_address_out[5:2] == 4'h0)?rtc_reg_0:
+	   (cpu_address_out[5:2] == 4'h1)?rtc_reg_1:
+	   (cpu_address_out[5:2] == 4'h2)?rtc_reg_2:
+	   (cpu_address_out[5:2] == 4'h3)?rtc_reg_3:
+	   (cpu_address_out[5:2] == 4'h4)?rtc_reg_4:
+	   (cpu_address_out[5:2] == 4'h5)?rtc_reg_5:
+	   (cpu_address_out[5:2] == 4'h6)?rtc_reg_6:
+	   (cpu_address_out[5:2] == 4'h7)?rtc_reg_7:
+	   (cpu_address_out[5:2] == 4'h8)?rtc_reg_8:
+	   (cpu_address_out[5:2] == 4'h9)?rtc_reg_9:
+	   (cpu_address_out[5:2] == 4'ha)?rtc_reg_A:
+	   (cpu_address_out[5:2] == 4'hb)?rtc_reg_B:					   
+	   (cpu_address_out[5:2] == 4'hc)?rtc_reg_C:	   
+	   (cpu_address_out[5:2] == 4'hd)?4'h0:
+	   (cpu_address_out[5:2] == 4'he)?4'h0:
+	   4'h4 };
+
+// hours, minutes and seconds are just BCD encoded. But months and days need preprocessing
+// and the years ten digit can be > 9 which the bcd encoder already handles
+wire [7:0] b2c_in = 
+	   (rtc[10:8] == 3'd1)?(rtc[7:0]+1):      // months 0..11 -> 1..12
+	   (rtc[10:8] == 3'd2)?{3'd0,rtc[4:0]}:   // days excl. weekday bits
+	   rtc[7:0];                              // h/m/s
+
+wire [7:0] bcd;
+bin2bcd b2bcd ( .bin(b2c_in),.bcd(bcd) );
+   
 always @(posedge clk) begin
-	reg old_flg;
-	reg [31:0] cnt;
-	
-	old_flg <= rtc[64];
-	if(old_flg ^ rtc[64]) begin
-		rtc_reg <= {rtc[63:8], 8'd0};
-		cnt <= 0;
-	end
-	else if(cnt < 28375159) cnt <= cnt + 1;
-	else begin
-		cnt <= 0;
-		if(rtc_reg[3:0] < 9) rtc_reg[3:0] <= rtc_reg[3:0] + 1'd1;
-		else if(rtc_reg[7:4] < 5) rtc_reg[7:0] <= {rtc_reg[7:4] + 1'd1, 4'b0000};
-	end
+   reg old_flg = 1'b0;
+   reg [31:0] cnt;
+
+   // check if new value is being provided externally
+   old_flg <= rtc[11];
+   if(old_flg ^ rtc[11]) begin
+      if(rtc[10:8] == 3'd0) { rtc_reg_B, rtc_reg_A } <= bcd;  // years
+      if(rtc[10:8] == 3'd1) { rtc_reg_9, rtc_reg_8 } <= bcd;  // months
+      if(rtc[10:8] == 3'd2) { rtc_reg_7, rtc_reg_6 } <= bcd;  // days
+      if(rtc[10:8] == 3'd3) { rtc_reg_5, rtc_reg_4 } <= bcd;  // hours
+      if(rtc[10:8] == 3'd4) { rtc_reg_3, rtc_reg_2 } <= bcd;  // minutes
+      if(rtc[10:8] == 3'd5) { rtc_reg_1, rtc_reg_0 } <= bcd;  // seconds
+
+      // weekday is encoded in 3 msb of day
+      if(rtc[10:8] == 3'd2) rtc_reg_C <= { 1'b0, rtc[7:5] };  // weekday
+   end
+   else if(cnt < 32'd28375159) cnt <= cnt + 32'd1;
+   else begin
+      cnt <= 32'd0;
+
+      // the following chain increases the bcd encoded time and
+      // date registers by one second
+      
+      // advance the ones of seconds
+      if(rtc_reg_0 < 9) 
+	rtc_reg_0 <= rtc_reg_0 + 4'd1;
+      else begin
+	 // seconds ones rollover
+	 rtc_reg_0 <= 4'h0;	 
+	 // advance the tens of seconds		   
+	 if(rtc_reg_1 < 5) 
+	   rtc_reg_1 <= rtc_reg_1 + 4'd1;
+	 else begin
+	    // seconds rollover
+	    rtc_reg_1 <= 4'h0;
+	    // advance the ones of minutes
+	    if(rtc_reg_2 < 9) 
+	      rtc_reg_2 <= rtc_reg_2 + 4'd1;
+	    else begin
+	       // minutes ones rollover
+	       rtc_reg_2 <= 4'h0;	 
+	       // advance the tens of minutes
+	       if(rtc_reg_2 < 5) 
+		 rtc_reg_2 <= rtc_reg_2 + 4'd1;
+	       else begin
+		  // minutes rollover
+		  rtc_reg_2 <= 4'h0;
+		  // advance the ones of hours
+		  if(rtc_reg_3 < 9) 
+		    rtc_reg_3 <= rtc_reg_3 + 4'd1;
+		  else begin
+		     // hours ones rollover
+		     rtc_reg_3 <= 4'h0;	 
+		     // advance the tens of hours
+		     if(rtc_reg_4 < 5) 
+		       rtc_reg_4 <= rtc_reg_4 + 4'd1;
+		     else begin
+			// hours rollover
+			rtc_reg_4 <= 4'h0;
+
+			// TODO: Expand this to days, months and years ...
+			// But with NTP as the signal source this is less important
+			// as the periodic updates from NTP will update all
+			// registers.			
+		     end
+		  end
+	       end
+	    end
+	 end
+      end
+   end
 end
 `endif
 
@@ -934,19 +1060,19 @@ assign int6_toccata = 1'b0;
 //-------------------------------------------------------------------------------------
 
 //data multiplexer
-assign cpu_data_in[15:0]= gary_data_out[15:0]
-							 | cia_data_out[15:0]
+assign cpu_data_in = gary_data_out
+		     | cia_data_out
 `ifndef DISABLE_IDE
-							 | gayle_data_out[15:0]
+		     | gayle_data_out
 `endif
 `ifdef ENABLE_CART
-							 | cart_data_out[15:0]
+		     | cart_data_out
 `endif
 `ifdef ENABLE_RTC
-							 | rtc_out
+		     | rtc_out
 `endif
 `ifdef ENABLE_TOCCATA
-							 | toccata_out
+		     | toccata_out
 `endif
 ;
 

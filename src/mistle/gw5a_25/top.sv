@@ -3,6 +3,7 @@
 */ 
 
 `define GOWIN
+`define ENABLE_RTC
 
 module top(
   input			clk, // 50 MHz in
@@ -88,7 +89,7 @@ assign leds[4] = |sd_rd;
 // -> The resulting effective Amiga clock slightly below NTSC's 7.15909 and
 // close to PAL's 7.09379 Mhz
 
-`define PIXEL_CLOCK 28400000
+`define PIXEL_CLOCK 28333333
 
 wire clk_pixel_x5;   
 wire clk_85m;   
@@ -133,7 +134,7 @@ wire [1:0] osd_video_scanlines;
 wire       osd_joy_swap;        // 0=off, 1=on
 wire [2:0] osd_volume;          // Mute=0, 1=25%, 2=50%, 3=75%, 4=100%
 wire       osd_stereo_mix;      // 0=off, 1=on
-
+   
 // generate a reset for some time after rom has been initialized
 reg [15:0] reset_cnt;
 always @(negedge clk_28m) begin
@@ -160,7 +161,7 @@ wire spi_io_clk = pmod_companion_clk;
 
 // connect to ws2812 led
 wire [23:0] ws2812_color;
-ws2812 ws2812_inst (
+ws2812 #(.CLK_FRE(`PIXEL_CLOCK)) ws2812_inst (
     .clk(clk_28m),
     .reset(!pll_lock),
     .color(ws2812_color),
@@ -301,6 +302,7 @@ hid hid (
         .joystick1(hid_joy1)
          );   
 
+wire [11:0] rtc;                // rtc/time data
 sysctrl sysctrl (
         .clk(clk_28m),
         .reset(!pll_lock),
@@ -333,6 +335,7 @@ sysctrl sysctrl (
         .int_in( { 4'b0000, sdc_int, 1'b0, hid_int, 1'b0 }),
         .int_ack( int_ack ),
 
+		.rtc(rtc),
         .buttons( {!user_n, reset } ),
         .leds(),
         .color(ws2812_color)
@@ -476,6 +479,9 @@ nanomig nanomig
  // uart interface 
  .uart_rx(midi_in),
  .uart_tx(midi_out),
+
+ // real time clock (from ntp)
+ .rtc(rtc),
  
  // keyboard & mouse				 
  .mouse_buttons(mouse_buttons), // mouse buttons
