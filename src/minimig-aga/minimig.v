@@ -279,8 +279,10 @@ module minimig
 	input [2:0]   cachecfg,
 	output [6:0]  memcfg
 	);
-`ifndef LATTICE
+`ifndef GATEMATE
+ `ifndef LATTICE
   `default_nettype none
+ `endif  
 `endif  
   
 //--------------------------------------------------------------------------------------
@@ -955,9 +957,9 @@ assign custom_data_out[15:0] = agnus_data_out[15:0]
 
 //--------------------------------------------------------------------------------------
 
+reg _rst;
 assign _cpu_reset = _rst;
 
-reg _rst;
 always @(posedge clk) begin
 	reg r;
 	r <= ~(cpurst || sys_reset);
@@ -972,6 +974,8 @@ assign rst_out = reset;
 
 endmodule
 
-`ifndef LATTICE
+`ifndef GATEMATE
+ `ifndef LATTICE
   `default_nettype wire
+ `endif
 `endif

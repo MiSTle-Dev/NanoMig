@@ -24,9 +24,8 @@ module minimig_bankmapper
 	output [7:0] bank            // bank select
 );
 
-assign bank = bank_r;
-
 reg [7:0] bank_r;
+assign bank = bank_r;
 
 always @(*) begin
 	bank_r[7:4] = { kick,kick256kmirror , chip3 | chip2 | chip1 | chip0,  slow0 | slow1 | slow2 } ;

@@ -10,6 +10,37 @@
 // stress test concurrent FPGA Companion and Core accesses etc.
 //
 
+//
+//
+//  This takes two optional global defines:
+//  - NO_COMPANION, disables the FPGA Companion interface entirely
+//  - DISABLE_ROM_IMAGE disables the ROM image download interface
+//       to save some logic if unused. This is implied by NO_COMPANION
+//  - IMAGE_INDEX, index of an (optional) image to be used for direct
+//       SD card access without companion (NO_COMPANION set)
+//  - IMAGE_SIZE, size in bytes of an (optional) image to be used for direct
+//       SD card access without companion (NO_COMPANION set)
+//
+
+// without companion interface the rom interface is also disabled
+`ifdef NO_COMPANION
+ `ifndef DISABLE_ROM_IMAGE
+  `define DISABLE_ROM_IMAGE
+ `endif
+`endif
+
+`ifdef IMAGE_INDEX
+ `ifndef IMAGE_SIZE
+$error("sd_card.v: Error, IMAGE_INDEX given without IMAGE_SIZE")
+ `endif
+`endif  
+  
+`ifdef IMAGE_SIZE
+ `ifndef IMAGE_INDEX
+$error("sd_card.v: Error, IMAGE_SIZE given without IMAGE_INDEX")
+ `endif
+`endif  
+  
 module sd_card # (
     parameter [2:0]	CLK_DIV = 3'd2,
     parameter		SIMULATE = 0,
@@ -29,6 +60,7 @@ module sd_card # (
     inout [3:0]		  sddat,
 `endif   
 
+`ifndef NO_COMPANION
     // mcu interface
     input			  data_strobe,
     input			  data_start,
@@ -37,12 +69,14 @@ module sd_card # (
 
     output reg		  irq,
     input			  iack,
-
+`endif
+   
     // export sd image size   
     output reg [63:0] image_size,
     // up to eight drive images supported
     output reg [7:0]  image_mounted,
 
+`ifndef DISABLE_ROM_IMAGE
     // up to eight rom images supported
 	output reg		  rom_image_selection_strobe,
     output reg [2:0]  rom_image_selected,
@@ -50,6 +84,7 @@ module sd_card # (
     output			  rom_image_data_available,
     output reg [7:0]  rom_image_data,
     input			  rom_image_data_strobe,
+`endif
   
     // read sector command interface (sync with clk), this once was
     // directly tied to the sd card. Now this goes to the MCU via the
@@ -146,6 +181,7 @@ wire [2:0] drive =
 		   (rstart[6] || wstart[6])?3'd6:
 		   3'd7;   
 
+`ifndef NO_COMPANION
 // The MCU may allow for direct SD card access if the image is
 // continous (not fragmeneted) on card. In that case only the
 // start sector has to be known and the core will read and
@@ -153,6 +189,7 @@ wire [2:0] drive =
 // with the Companion.
 reg [31:0] direct_start [8];   
 wire	   direct_enable = direct_start[drive] != 32'd0;   
+`endif
    
 wire [7:0] doutb;
 reg  dinb_we;
@@ -198,7 +235,11 @@ sector_dpram buffer(
 );
 `endif
 
+`ifndef NO_COMPANION   // no IRQ handling without companion
+   
+`ifndef DISABLE_ROM_IMAGE
 reg	      rom_image_trigger_irq;   
+`endif
    
 always @(posedge clk) begin
    reg	  startD;   
@@ -222,14 +263,17 @@ always @(posedge clk) begin
       if(start_any && !startD && !direct_enable)
         irq <= 1'b1;
 
+`ifndef DISABLE_ROM_IMAGE
 	  // if a rom image transfer has been accepted by the core, raise
 	  // interrupt to start transfer
 	  if(rom_image_accepted || rom_image_trigger_irq )  // initial IRQ
         irq <= 1'b1;
-	  
+`endif	  
    end   
 end
-
+`endif // !`ifndef NO_COMPANION
+   
+`ifndef DISABLE_ROM_IMAGE
 // register indicating whether the core has accepted a rom image
 reg [7:0] rom_image_valid;   
 
@@ -254,6 +298,15 @@ wire	rom_image_fifo_low = rom_image_fifo_fill < IMAGE_FIFO_SIZE/2;
    
 // the rom_image_data_available tells the core that data may be read from the fifo
 assign rom_image_data_available = !rom_image_fifo_empty;  
+`endif
+
+`ifdef NO_COMPANION
+`ifdef IMAGE_SIZE
+// an image size may be given in NO_COMPANION mode
+reg reset_D;   
+`endif   
+`endif   
+
 
 // register the rising edge of rstart and clear it once
 // it has been reported to the MCU
@@ -266,7 +319,14 @@ always @(posedge clk) begin
       image_size <= 64'd0;
       image_mounted <= 8'b00000000;
 	  dinb_we <=1'b0;
-
+`ifdef NO_COMPANION
+`ifdef IMAGE_SIZE
+	  reset_D <= 1'b1;   
+      image_size <= `IMAGE_SIZE;
+`endif
+`endif
+	  
+`ifndef DISABLE_ROM_IMAGE
 	  // rom image handling related values
       rom_image_selection_strobe <= 1'b0;
       rom_image_selected <= 3'd0;
@@ -277,6 +337,7 @@ always @(posedge clk) begin
 	  rom_image_fifo_wr_ptr <= 'd0;	  
 	  rom_image_fifo_expected <= 'd0;
 	  rom_image_fifo_filled <= 1'b0;	  
+`endif
 	  
 	  // no MCU or core request by now
 	  mcu_request <= MCU_REQ_IDLE;	  
@@ -284,13 +345,23 @@ always @(posedge clk) begin
    end else begin
       image_mounted <= 8'b00000000;
 
+`ifdef NO_COMPANION
+`ifdef IMAGE_SIZE
+	  if(reset_D) begin
+		 reset_D <= 1'b0;
+		 image_mounted[`IMAGE_INDEX] <= 1'b1;
+	  end
+`endif
+`endif
+
+`ifndef DISABLE_ROM_IMAGE
 	  // store core reply to the rom image selection request
 	  if(rom_image_selection_strobe) begin
 		 rom_image_valid[rom_image_selected] <= rom_image_accepted;
 		 rom_image_length <= image_size[31:0];		 
 		 rom_image_selection_strobe <= 1'b0;
 	  end
-
+	  
 	  // core is reading from rom image fifo
 	  rom_image_trigger_irq <= 1'b0;
 	  if(rom_image_data_strobe) begin
@@ -313,6 +384,7 @@ always @(posedge clk) begin
 			end
 		 end
 	  end
+`endif
 	  
 	  // handle MCU/core requests
 	  if(!busy_int && !done_int) begin
@@ -385,9 +457,10 @@ always @(posedge clk) begin
 			$display("sd_card.v: MCU SD write done");
 			mcu_request <= MCU_REQ_IDLE;
 		 end
-
+`ifndef YOSYS  // yosys does not like $error's
 		 else
 		   $error("sd_card.v: Error, spurious done_int");
+`endif
 	  end
 	  
 	  // buffer writing on MCU write is triggered via dinb_we
@@ -403,6 +476,7 @@ always @(posedge clk) begin
 		 end
 	  end
 
+`ifndef NO_COMPANION
 	  if(!data_strobe) begin
 		 // If the core requests IO and direct access is enabled, then
 		 // don't wait for the MCU. Instead the sector to be read from SD card
@@ -415,8 +489,21 @@ always @(posedge clk) begin
 			if(rstart_any) core_request <= CORE_REQ_READ;
 			if(wstart_any) core_request <= CORE_REQ_WRITE;
 		 end
+	  end // if (!data_strobe)
+`else // !`ifndef NO_COMPANION
+	  // without FPGA companion, one drive may be mapped directly to the SD card
+	  // (may be a floppy drive, but probably rather a HDD)
+`ifdef IMAGE_INDEX
+	  if(start_any && drive == `IMAGE_INDEX && core_request == CORE_REQ_IDLE) begin
+		 $display("sd_card.v: Companion-less request for drive %0d, sector %0d", drive, rsector);		 
+		 core_sector <= rsector;
+		 if(rstart_any) core_request <= CORE_REQ_READ;
+		 if(wstart_any) core_request <= CORE_REQ_WRITE;
 	  end
+`endif
+`endif
 	  
+`ifndef NO_COMPANION
       else begin // data_strobe active		 
          if(data_start) begin
 			command <= data_in;
@@ -577,6 +664,7 @@ always @(posedge clk) begin
                end
             end
 
+`ifndef DISABLE_ROM_IMAGE
             // SDC CMD 8: IMAGE, used to e.g. load kickstart (unless read from flash)
             if(command == 8'd8) begin
                if(byte_cnt == 4'd0) sub_command <= data_in;
@@ -651,15 +739,17 @@ always @(posedge clk) begin
 							 if(rom_image_fifo_expected == 'd1 && rom_image_length > 1)
 							   rom_image_fifo_filled <= 1'b1;
 						  end
-					   end
-					end
+				       end // if (byte_cnt >= 4'd2)
+					end // case: 8'h02					
 				  endcase
-			   end			   
-			end
+			   end
+			end // if (command == 8'd8)
+`endif   // !DISABLE_ROM_IMAGE
 			   
 			if(byte_cnt != 4'd15) byte_cnt <= byte_cnt + 4'd1;    
          end
-      end
+      end // else: !if(!data_strobe)
+`endif
    end
 end
    

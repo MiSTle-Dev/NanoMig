@@ -110,25 +110,58 @@ parameter BLS_CNT_MAX = 3;    //when CPU misses the bus for 3 consecutive memory
 
 //--------------------------------------------------------------------------------------
 
-//register address bus output
-assign reg_address_out = reg_address;
-
-//data out multiplexer
-assign data_out = data_bmc | dmaconr | data_blt;
-
 //cpu address decoder
 wire [8:1] reg_address_cpu = (aen&(rd|hwr|lwr)) ? address_in : 8'hFF;
 
 //--------------------------------------------------------------------------------------
 
+wire req_spr;         //sprite dma request
+wire req_cop;         //copper dma request
+wire req_blt;         //blitter dma request
+wire spren;
+wire copen;
+wire blten;
+   
 wire dma_spr = req_spr & spren; //sprite dma is using its slot
 wire dma_cop = req_cop & copen; //copper dma is using its slot
 wire dma_blt = req_blt & blten; //blitter dma is using its slot
+wire dma_ref;                   //refresh dma slots
 
 reg       ack_cop;        //copper dma acknowledge
 reg       ack_blt;        //blitter dma acknowledge
 reg       ack_spr;        //sprite dma acknowledge
 reg [8:1] reg_address;    //local register address bus
+
+//register address bus output
+assign reg_address_out = reg_address;
+
+wire        dma_dsk;         //disk dma uses its slot
+wire        wr_dsk;          //disk dma engine write enable out
+wire [20:1] address_dsk;     //disk dma engine chip address out
+wire  [8:1] reg_address_dsk; //disk dma engine register address out
+
+wire        dma_aud;         //audio dma uses its slot
+wire [20:1] address_aud;     //audio dma engine chip address out
+wire  [8:1] reg_address_aud; //audio dma engine register address out
+
+wire        dma_bpl;         //bitplane dma engine uses it's slot
+wire [20:1] address_bpl;     //bitplane dma engine chip address out
+wire  [8:1] reg_address_bpl; //bitplane dma engine register address out
+
+wire [20:1] address_spr;     //sprite dma engine chip address out
+wire  [8:1] reg_address_spr; //sprite dma engine register address out
+
+wire [20:1] address_cop;     //copper dma engine chip address out
+wire  [8:1] reg_address_cop; //copper dma engine register address out
+
+wire        blit_zero;       //blitter zero status
+wire [20:1] address_blt;     //blitter dma engine chip address out
+wire  [8:1] reg_address_blt; //blitter dma engine register address out
+wire [15:0] data_blt;        //blitter dma engine data out
+wire        we_blt;          //blitter dma engine write enable out
+
+wire [15:0] data_bmc;  //beam counter data out
+reg [1:0] bls_cnt;      //blitter slowdown counter, counts memory cycles when the CPU misses the bus
 
 //chip address, register address and control signal multiplexer
 //AND dma priority handler
@@ -240,6 +273,9 @@ reg [15:0] dmaconr;      //dma control read register
 
 wire        blit_busy;       //blitter busy status
 
+//data out multiplexer
+assign data_out = data_bmc | dmaconr | data_blt;
+
 //dma control register read
 always @(*) begin
 	if (reg_address[8:1]==DMACONR[8:1]) dmaconr[15:0] = {1'b0, blit_busy, blit_zero, dmacon[12:0]};
@@ -261,9 +297,9 @@ end
 //assign dma enable bits
 wire bltpri = dmacon[10];
 wire bplen  = dmacon[8] & dmacon[9];
-wire copen  = dmacon[7] & dmacon[9];
-wire blten  = dmacon[6] & dmacon[9];
-wire spren  = dmacon[5] & dmacon[9];
+assign copen  = dmacon[7] & dmacon[9];
+assign blten  = dmacon[6] & dmacon[9];
+assign spren  = dmacon[5] & dmacon[9];
 
 //copper dma is enabled only when any higher priority dma channel is inactive
 //copper uses dma slots which can be optionally assigned only to bitplane dma (also to blitter but it has lower priority than copper)
@@ -273,7 +309,6 @@ wire ena_cop = ~dma_bpl;
 //since blitter has the lowest priority and can use any dma slot (even and odd) all other dma channels block blitter activity
 wire ena_blt = ~(dma_ref | dma_dsk | dma_aud | dma_spr | dma_bpl | dma_cop) && bls_cnt!=BLS_CNT_MAX ? 1'b1 : 1'b0;
 
-wire  dma_ref;        //refresh dma slots
 wire  [8:0] hpos;      //alternative horizontal beam counter
 wire [10:0] vpos;      //vertical beam counter
 wire        vbl;       //JB: vertical blanking
@@ -286,11 +321,6 @@ agnus_refresh ref1
 	.hpos(hpos),
 	.dma(dma_ref)
 );
-
-wire        dma_dsk;         //disk dma uses its slot
-wire        wr_dsk;          //disk dma engine write enable out
-wire [20:1] address_dsk;     //disk dma engine chip address out
-wire  [8:1] reg_address_dsk; //disk dma engine register address out
 
 //instantiate disk dma engine
 agnus_diskdma dsk1
@@ -311,10 +341,6 @@ agnus_diskdma dsk1
 
 //--------------------------------------------------------------------------------------
 
-wire        dma_aud;         //audio dma uses its slot
-wire [20:1] address_aud;     //audio dma engine chip address out
-wire  [8:1] reg_address_aud; //audio dma engine register address out
-
 //instantiate audio dma engine
 agnus_audiodma aud1
 (
@@ -331,10 +357,6 @@ agnus_audiodma aud1
 );
 
 //--------------------------------------------------------------------------------------
-
-wire        dma_bpl;         //bitplane dma engine uses it's slot
-wire [20:1] address_bpl;     //bitplane dma engine chip address out
-wire  [8:1] reg_address_bpl; //bitplane dma engine register address out
 
 //instantiate bitplane dma
 agnus_bitplanedma bpd1
@@ -360,10 +382,6 @@ agnus_bitplanedma bpd1
 
 //--------------------------------------------------------------------------------------
 
-wire        req_spr;         //sprite dma request
-wire [20:1] address_spr;     //sprite dma engine chip address out
-wire  [8:1] reg_address_spr; //sprite dma engine register address out
-
 //instantiate sprite dma engine
 agnus_spritedma spr1
 (
@@ -385,10 +403,6 @@ agnus_spritedma spr1
 );
 
 //--------------------------------------------------------------------------------------
-
-wire        req_cop;         //copper dma request
-wire [20:1] address_cop;     //copper dma engine chip address out
-wire  [8:1] reg_address_cop; //copper dma engine register address out
 
 //instantiate copper
 agnus_copper cp1
@@ -412,20 +426,11 @@ agnus_copper cp1
 
 //--------------------------------------------------------------------------------------
 
-reg [1:0] bls_cnt;      //blitter slowdown counter, counts memory cycles when the CPU misses the bus
-
 always @(posedge clk) if (clk7_en) begin
 	if (!cck)
 		if (!bls || bltpri) bls_cnt <= 2'b00;
 		else if (bls_cnt[1:0] != BLS_CNT_MAX) bls_cnt <= bls_cnt + 2'b01;
 end
-
-wire        blit_zero;       //blitter zero status
-wire        req_blt;         //blitter dma request
-wire [20:1] address_blt;     //blitter dma engine chip address out
-wire  [8:1] reg_address_blt; //blitter dma engine register address out
-wire [15:0] data_blt;        //blitter dma engine data out
-wire        we_blt;          //blitter dma engine write enable out
 
 //instantiate blitter
 agnus_blitter bl1
@@ -450,8 +455,6 @@ agnus_blitter bl1
 );
 
 //--------------------------------------------------------------------------------------
-
-wire [15:0] data_bmc;  //beam counter data out
 
 //instantiate beam counters
 agnus_beamcounter  bc1

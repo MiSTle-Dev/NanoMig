@@ -89,8 +89,10 @@ module nanomig (
    output	 fastram_wr,
    input	 fastram_ready
 ); 
-`ifndef LATTICE
+`ifndef GATEMATE
+ `ifndef LATTICE
   `default_nettype none
+ `endif
 `endif
    
 wire cpu_rst;
@@ -209,14 +211,14 @@ reg	    ram_ready;
 
 // generate a ram_cs at the begin of the bus cycle, so the ram cycle starts
 // at the right time
+reg	    ram_cs_trigger;   
+reg	    ram_cs_triggerD;
 wire	    ram_cs = (cpu_ph2 && ram_sel) || ram_cs_trigger || ram_cs_triggerD; 
 
-reg	    ram_cs_trigger;   
 always @(negedge clk_sys)
    if( cpu_ph2 )      ram_cs_trigger <= ram_sel;
    else if( clk7_en ) ram_cs_trigger <= 1'b0;   
 
-reg	    ram_cs_triggerD;
 always @(posedge clk_sys)
   ram_cs_triggerD <= ram_cs_trigger;   
    
@@ -531,6 +533,17 @@ always @(posedge clk_sys) begin
       end
    end
 end
+
+// ide requests:
+// 110 - reset
+// 000 - write to mgmt address 5
+// 100 - new command
+// 101 - data send/recv
+wire [5:0] ide_request;
+
+// IDE management signals   
+wire [15:0] ide_writedata;   
+wire [15:0] ide_readdata;   
 
 always @(posedge clk_sys, posedge reset) begin
    if(reset) begin
@@ -915,17 +928,6 @@ always @(posedge clk_sys, posedge reset) begin
       
    end
 end   
-
-// IDE management signals   
-wire [15:0] ide_writedata;   
-wire [15:0] ide_readdata;   
-
-// ide requests:
-// 110 - reset
-// 000 - write to mgmt address 5
-// 100 - new command
-// 101 - data send/recv
-wire [5:0] ide_request;
 
 // IDE identify device reply
 wire [15:0] ide_identify_data =
@@ -1331,7 +1333,9 @@ Amber AMBER
  );
     
 endmodule
-`ifndef LATTICE
+`ifndef GATEMATE
+ `ifndef LATTICE
   `default_nettype wire
+ `endif
 `endif
 // vim:ts=3 sw=3 tw=120 et

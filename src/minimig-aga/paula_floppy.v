@@ -201,6 +201,11 @@ reg	   fd_dma_buffer_trigger_wr;
 reg [7:0]  fd_dma_buffer_data_wr;
 reg	   fd_dma_is_writing;
 
+reg [3:0] fifo_sector_counter;   // sector being written into fifo
+reg [9:0] fifo_word_counter;     // sector word being written into fifo
+reg 	  fifo_reading_sector;      
+reg 	  fifo_is_writing;
+   
 // read data from fifo
 always @(posedge clk) begin
    if(!fd_dma_is_writing) begin
@@ -232,6 +237,7 @@ end
 reg [3:0] cpu_wr_state;
 reg [8:0] cpu_wr_cnt;
 reg [31:0] wr_sector_header_word;   
+reg [15:0] wr_sector_csum;   
    
 // dma is active if it's globally enabled, if the transfer length is != zero and if
 // the dsklen top bit has two times been written '1'
@@ -466,9 +472,6 @@ wire [15:0] data_even = {
    1'b1, fd_dma_buf_out[ 6], 1'b1, fd_dma_buf_out[ 4],
    1'b1, fd_dma_buf_out[ 2], 1'b1, fd_dma_buf_out[ 0] };
       
-// a track contains 11 sectors. The GAP afterwards is filled with MFM encoded 00 bytes (aaaa)
-wire [15:0] floppy_data = (fifo_sector_counter <= 10)?floppy_sector_data:16'haaaa;   
-
 // main data multiplexor, returning all MFM encoded words of a
 // sector incl. header and checksums
 wire [15:0] floppy_sector_data =    	    
@@ -489,12 +492,18 @@ wire [15:0] floppy_sector_data =
 		    
     16'haaaa;
    
+// a track contains 11 sectors. The GAP afterwards is filled with MFM encoded 00 bytes (aaaa)
+wire [15:0] floppy_data = (fifo_sector_counter <= 10)?floppy_sector_data:16'haaaa;   
+
+//disk states
+parameter DISKDMA_IDLE   = 2'b00;
+parameter DISKDMA_ACTIVE = 2'b10;
+parameter DISKDMA_INT    = 2'b11;
+
+reg		[1:0] dskstate;		//current state of disk
+reg	trackrdok;			// track read enable
+
 // ======== state machine that copies data from the two sector buffers into the fifo ===========  
-reg [3:0] fifo_sector_counter;   // sector being written into fifo
-reg [9:0] fifo_word_counter;     // sector word being written into fifo
-reg 	  fifo_reading_sector;      
-reg 	  fifo_is_writing;
-   
 always @(posedge clk) begin
    if (clk7_en) begin
       if(dskstate == DISKDMA_IDLE) begin
@@ -738,7 +747,6 @@ assign lenzero = (dsklen[13:0]==0);
 //disk data read path
 wire	busrd /* verilator public */;	// bus read
 wire	buswr /* verilator public */;	// bus write
-reg	trackrdok;			// track read enable
 
 //disk buffer bus read address decode
 assign busrd = (reg_address_in[8:1]==DSKDATR[8:1]);
@@ -758,9 +766,12 @@ wire	stbdat = trackwr & !fifo_empty & buffer_write_allowed;
 //fifo write control
 assign fifo_wr = (trackrdok && fifo_reading_sector & !fifo_full & ~lenzero) | (buswr & dmaon);
 
-reg [15:0] wr_sector_csum;   
 wire	   fifo_out_sync = fifo_out == dsksync[15:0];   
 
+// seperate data and ignore clock bits
+wire [7:0] dbyte = { fifo_out[14], fifo_out[12], fifo_out[10], fifo_out[8],
+		     fifo_out[6],  fifo_out[4],  fifo_out[2], fifo_out[0] };
+	 
 // this state machine receives floppy data written by the CPU from the fifo and parses
 // it, verifies the checksum etc.
 always @(posedge clk) begin
@@ -774,10 +785,6 @@ always @(posedge clk) begin
       end
 	 
       else if(stbdat) begin
-	 // seperate data and ignore clock bits
-	 logic [7:0] dbyte = { fifo_out[14], fifo_out[12], fifo_out[10], fifo_out[8],
-			        fifo_out[6],  fifo_out[4],  fifo_out[2], fifo_out[0] };
-	 
 	 case(cpu_wr_state)
 	   4'd0:
 	     // state 0 -> wait for sync marker
@@ -943,13 +950,7 @@ assign dmas = dmaon & dsklen[14] & ~fifo_full;
 
 //--------------------------------------------------------------------------------------
 //main disk controller
-reg		[1:0] dskstate;		//current state of disk
 reg		[1:0] nextstate; 	//next state of state
-
-//disk states
-parameter DISKDMA_IDLE   = 2'b00;
-parameter DISKDMA_ACTIVE = 2'b10;
-parameter DISKDMA_INT    = 2'b11;
 
 always @(posedge clk) begin
    integer i;
