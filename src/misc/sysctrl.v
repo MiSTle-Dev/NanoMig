@@ -85,7 +85,9 @@ reg  [7:0] menu_rom_data;
 reg [7:0] amiga_xml[1536];
 initial $readmemh("amiga_xml.hex", amiga_xml);
 
+`ifdef ENABLE_RTC
 reg [7:0] rtc_cmd;   
+`endif
    
 always @(posedge clk) 
      menu_rom_data <= amiga_xml[menu_rom_addr];
@@ -106,7 +108,9 @@ always @(posedge clk) begin
       coldboot <= 1'b1;      // reset is actually the power-on-reset
       sys_int <= 1'b1;       // coldboot interrupt
       jtagsel <= 1'b0;      
+`ifdef ENABLE_RTC
       rtc <= 12'h000;
+`endif
       
       // OSD value defaults. These should be sane defaults, but the MCU
       // will very likely override these early
