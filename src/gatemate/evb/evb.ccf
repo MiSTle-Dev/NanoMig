@@ -1,0 +1,11 @@
+Pin_in   "clk"  Loc = "IO_SB_A8" | SCHMITT_TRIGGER=true;
+
+# HDMI on PMOD A
+Pin_out "TMDS_data_p[2]" Loc = "IO_NB_A0" | LVDS_BOOST=true; #JA1
+Pin_out "TMDS_data_p[1]" Loc = "IO_NB_A1" | LVDS_BOOST=true; #JA2
+Pin_out "TMDS_data_p[0]" Loc = "IO_NB_A2" | LVDS_BOOST=true; #JA3
+Pin_out "TMDS_clk_p"     Loc = "IO_NB_A3" | LVDS_BOOST=true; #JA4
+Pin_out "TMDS_data_n[2]" Loc = "IO_NB_B0" | LVDS_BOOST=true; #JA7
+Pin_out "TMDS_data_n[1]" Loc = "IO_NB_B1" | LVDS_BOOST=true; #JA8
+Pin_out "TMDS_data_n[0]" Loc = "IO_NB_B2" | LVDS_BOOST=true; #JA9
+Pin_out "TMDS_clk_n"     Loc = "IO_NB_B3" | LVDS_BOOST=true; #JA10
