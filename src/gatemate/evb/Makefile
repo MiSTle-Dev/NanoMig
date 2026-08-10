@@ -3,7 +3,7 @@ BOARD := evb
 
 YOSYS_PARAM ?= -nomx8
 YOSYS_CMDS ?=
-YOSYS_DEFS ?= -DGATEMATE -DTMDS_BY_LOGIC -DINFER_DPRAM -DYOSYS -DDISABLE_IDE -DBOARD_FREQ_STR="10.0" -D BOARD_FREQ=10000000
+YOSYS_DEFS ?= -DGATEMATE -DTMDS_BY_LOGIC -DINFER_DPRAM -DYOSYS -DDISABLE_IDE -DBOARD_FREQ_STR="10.0" -DBOARD_FREQ=10000000
 
 TARGETS ?= impl
 FPGA ?= CCGM1A1
@@ -17,7 +17,7 @@ GMPACK = gmpack
 GMUNPACK = gmunpack
 EQY_CLOCK = async2sync
 
-VERILOG_FILES = top.sv
+VERILOG_FILES = $(BOARD).vh top.sv
 
 HDMI_FILES = audio_clock_regeneration_packet.sv audio_info_frame.sv audio_sample_packet.sv auxiliary_video_information_info_frame.sv hdmi.sv packet_assembler.sv packet_picker.sv serializer.sv source_product_description_info_frame.sv tmds_channel.sv
 VERILOG_FILES += $(HDMI_FILES:%=../../hdmi/%)
@@ -124,13 +124,13 @@ help:
 synth: $(TEST_CASE)_synth.v
 json: $(TEST_CASE).json
 
-$(TEST_CASE)_synth.v: ./$(BOARD).vh $(VERILOG_FILES)
+$(TEST_CASE)_synth.v: $(VERILOG_FILES)
 	@echo "Running Yosys"
-	@$(YOSYS) -l synth.log -p 'read_slang $(YOSYS_DEFS) --ignore-timing $^; $(YOSYS_CMDS) synth_gatemate $(YOSYS_PARAM) -top $(TOP) -nomx8 -vlog $(TEST_CASE)_synth.v'
+	@$(YOSYS) -ql synth.log -p 'read_slang $(YOSYS_DEFS) --ignore-timing $^; $(YOSYS_CMDS) synth_gatemate $(YOSYS_PARAM) -top $(TOP) -nomx8 -vlog $(TEST_CASE)_synth.v'
 
-$(TEST_CASE).json $(TEST_CASE)_ys.v: ./$(BOARD).vh $(VERILOG_FILES)
+$(TEST_CASE).json $(TEST_CASE)_ys.v: $(VERILOG_FILES)
 	@echo "Running Yosys"
-	@$(YOSYS) -l synth.log -p 'read_slang $(YOSYS_DEFS) --ignore-timing $^; $(YOSYS_CMDS) synth_gatemate $(YOSYS_PARAM) -luttree -top $(TOP) -json $(TEST_CASE).json; write_verilog -norename -noattr $(TEST_CASE)_ys.v'
+	@$(YOSYS) -ql synth.log -p 'read_slang $(YOSYS_DEFS) --ignore-timing $^; $(YOSYS_CMDS) synth_gatemate $(YOSYS_PARAM) -luttree -top $(TOP) -json $(TEST_CASE).json; write_verilog -norename -noattr $(TEST_CASE)_ys.v'
 
 $(TEST_CASE)_$(BOARD)_00.cfg: $(TEST_CASE)_synth.v $(BOARD).ccf
 	$(call check_cc_tool)

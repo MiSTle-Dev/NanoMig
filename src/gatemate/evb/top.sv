@@ -61,57 +61,67 @@ wire [5:0] db9_joy1 = { !js1[5], !js1[0], !js1[2], !js1[1], !js1[4], !js1[3] };
    
 // ============================== clock generation ===========================
    
-// HDMI clock:  141.6666 MHz
-// Pixel clock: 28.33333 MHz (HDMI/5)
+// HDMI clock:  142.5 MHz
+// Pixel clock: 28.5 MHz (HDMI/5)
 // SDRAM and flash clock: 85 MHz
-// Amiga clock: 7.083333 (Pixel/4)
+// Amiga clock: 7.125 (Pixel/4)
    
-`define PIXEL_CLOCK 28_333_333 // should be 28375160
+`define PIXEL_CLOCK 28_500_000 // should be 28375160
 
 wire clk_pixel_x5;   
-reg  pll_lock;   
+wire pll_lock;   
 wire clk_28m;
 wire clk_85m;
 wire clk_85m_shifted;
 wire clk_pixel;
 
-`ifdef NO_FAKE_PLL
-
-pll_142m pll_142m (
-	.CLKI( clk ),               // 50Mhz in
-	.CLKOP( clk_pixel_x5),      // 140 Mhz
-	.CLKOS( clk_85m ),          // 84 Mhz
-	.CLKOS2( clk_85m_shifted ), // 84 Mhz shifted by 216° 
-	.CLKOS3( clk_pixel ),       // 28 Mhz
-        .LOCK( pll_lock )
-);
-
-`else // !`ifdef NO_FAKE_PLL
-
-wire usr_pll_lock_stdy, usr_pll_lock;   
-C_PLL #(
+wire usr_pll0_lock_stdy, usr_pll0_lock;   
+CC_PLL #(
         .REF_CLK(`BOARD_FREQ_STR),    // reference input in MHz
-        .OUT_CLK("125.0"),   // pll output frequency in MHz
-        .LOW_JITTER(1),      // 0: disable, 1: enable low jitter mode
-        .CI_FILTER_CONST(2), // optional CI filter constant
-        .CP_FILTER_CONST(4)  // optional CP filter constant
-) pll125 (
+        .OUT_CLK("142.5"),            // pll output frequency in MHz
+        .PERF_MD("SPEED"),            // LOWPOWER, ECONOMY, SPEED
+        .LOW_JITTER(1),               // 0: disable, 1: enable low jitter mode
+        .CI_FILTER_CONST(2),          // optional CI filter constant
+        .CP_FILTER_CONST(4)           // optional CP filter constant
+) pll_142m (
           .CLK_REF(clk), .CLK_FEEDBACK(1'b0), .USR_CLK_REF(1'b0),
-	  .USR_LOCKED_STDY_RST(1'b0), .USR_PLL_LOCKED_STDY(usr_pll_lock_stdy), .USR_PLL_LOCKED(usr_pll_lock),
+	  .USR_LOCKED_STDY_RST(1'b0), .USR_PLL_LOCKED_STDY(usr_pll0_lock_stdy), .USR_PLL_LOCKED(usr_pll0_lock),
 	  .CLK270(), .CLK180(), .CLK90(), .CLK0(clk_pixel_x5), .CLK_REF_OUT()
 );
 
+wire usr_pll1_lock_stdy, usr_pll1_lock;   
+CC_PLL #(
+        .REF_CLK(`BOARD_FREQ_STR),    // reference input in MHz
+        .OUT_CLK("85"),               // pll output frequency in MHz
+        .PERF_MD("SPEED"),            // LOWPOWER, ECONOMY, SPEED
+        .LOW_JITTER(1),               // 0: disable, 1: enable low jitter mode
+        .CI_FILTER_CONST(2),          // optional CI filter constant
+        .CP_FILTER_CONST(4)           // optional CP filter constant
+) pll_85m (
+          .CLK_REF(clk), .CLK_FEEDBACK(1'b0), .USR_CLK_REF(1'b0),
+	  .USR_LOCKED_STDY_RST(1'b0), .USR_PLL_LOCKED_STDY(usr_pll1_lock_stdy), .USR_PLL_LOCKED(usr_pll1_lock),
+	  .CLK270(clk85m_shifted), .CLK180(), .CLK90(), .CLK0(clk_85m), .CLK_REF_OUT()
+);
+
 // reset is synced the clock
-reg locked_s1 = 1'b0;
+reg locked0_s1 = 1'b0;
+reg pll0_lock;   
 always @(posedge clk_pixel_x5) begin
-   locked_s1 <= usr_pll_lock;
-   pll_lock <= locked_s1;
+   locked0_s1 <= usr_pll0_lock;
+   pll0_lock <= locked0_s1;
 end
    
-assign clk_85m = clk;
-assign clk_85m_shifted = clk;
+reg locked1_s1 = 1'b0;
+reg pll1_lock;   
+always @(posedge clk_pixel_x5) begin
+   locked1_s1 <= usr_pll1_lock;
+   pll1_lock <= locked1_s1;
+end
+
+assign pll_lock = pll0_lock && pll1_lock;   
+   
+// TODO: clock pixel 1/5 clk_pixel_x5
 assign clk_pixel = clk;
-`endif  
    
 assign clk_28m = clk_pixel;
 
