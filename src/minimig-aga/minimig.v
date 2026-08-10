@@ -893,28 +893,6 @@ end
 
 `ifdef ENABLE_RTC
 
-// 8 bit to 2*4 digit double dabble algorithm. The add-5 step
-// is omitted for the tens digit, allowing for the "digits" 10,11,...
-// which is needed for years > 99
-module bin2bcd (
-   input wire [7:0] bin, // 8-bit binary input (0..255)
-   output reg [7:0] bcd  // 2 BCD digits: {tens, ones}
-);
-   integer i;
-   
-   always @(*) begin
-      bcd = 8'h00;     // clear result
-      
-      for (i = 7; i >= 0; i = i - 1) begin
-         // "add 3" step: if any BCD digit >= 5, add 3 to it
-         if (bcd[3:0] >= 5) bcd[3:0] = bcd[3:0] + 4'd3;  // ones
-	 
-         // shift-left one bit, bringing in the next binary bit
-         bcd = {bcd[6:0], bin[i]};
-      end
-   end
-endmodule
-   
 reg [3:0] rtc_reg_0;  // seconds ones
 reg [3:0] rtc_reg_1;  // seconds tens
 reg [3:0] rtc_reg_2;  // minutes ones
@@ -954,8 +932,21 @@ wire [7:0] b2c_in =
 	   (rtc[10:8] == 3'd2)?{3'd0,rtc[4:0]}:   // days excl. weekday bits
 	   rtc[7:0];                              // h/m/s
 
-wire [7:0] bcd;
-bin2bcd b2bcd ( .bin(b2c_in),.bcd(bcd) );
+reg [7:0] bcd;  // 2 BCD digits: {tens, ones}
+
+// 8 bit to 2*4 digit double dabble algorithm. The add-5 step
+// is omitted for the tens digit, allowing for the "digits" 10,11,...
+// which is needed for years > 99
+always @(*) begin
+   integer i;   
+   bcd = 8'h00;     // clear result      
+   for (i = 7; i >= 0; i = i - 1) begin
+      // "add 3" step: if any BCD digit >= 5, add 3 to it
+      if (bcd[3:0] >= 5) bcd[3:0] = bcd[3:0] + 4'd3;  // ones
+      // shift-left one bit, bringing in the next binary bit
+      bcd = {bcd[6:0], b2c_in[i]};
+   end
+end
    
 always @(posedge clk) begin
    reg old_flg = 1'b0;

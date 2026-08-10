@@ -12,12 +12,12 @@ module top(
   output [4:0]	    leds,
 
   // spi flash interface
+  output	    mspi_clk,
   output	    mspi_cs,
   inout		    mspi_di,
   inout		    mspi_hold,
   inout		    mspi_wp,
   inout		    mspi_do,
-  input		    mspi_clk_ts,
 
   // SDRAM
   output	    O_sdram_clk,
@@ -100,7 +100,7 @@ CC_PLL #(
 ) pll_85m (
           .CLK_REF(clk), .CLK_FEEDBACK(1'b0), .USR_CLK_REF(1'b0),
 	  .USR_LOCKED_STDY_RST(1'b0), .USR_PLL_LOCKED_STDY(usr_pll1_lock_stdy), .USR_PLL_LOCKED(usr_pll1_lock),
-	  .CLK270(clk85m_shifted), .CLK180(), .CLK90(), .CLK0(clk_85m), .CLK_REF_OUT()
+	  .CLK270(clk_85m_shifted), .CLK180(), .CLK90(), .CLK0(clk_85m), .CLK_REF_OUT()
 );
 
 // reset is synced the clock
@@ -113,16 +113,18 @@ end
    
 reg locked1_s1 = 1'b0;
 reg pll1_lock;   
-always @(posedge clk_pixel_x5) begin
+always @(posedge clk_85m) begin
    locked1_s1 <= usr_pll1_lock;
    pll1_lock <= locked1_s1;
 end
 
 assign pll_lock = pll0_lock && pll1_lock;   
-   
-// TODO: clock pixel 1/5 clk_pixel_x5
-assign clk_pixel = clk;
-   
+
+divide_5 div_inst (
+   .clk_i(clk_pixel_x5),
+   .clk_o(clk_pixel)
+);
+
 assign clk_28m = clk_pixel;
 
 wire	clk7_en;   
@@ -834,6 +836,7 @@ sdram sdram (
 
 // run the flash a 85MHz. This is only used at power-up to copy kickstart
 // from flash to sdram
+assign mspi_clk = clk_85m_shifted;   
 flash flash (
     .clk       ( clk_85m     ),
     .resetn    ( pll_lock    ),
@@ -976,4 +979,24 @@ hdmi #(
   .rgb( { video_red, 2'b00, video_green, 2'b00, video_blue, 2'b00 } )
 );
    
+endmodule
+
+module divide_5 (
+   input	clk_i,
+   output	clk_o
+);
+
+reg q2 = 0, q1 = 0, q0 = 0, q1d = 0;
+   
+always @(posedge clk_i) begin
+   q0 <= (!q2 & !q0);
+   q1 <= ( q1 & !q0) | (!q1 & q0);
+   q2 <= ( q1 &  q0);
+end
+   
+always @(negedge clk_i)
+  q1d <= q1;
+   
+assign clk_o = q1 | q1d;
+
 endmodule
