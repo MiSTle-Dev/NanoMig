@@ -7,7 +7,7 @@ This is currently done on a Colognechip EVB with a HDMI-PMOD in PMODA.
 
   - Complete minimal setup is synthesizable into 58% CPE's on CCGM1A1
   - Most IO is wired to random unused pin locations
-     - SDRAM is wired to banks EA and EB
+     - SDRAM is wired to banks EA and SA
      - Flash memory is wired to bank WC
      - SD card is wired to bank WC
      - Companion (rp2040) is wired to bank WC
