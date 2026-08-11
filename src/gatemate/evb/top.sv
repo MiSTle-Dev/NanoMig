@@ -101,9 +101,12 @@ CC_PLL #(
 ) pll_85m (
           .CLK_REF(clk), .CLK_FEEDBACK(1'b0), .USR_CLK_REF(1'b0),
 	  .USR_LOCKED_STDY_RST(1'b0), .USR_PLL_LOCKED_STDY(usr_pll1_lock_stdy), .USR_PLL_LOCKED(usr_pll1_lock),
-	  .CLK270(clk_85m_shifted), .CLK180(), .CLK90(), .CLK0(clk_85m), .CLK_REF_OUT()
+	  .CLK270(/*clk_85m_shifted*/), .CLK180(), .CLK90(), .CLK0(clk_85m), .CLK_REF_OUT()
 );
 
+// using the 270 deg pll output exceeds routing ...
+assign clk_85m_shifted = !clk_85m;  
+   
 // reset is synced the clock
 reg locked0_s1 = 1'b0;
 reg pll0_lock;   
