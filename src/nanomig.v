@@ -1148,10 +1148,16 @@ wire [15:0] JOYA1 = 16'h0000;
 reg [15:0] rom[1024];  // 2kbytes rom
 
 // here, one of the rom images from the test_roms directory may be selected
-// initial $readmemh("pwr_led_blink.hex", rom);   // pwr_led_blink is a very basic cpu test
-// initial $readmemh("video_init.hex", rom);
+`ifdef ENABLE_INT_ROM_BLINK_LED
+initial $readmemh("pwr_led_blink.hex", rom);   // pwr_led_blink is a very basic cpu test
+`elsif ENABLE_INT_ROM_VIDEO_INIT
+initial $readmemh("video_init.hex", rom);
+`elsif ENABLE_INT_ROM_FLASH_READ
 initial $readmemh("flash_read.hex", rom);
-
+`else
+$error "Please specify a ROM to use internally"
+`endif
+	   
 reg [15:0] romD;
 always_ff @(posedge clk_sys)
   if(clk7n_en && !_ram_oe)

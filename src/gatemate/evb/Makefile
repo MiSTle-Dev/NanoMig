@@ -1,9 +1,10 @@
 TEST_CASE := nanomig
 BOARD := evb
 
-YOSYS_PARAM ?= -nomx8
-YOSYS_CMDS ?=
-YOSYS_DEFS ?= -DGATEMATE -DTMDS_BY_LOGIC -DINFER_DPRAM -DYOSYS -DDISABLE_IDE -DBOARD_FREQ_STR="10.0" -DBOARD_FREQ=10000000
+YOSYS_PARAM = -nomx8
+YOSYS_DEFS  = -DGATEMATE -DTMDS_BY_LOGIC -DINFER_DPRAM -DYOSYS -DDISABLE_IDE -DBOARD_FREQ_STR="10.0" -DBOARD_FREQ=10000000
+YOSYS_DEFS += -DENABLE_INT_ROM -DENABLE_INT_ROM_BLINK_LED
+# YOSYS_DEFS += -DNO_SYS
 
 TARGETS ?= impl
 FPGA ?= CCGM1A1
@@ -111,56 +112,30 @@ all: nextpnr
 
 help:
         @echo "Use one of targets for '$(BOARD)' board:"
-	@echo " - synth - running Yosys synthesys only"
-	@echo " - pr - Yosys + p_r"
-	@echo " - unpack - Unpack p_r bitstream"
-	@echo " - jtag_pr - programming bitstream produced by p_r"
 	@echo " - json - Yosys for nextpnr"
 	@echo " - nextpnr - Yosys + nextpnr"
 	@echo " - jtag - programming bitstream produced by nextpnr"
 	@echo " - post - generate post pnr verilog netlist by nextpnr"
 	@exit
 
-synth: $(TEST_CASE)_synth.v
 json: $(TEST_CASE).json
-
-$(TEST_CASE)_synth.v: $(VERILOG_FILES)
-	@echo "Running Yosys"
-	@$(YOSYS) -ql synth.log -p 'read_slang $(YOSYS_DEFS) --ignore-timing $^; $(YOSYS_CMDS) synth_gatemate $(YOSYS_PARAM) -top $(TOP) -nomx8 -vlog $(TEST_CASE)_synth.v'
 
 $(TEST_CASE).json $(TEST_CASE)_ys.v: $(VERILOG_FILES)
 	@echo "Running Yosys"
-	@$(YOSYS) -ql synth.log -p 'read_slang $(YOSYS_DEFS) --ignore-timing $^; $(YOSYS_CMDS) synth_gatemate $(YOSYS_PARAM) -luttree -top $(TOP) -json $(TEST_CASE).json; write_verilog -norename -noattr $(TEST_CASE)_ys.v'
-
-$(TEST_CASE)_$(BOARD)_00.cfg: $(TEST_CASE)_synth.v $(BOARD).ccf
-	$(call check_cc_tool)
-	@echo "Running P_R for '$(BOARD)' board"
-	@$(P_R) -i $(TEST_CASE)_synth.v ${PR_OPTS} -cCP -pr -ccf $(BOARD).ccf -o $(TEST_CASE)_$(BOARD)
+	@$(YOSYS) -l synth.log -p 'read_slang $(YOSYS_DEFS) -y../../test_roms --ignore-timing $^; synth_gatemate $(YOSYS_PARAM) -luttree -top $(TOP) -json $(TEST_CASE).json; write_verilog -norename -noattr $(TEST_CASE)_ys.v'
 
 $(TEST_CASE)_$(BOARD).txt $(TEST_CASE)_$(BOARD)_pnr.json: $(TEST_CASE).json $(BOARD).ccf
 	@echo "Running nextpnr for '$(BOARD)' board"
-	$(NEXTPNR) --device $(FPGA) --json $(TEST_CASE).json --vopt ccf=$(BOARD).ccf --vopt out=$(TEST_CASE)_$(BOARD).txt --vopt allow-unconstrained --router router2 --freq $(FREQ) $(SEED_OPT) $(SDC_OPT) --write $(TEST_CASE)_$(BOARD)_pnr.json --sdf $(TEST_CASE)_$(BOARD).sdf --placer-heap-beta 0.5 --vopt time_mode=typical $(NEXTPNR_PARAMS)
-
-$(TEST_CASE)_$(BOARD)_00.txt: $(TEST_CASE)_$(BOARD)_00.cfg
-	@echo "Running unpack for '$(BOARD)' board"
-	@$(GMUNPACK) $(TEST_CASE)_$(BOARD)_00.cfg.bit $(TEST_CASE)_$(BOARD)_00.txt
-
-pr: $(TEST_CASE)_$(BOARD)_00.cfg
-
-unpack: $(TEST_CASE)_$(BOARD)_00.txt
+	$(NEXTPNR) --device $(FPGA) --json $(TEST_CASE).json --vopt ccf=$(BOARD).ccf --vopt out=$(TEST_CASE)_$(BOARD).txt --router router2 --freq $(FREQ) $(SEED_OPT) $(SDC_OPT) --write $(TEST_CASE)_$(BOARD)_pnr.json --timing-allow-fail --sdf $(TEST_CASE)_$(BOARD).sdf --placer-heap-beta 0.5 --vopt time_mode=typical $(NEXTPNR_PARAMS)
 
 nextpnr: $(TEST_CASE)_$(BOARD).txt
 
 post: $(TEST_CASE)_$(BOARD)_pnr.v
 
-jtag_pr: $(TEST_CASE)_$(BOARD)_00.cfg
-	@echo "Running openFPGALoader for '$(BOARD)' board"
-	@$(OFL) $(OFL_BOARD) --index-chain 0 $^
-
 jtag: $(TEST_CASE)_$(BOARD).txt
 	@echo "Running openFPGALoader for '$(BOARD)' board"
-	@$(GMPACK) $(TEST_CASE)_$(BOARD).txt $(TEST_CASE)_$(BOARD).bit
-	@$(OFL) $(OFL_BOARD) --index-chain 0 $(TEST_CASE)_$(BOARD).bit
+	$(GMPACK) $(TEST_CASE)_$(BOARD).txt $(TEST_CASE)_$(BOARD).bit
+	$(OFL) $(OFL_BOARD) --index-chain 0 $(TEST_CASE)_$(BOARD).bit
 
 $(TEST_CASE)_$(BOARD)_pnr.v: $(TEST_CASE)_$(BOARD).txt
 	@echo "Generate post PnR Verilog netlist"
@@ -179,7 +154,7 @@ clean:
 force-nextpnr:
 	$(NEXTPNR) --device $(FPGA) --json $(TEST_CASE).json --vopt ccf=$(BOARD).ccf --vopt out=../logs/$(TEST_CASE)_$(BOARD)_$(SEED).txt --router router2 --freq $(FREQ) $(SEED_OPT) $(SDC_OPT) --placer-heap-beta 0.5 --vopt time_mode=typical $(NEXTPNR_PARAMS)
 
-.PHONY: synth json pr nextpnr force-nextpnr jtag_pr jtag unpack check_yosys check_pnr check_pnr_post
+.PHONY: synth json pr nextpnr force-nextpnr jtag unpack check_yosys check_pnr check_pnr_post
 
 check_yosys.eqy: $(TEST_CASE)_ys.v ./$(BOARD).vh $(VERILOG_FILES)
 	@echo "Generang EQY file"
@@ -188,7 +163,6 @@ check_yosys.eqy: $(TEST_CASE)_ys.v ./$(BOARD).vh $(VERILOG_FILES)
 	  echo "$(YOSYS_DEFS_OPT)"; \
 	  echo "read_verilog -nowb -noblackbox +/gatemate/cells_sim.v ../cells_extra.v"; \
 	  echo "read_verilog -defer -sv ./$(BOARD).vh $(VERILOG_FILES)"; \
-	  echo "$(YOSYS_CMDS)"; \
 	  echo "prep -top $(TOP)"; \
 	  echo "flatten";\
 	  echo "$(EQY_CLOCK)";\
@@ -221,7 +195,6 @@ check_pnr.eqy: $(TEST_CASE)_$(BOARD)_pnr.v ./$(BOARD).vh $(VERILOG_FILES)
 	  echo "$(YOSYS_DEFS_OPT)"; \
 	  echo "read_verilog -nowb -noblackbox +/gatemate/cells_sim.v ../cells_extra.v"; \
 	  echo "read_verilog -defer -sv ./$(BOARD).vh $(VERILOG_FILES)"; \
-	  echo "$(YOSYS_CMDS)"; \
 	  echo "prep -top $(TOP)"; \
 	  echo "flatten";\
 	  echo "$(EQY_CLOCK)";\

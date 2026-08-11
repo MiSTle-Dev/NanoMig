@@ -7,9 +7,9 @@ module top(
   input		    clk,
 
   input		    reset_n,
-  input		    user_n,
+  // input    user_n,
 
-  output [4:0]	    leds,
+  output [7:0]	    leds_n,
 
   // spi flash interface
   output	    mspi_clk,
@@ -19,16 +19,21 @@ module top(
   inout		    mspi_wp,
   inout		    mspi_do,
 
+  // companion
+  output	    spi_dir,
+  output	    spi_irqn,
+  input		    spi_csn,
+  input		    spi_dat, 
+  input		    spi_sclk,
+
   // SDRAM
   output	    O_sdram_clk,
-  output	    O_sdram_cke,
   output	    O_sdram_cs_n, // chip select
   output	    O_sdram_cas_n, // columns address select
   output	    O_sdram_ras_n, // row address select
   output	    O_sdram_wen_n, // write enable
   inout [15:0]	    IO_sdram_dq, // 16 bit bidirectional data bus
   output [12:0]	    O_sdram_addr, // 13 bit multiplexed address bus
-  output [1:0]	    O_sdram_ba, // four banks
   output [1:0]	    O_sdram_dqm, // 2*8bit
 
   // SD card slot
@@ -44,17 +49,13 @@ module top(
 );
 
 
+// We'll not have enough pins on the two FPGA banks used for SDRAM to
+// drive the SDRAMs BA signals, so they are just dangling here
+wire [1:0]	    O_sdram_ba; // this would habe been four banks ...
+
 wire [5:0]	    js0 = 6'b111111;
 wire [5:0]	    js1 = 6'b111111;
    
-// map companion onto GPIO 21 to 25 ...
-// ... and GPIO 18 instead of GPIO 23 due to a stupid oversight on the carrier
-wire spi_dir;
-wire spi_irqn;
-wire	spi_csn  = 1'b1;
-wire	spi_dat  = 1'b1;   
-wire spi_sclk = 1'b1;  // no filter
-
 // physcial dsub9 joystick & mouse port 1 and 2
 wire [5:0] db9_joy0 = { !js0[5], !js0[0], !js0[2], !js0[1], !js0[4], !js0[3] };   
 wire [5:0] db9_joy1 = { !js1[5], !js1[0], !js1[2], !js1[1], !js1[4], !js1[3] }; 
@@ -120,13 +121,41 @@ end
 
 assign pll_lock = pll0_lock && pll1_lock;   
 
-divide_5 div_inst (
-   .clk_i(clk_pixel_x5),
-   .clk_o(clk_pixel)
-);
+// ========================== divide hdmi clock by 5 =====================
+reg [2:0] q = 3'b000;   
+reg q1d = 0;   
+always @(posedge clk_pixel_x5) begin
+   // count 0..4
+   q <= {  q == 3'bx11,
+	  (q == 3'bx10) | (q == 3'bx01),
+	   q == 3'b0x0 };   
+end
 
+// q1 is 1 in cycles 2 and 3, extend it halfway through cycle 4
+always @(negedge clk_pixel_x5)
+  q1d <= q[1];
+   
+assign clk_pixel = q[1] | q1d;
 assign clk_28m = clk_pixel;
 
+// blink
+reg [31:0] clk_cnt;
+reg	   led_state;
+   
+always @(posedge clk_28m) begin
+   if(clk_cnt < `PIXEL_CLOCK) 
+     clk_cnt <= clk_cnt + 1;
+   else begin
+      clk_cnt <= 0;
+      led_state <= !led_state;      
+   end
+end  
+   
+wire [4:0] leds;
+assign leds_n = { led_state, 2'b11, ~leds };   
+
+`ifndef NO_SYS
+   
 wire	clk7_en;   
 wire	clk7n_en;   
 
@@ -461,7 +490,7 @@ sysctrl sysctrl (
         .int_in( { 4'b0000, sdc_int, 1'b0, hid_int, 1'b0 }),
         .int_ack( int_ack ),
 
-        .buttons( {!user_n, !reset_n} ),
+        .buttons( {1'b0, !reset_n} ),
         .leds(),
         .color()
 );
@@ -569,6 +598,10 @@ wire [3:0] floppy_config = { osd_floppy_drives, osd_floppy_wrprot, osd_floppy_tu
 wire [3:0] video_config = { osd_video_filter, osd_video_scanlines };   
 `ifndef DISABLE_IDE
 wire [5:0] ide_config = { 5'b00000, osd_ide_enable };   
+`endif
+
+`ifdef DISABLE_IDE
+assign leds[2] = 1'b0;
 `endif
 
 nanomig nanomig
@@ -798,7 +831,6 @@ wire [21:0] sdram_addr    =
 			ram_a[22:1];                                        // regular operation
 
 assign O_sdram_clk = clk_85m_shifted;   
-assign O_sdram_cke = 1'b1;  // clock enable
 
 sdram sdram (
 	.sd_data    ( IO_sdram_dq   ), // 14 bit bidirectional data bus
@@ -948,19 +980,39 @@ video_analyzer video_analyzer (
     .interlace   ( interlace ),
     .vreset      ( vreset    )
 );
+`else
 
-wire TMDS_clk;   
-wire [2:0] TMDS_data;   
+wire vpal = 1'b0;
+wire short_frame = 1'b0;
+wire osd_video_screen = 2'b00;
+wire interlace = 1'b0;
+wire vreset = 1'b0;
+   
+wire [15:0] audio_reg [2];
+assign audio_reg[0] = 16'h0000;
+assign audio_reg[1] = 16'h0000;   
 
+assign leds[4:0] = 5'b00000;   
+
+// some orange ...
+wire [5:0] video_red   = 6'b100000;
+wire [5:0] video_green = 6'b000000;
+wire [5:0] video_blue  = 6'b100000;
+   
+`endif //  `ifndef NO_SYS
+  
+wire [1:0] TMDS_clk;   
+wire [5:0] TMDS_data;   
+   
 CC_LVDS_OBUF lvds_obuf_inst [3:0] (
-	   .A({TMDS_clk, TMDS_data}),
+	   .A({TMDS_clk[0], TMDS_data[4],TMDS_data[2],TMDS_data[0]}),
 	   .O_P({TMDS_clk_p, TMDS_data_p}),
 	   .O_N({TMDS_clk_n, TMDS_data_n})
 );
    
 hdmi #(
     .AUDIO_RATE(48000), .AUDIO_BIT_WIDTH(16),
-    .VENDOR_NAME( { "MiSTle", 16'd0} ),
+    .VENDOR_NAME( { "MiSTle", 16'd0} ), .DVI_OUTPUT(1),
     .PRODUCT_DESCRIPTION( {"Nanomig", 72'd0} )
 ) hdmi(
   .clk_pixel_x5(clk_pixel_x5),
@@ -971,32 +1023,12 @@ hdmi #(
   .tmds(TMDS_data),
 
   .pal_mode(vpal),
-  .short_frame ( short_frame ),
-  .screen ( osd_video_screen ),
+  .short_frame (short_frame),
+  .screen (osd_video_screen),
   .interlace(interlace),
   .reset(vreset),    // signal to synchronize HDMI
 
-  .rgb( { video_red, 2'b00, video_green, 2'b00, video_blue, 2'b00 } )
+  .rgb( { 2'b11, video_red, video_green, 2'b00, video_blue, 2'b00 } )
 );
    
-endmodule
-
-module divide_5 (
-   input	clk_i,
-   output	clk_o
-);
-
-reg q2 = 0, q1 = 0, q0 = 0, q1d = 0;
-   
-always @(posedge clk_i) begin
-   q0 <= (!q2 & !q0);
-   q1 <= ( q1 & !q0) | (!q1 & q0);
-   q2 <= ( q1 &  q0);
-end
-   
-always @(negedge clk_i)
-  q1d <= q1;
-   
-assign clk_o = q1 | q1d;
-
 endmodule
