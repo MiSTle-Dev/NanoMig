@@ -2,8 +2,14 @@ TEST_CASE := nanomig
 BOARD := evb
 
 YOSYS_PARAM = -nomx8
-YOSYS_DEFS  = -DGATEMATE -DTMDS_BY_LOGIC -DINFER_DPRAM -DYOSYS -DDISABLE_IDE -DBOARD_FREQ_STR="10.0" -DBOARD_FREQ=10000000
-YOSYS_DEFS += -DENABLE_INT_ROM -DENABLE_INT_ROM_BLINK_LED
+YOSYS_DEFS  = -DGATEMATE -DINFER_DPRAM -DYOSYS -DDISABLE_IDE -DBOARD_FREQ_STR="10.0" -DBOARD_FREQ=10000000
+YOSYS_DEFS +=  -DTMDS_BY_LOGIC
+
+# enable 2k internal ROM and 2k internal RAM allowing to run the CPU without
+# flash and sdram working correctly, ram is not needed for the basic blink_led rom
+YOSYS_DEFS += -DENABLE_INT_ROM -DENABLE_INT_ROM_BLINK_LED # -DENABLE_INT_RAM 
+
+# disable the entire system and only run the HDMI/DVI with a solid image
 # YOSYS_DEFS += -DNO_SYS
 
 TARGETS ?= impl
@@ -70,16 +76,8 @@ ifndef BOARD
 $(error BOARD variable is not set)
 endif
 
-ifeq ($(BOARD), olimex)
-OFL_BOARD=-b olimex_gatemateevb
-FREQ = 10
-else ifeq ($(BOARD), kolsch)
-OFL_BOARD=-c dirtyJtag
-FREQ = 48
-else
 OFL_BOARD=-b gatemate_evb_jtag
 FREQ = 10
-endif
 
 ifdef SEED
 SEED_OPT=--seed $(SEED)
@@ -126,7 +124,7 @@ $(TEST_CASE).json $(TEST_CASE)_ys.v: $(VERILOG_FILES)
 
 $(TEST_CASE)_$(BOARD).txt $(TEST_CASE)_$(BOARD)_pnr.json: $(TEST_CASE).json $(BOARD).ccf
 	@echo "Running nextpnr for '$(BOARD)' board"
-	$(NEXTPNR) --device $(FPGA) --json $(TEST_CASE).json --vopt ccf=$(BOARD).ccf --vopt out=$(TEST_CASE)_$(BOARD).txt --router router2 --freq $(FREQ) $(SEED_OPT) $(SDC_OPT) --write $(TEST_CASE)_$(BOARD)_pnr.json --timing-allow-fail --sdf $(TEST_CASE)_$(BOARD).sdf --placer-heap-beta 0.5 --vopt time_mode=typical $(NEXTPNR_PARAMS)
+	$(NEXTPNR) --device $(FPGA) --json $(TEST_CASE).json --vopt ccf=$(BOARD).ccf --vopt out=$(TEST_CASE)_$(BOARD).txt --router router2 --freq $(FREQ) $(SEED_OPT) $(SDC_OPT) --write $(TEST_CASE)_$(BOARD)_pnr.json --timing-allow-fail --sdf $(TEST_CASE)_$(BOARD).sdf --placer-heap-beta 0.9 --vopt time_mode=typical $(NEXTPNR_PARAMS)
 
 nextpnr: $(TEST_CASE)_$(BOARD).txt
 
@@ -149,107 +147,9 @@ clean:
 	@rm -rf *.log *_synth.v *.history *.txt *.refwire *.refparam *_ys.v *~
 	@rm -rf *.refcomp *.pos *.pathes *.path_struc *.net *.id *.prn
 	@rm -rf *_00.v *.used *.sdf *.place *.pin *.cfg *.bit  *.cdf *.idh *.min *.json
-	@rm -rf *_pnr.v check_yosys check_yosys.eqy check_pnr check_pnr.eqy check_pnr_post check_pnr_post.eqy
+	@rm -rf *_pnr.v
 
 force-nextpnr:
-	$(NEXTPNR) --device $(FPGA) --json $(TEST_CASE).json --vopt ccf=$(BOARD).ccf --vopt out=../logs/$(TEST_CASE)_$(BOARD)_$(SEED).txt --router router2 --freq $(FREQ) $(SEED_OPT) $(SDC_OPT) --placer-heap-beta 0.5 --vopt time_mode=typical $(NEXTPNR_PARAMS)
+	$(NEXTPNR) --device $(FPGA) --json $(TEST_CASE).json --vopt ccf=$(BOARD).ccf --vopt out=../logs/$(TEST_CASE)_$(BOARD)_$(SEED).txt --router router2 --freq $(FREQ) $(SEED_OPT) $(SDC_OPT) --placer-heap-beta 0.2 --vopt time_mode=typical $(NEXTPNR_PARAMS)
 
-.PHONY: synth json pr nextpnr force-nextpnr jtag unpack check_yosys check_pnr check_pnr_post
-
-check_yosys.eqy: $(TEST_CASE)_ys.v ./$(BOARD).vh $(VERILOG_FILES)
-	@echo "Generang EQY file"
-	@{ \
-	  echo "[gold]"; \
-	  echo "$(YOSYS_DEFS_OPT)"; \
-	  echo "read_verilog -nowb -noblackbox +/gatemate/cells_sim.v ../cells_extra.v"; \
-	  echo "read_verilog -defer -sv ./$(BOARD).vh $(VERILOG_FILES)"; \
-	  echo "prep -top $(TOP)"; \
-	  echo "flatten";\
-	  echo "$(EQY_CLOCK)";\
-	  echo "memory_map";\
-	  echo ""; \
-	  echo "[gate]"; \
-	  echo "$(YOSYS_DEFS_OPT)"; \
-	  echo "read_verilog -nowb -noblackbox +/gatemate/cells_sim.v ../cells_extra.v"; \
-	  echo "read_verilog $(TEST_CASE)_ys.v"; \
-	  echo "prep -top $(TOP)"; \
-	  echo "flatten";\
-	  echo "$(EQY_CLOCK)";\
-	  echo "memory_map";\
-	  echo ""; \
-	  echo "[collect *]"; \
-	  echo "bind *"; \
-	  echo ""; \
-	  echo "[strategy pdr]"; \
-	  echo "use sby"; \
-	  echo "engine abc scorr; pdr"; \
-	} > $@
-
-check_yosys: check_yosys.eqy
-	@eqy -f $^
-
-check_pnr.eqy: $(TEST_CASE)_$(BOARD)_pnr.v ./$(BOARD).vh $(VERILOG_FILES)
-	@echo "Generating EQY file"
-	@{ \
-	  echo "[gold]"; \
-	  echo "$(YOSYS_DEFS_OPT)"; \
-	  echo "read_verilog -nowb -noblackbox +/gatemate/cells_sim.v ../cells_extra.v"; \
-	  echo "read_verilog -defer -sv ./$(BOARD).vh $(VERILOG_FILES)"; \
-	  echo "prep -top $(TOP)"; \
-	  echo "flatten";\
-	  echo "$(EQY_CLOCK)";\
-	  echo "memory_map";\
-	  echo ""; \
-	  echo "[gate]"; \
-	  echo "$(YOSYS_DEFS_OPT)"; \
-	  echo "read_verilog -nowb -noblackbox +/gatemate/cells_sim.v ../cpesim.v"; \
-	  echo "read_verilog $(TEST_CASE)_$(BOARD)_pnr.v"; \
-	  echo "rename top $(TOP)";\
-	  echo "prep -top $(TOP)"; \
-	  echo "flatten";\
-	  echo "$(EQY_CLOCK)";\
-	  echo "memory_map";\
-	  echo ""; \
-	  echo "[collect *]"; \
-	  echo "bind *"; \
-	  echo ""; \
-	  echo "[strategy pdr]"; \
-	  echo "use sby"; \
-	  echo "engine abc scorr; pdr"; \
-	} > $@
-
-check_pnr: check_pnr.eqy
-	@eqy -f $^
-
-check_pnr_post.eqy: $(TEST_CASE)_$(BOARD)_pnr.v ./$(BOARD).vh $(TEST_CASE)_ys.v
-	@echo "Generating EQY file"
-	@{ \
-	  echo "[gold]"; \
-	  echo "$(YOSYS_DEFS_OPT)"; \
-	  echo "read_verilog -nowb -noblackbox +/gatemate/cells_sim.v ../cells_extra.v"; \
-	  echo "read_verilog $(TEST_CASE)_ys.v"; \
-	  echo "prep -top $(TOP)"; \
-	  echo "flatten";\
-	  echo "$(EQY_CLOCK)";\
-	  echo "memory_map";\
-	  echo ""; \
-	  echo "[gate]"; \
-	  echo "$(YOSYS_DEFS_OPT)"; \
-	  echo "read_verilog -nowb -noblackbox +/gatemate/cells_sim.v ../cpesim.v"; \
-	  echo "read_verilog $(TEST_CASE)_$(BOARD)_pnr.v"; \
-	  echo "rename top $(TOP)";\
-	  echo "prep -top $(TOP)"; \
-	  echo "flatten";\
-	  echo "$(EQY_CLOCK)";\
-	  echo "memory_map";\
-	  echo ""; \
-	  echo "[collect *]"; \
-	  echo "bind *"; \
-	  echo ""; \
-	  echo "[strategy pdr]"; \
-	  echo "use sby"; \
-	  echo "engine abc scorr; pdr"; \
-	} > $@
-
-check_pnr_post: check_pnr_post.eqy
-	@eqy -f $^
+.PHONY: synth json pr nextpnr force-nextpnr jtag unpack

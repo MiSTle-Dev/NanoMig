@@ -4,10 +4,8 @@
  
 
 module top(
-  input		    clk,
-
-  input		    reset_n,
-  // input    user_n,
+  input		    clk,       // 10 Mhz
+  input		    reset_n,   // SW3
 
   output [7:0]	    leds_n,
 
@@ -19,7 +17,7 @@ module top(
   inout		    mspi_wp,
   inout		    mspi_do,
 
-  // companion
+  // companion, currently on PMOD-B
   output	    spi_dir,
   output	    spi_irqn,
   input		    spi_csn,
@@ -41,7 +39,7 @@ module top(
   inout		    sd_cmd, // MOSI
   inout [3:0]	    sd_dat, // 0: MISO
 
-  // hdmi/tdms
+  // hdmi/tdms, currently on PMOD-A
   output wire	    TMDS_clk_p,
   output wire	    TMDS_clk_n,
   output wire [2:0] TMDS_data_p,
@@ -76,7 +74,7 @@ wire clk_85m;
 wire clk_85m_shifted;
 wire clk_pixel;
 
-wire usr_pll0_lock_stdy, usr_pll0_lock;   
+wire pll0_lock;   
 CC_PLL #(
         .REF_CLK(`BOARD_FREQ_STR),    // reference input in MHz
         .OUT_CLK("142.5"),            // pll output frequency in MHz
@@ -86,11 +84,11 @@ CC_PLL #(
         .CP_FILTER_CONST(4)           // optional CP filter constant
 ) pll_142m (
           .CLK_REF(clk), .CLK_FEEDBACK(1'b0), .USR_CLK_REF(1'b0),
-	  .USR_LOCKED_STDY_RST(1'b0), .USR_PLL_LOCKED_STDY(usr_pll0_lock_stdy), .USR_PLL_LOCKED(usr_pll0_lock),
+	  .USR_LOCKED_STDY_RST(1'b0), .USR_PLL_LOCKED_STDY(), .USR_PLL_LOCKED(pll0_lock),
 	  .CLK270(), .CLK180(), .CLK90(), .CLK0(clk_pixel_x5), .CLK_REF_OUT()
 );
 
-wire usr_pll1_lock_stdy, usr_pll1_lock;   
+wire	pll1_lock;   
 CC_PLL #(
         .REF_CLK(`BOARD_FREQ_STR),    // reference input in MHz
         .OUT_CLK("85"),               // pll output frequency in MHz
@@ -100,39 +98,29 @@ CC_PLL #(
         .CP_FILTER_CONST(4)           // optional CP filter constant
 ) pll_85m (
           .CLK_REF(clk), .CLK_FEEDBACK(1'b0), .USR_CLK_REF(1'b0),
-	  .USR_LOCKED_STDY_RST(1'b0), .USR_PLL_LOCKED_STDY(usr_pll1_lock_stdy), .USR_PLL_LOCKED(usr_pll1_lock),
-	  .CLK270(/*clk_85m_shifted*/), .CLK180(), .CLK90(), .CLK0(clk_85m), .CLK_REF_OUT()
+	  .USR_LOCKED_STDY_RST(1'b0), .USR_PLL_LOCKED_STDY(), .USR_PLL_LOCKED(pll1_lock),
+	  .CLK270(/* clk_85m_shifted */), .CLK180(), .CLK90(), .CLK0(clk_85m), .CLK_REF_OUT()
 );
 
-// using the 270 deg pll output exceeds routing ...
-assign clk_85m_shifted = !clk_85m;  
+assign clk_85m_shifted = !clk_85m;   
    
-// reset is synced the clock
-reg locked0_s1 = 1'b0;
-reg pll0_lock;   
-always @(posedge clk_pixel_x5) begin
-   locked0_s1 <= usr_pll0_lock;
-   pll0_lock <= locked0_s1;
-end
-   
-reg locked1_s1 = 1'b0;
-reg pll1_lock;   
-always @(posedge clk_85m) begin
-   locked1_s1 <= usr_pll1_lock;
-   pll1_lock <= locked1_s1;
-end
+// delay pll_lock, so it can safely be used as a global hw reset
+// TODO: Check if this is really still needed, once everything works
+reg [15:0] pll_lock_delay = 16'h0000;
+always @(posedge clk) begin
+   if(!pll0_lock || !pll1_lock) 
+     pll_lock_delay <= 16'd0;
+   else if(pll_lock_delay != 16'hffff)
+     pll_lock_delay <= pll_lock_delay + 16'd1;
+end   
 
-assign pll_lock = pll0_lock && pll1_lock;   
-
+assign pll_lock = (pll_lock_delay == 16'hffff);
+      
 // ========================== divide hdmi clock by 5 =====================
-reg [2:0] q = 3'b000;   
-reg q1d = 0;   
-always @(posedge clk_pixel_x5) begin
-   // count 0..4
-   q <= {  q == 3'bx11,
-	  (q == 3'bx10) | (q == 3'bx01),
-	   q == 3'b0x0 };   
-end
+reg [2:0] q;   
+reg q1d;   
+always @(posedge clk_pixel_x5)
+   q <= { q == 3'bx11, (q == 3'bx10) | (q == 3'bx01), q == 3'b0x0 };   
 
 // q1 is 1 in cycles 2 and 3, extend it halfway through cycle 4
 always @(negedge clk_pixel_x5)
@@ -141,21 +129,22 @@ always @(negedge clk_pixel_x5)
 assign clk_pixel = q[1] | q1d;
 assign clk_28m = clk_pixel;
 
-// blink
+// blink led 8 once a second to show that the pll and clock
+// divider are running
 reg [31:0] clk_cnt;
 reg	   led_state;
    
 always @(posedge clk_28m) begin
-   if(clk_cnt < `PIXEL_CLOCK) 
+   if(clk_cnt < `PIXEL_CLOCK/2) 
      clk_cnt <= clk_cnt + 1;
    else begin
       clk_cnt <= 0;
       led_state <= !led_state;      
    end
 end  
-   
-wire [4:0] leds;
-assign leds_n = { led_state, 2'b11, ~leds };   
+
+wire [6:0] leds;
+assign leds_n = { led_state, ~leds };   
 
 `ifndef NO_SYS
    
@@ -197,7 +186,9 @@ end
 
 // this is the reset that goes into the nanomig itself
 wire cpu_reset = reset_cnt != 0;
-
+assign leds[5] = 1'b0;   
+assign leds[6] = cpu_reset;   
+   
 wire sdram_ready;
 
 // -------------------------- M0S MCU interface -----------------------
@@ -995,7 +986,7 @@ wire [15:0] audio_reg [2];
 assign audio_reg[0] = 16'h0000;
 assign audio_reg[1] = 16'h0000;   
 
-assign leds[4:0] = 5'b00000;   
+assign leds = 7'd0;   
 
 // some orange ...
 wire [5:0] video_red   = 6'b100000;
@@ -1003,12 +994,21 @@ wire [5:0] video_green = 6'b000000;
 wire [5:0] video_blue  = 6'b100000;
    
 `endif //  `ifndef NO_SYS
-  
+
+`ifdef TMDS_BY_LOGIC   
 wire [1:0] TMDS_clk;   
-wire [5:0] TMDS_data;   
-   
+wire [5:0] TMDS_data;
+`else
+wire TMDS_clk;
+wire [2:0] TMDS_data;   
+`endif   
+    
 CC_LVDS_OBUF lvds_obuf_inst [3:0] (
+`ifdef TMDS_BY_LOGIC   
 	   .A({TMDS_clk[0], TMDS_data[4],TMDS_data[2],TMDS_data[0]}),
+`else
+	   .A({TMDS_clk, TMDS_data[2],TMDS_data[1],TMDS_data[0]}),
+`endif
 	   .O_P({TMDS_clk_p, TMDS_data_p}),
 	   .O_N({TMDS_clk_n, TMDS_data_n})
 );

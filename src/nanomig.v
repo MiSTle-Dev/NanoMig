@@ -1174,6 +1174,7 @@ wire int_rom_sel = ram_address[22:11] == 12'hf00;
 reg [7:0] raml[1024];  // 2kbytes ram
 reg [7:0] ramh[1024];
 
+wire int_ram_sel = ram_address[22:11] == 12'h000;
 reg [15:0] ramD;
 always_ff @(posedge clk_sys) begin
 	if(clk7n_en) begin
@@ -1187,7 +1188,6 @@ always_ff @(posedge clk_sys) begin
 	   end
 end
 
-wire int_ram_sel = ram_address[22:11] == 12'h000;
 wire [15:0] ramdata_in_ext = int_rom_sel?romD:
 						       int_ram_sel?ramD:
 							   ramdata_in;

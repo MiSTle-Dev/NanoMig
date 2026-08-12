@@ -1,7 +1,9 @@
 `ifndef LATTICE
 `ifndef TMDS_BY_LOGIC
+`ifndef TMDS_BY_LOGIC_ALT
 // TODO: GOWIN should be set globally by all top levels that need it
  `define GOWIN
+`endif
 `endif
 `endif
 
@@ -352,7 +354,7 @@ end
      ALTLVDS_TX_component.clk_src_is_pll = "off";
 `endif //  `ifdef ALTERA_RESERVED_QIS
 
-`ifdef UNKNOWN_PLATFORM
+`ifdef TMDS_BY_LOGIC_ALT
 // We don't know what the platform is so the best bet is an IP-less implementation.
 // Shift registers are loaded with a set of values from tmds_channels every clk_pixel.
 // They are shifted out on clk_pixel_x5 by the time the next set is loaded.
@@ -376,34 +378,46 @@ always_comb begin
      tmds_mux = tmds_shift;
 end
    
+logic [9:0] tmds_shift_clk_pixel = 10'b0000011111;
+always_ff @(posedge clk_pixel_x5)
+  tmds_shift_clk_pixel <= load ? 10'b0000011111 : {tmds_shift_clk_pixel[1:0], tmds_shift_clk_pixel[9:2]};
+logic [NUM_CHANNELS-1:0] tmds_shift_negedge_temp;
+
+reg [NUM_CHANNELS-1:0] tmds_p;
+reg [NUM_CHANNELS-1:0] tmds_n;
+      
+genvar i;
+generate
 // See Section 5.4.1
 for (i = 0; i < NUM_CHANNELS; i++) begin: tmds_shifting
    always_ff @(posedge clk_pixel_x5)
      tmds_shift[i] <= load ? tmds_mux[i] : tmds_shift[i] >> 2;
-end
-   
-logic [9:0] tmds_shift_clk_pixel = 10'b0000011111;
-always_ff @(posedge clk_pixel_x5)
-  tmds_shift_clk_pixel <= load ? 10'b0000011111 : {tmds_shift_clk_pixel[1:0], tmds_shift_clk_pixel[9:2]};
 
-logic [NUM_CHANNELS-1:0] tmds_shift_negedge_temp;
-for (i = 0; i < NUM_CHANNELS; i++) begin: tmds_driving
    always_ff @(posedge clk_pixel_x5) begin
-      tmds[i] <= tmds_shift[i][0];
+      tmds_p[i] <= tmds_shift[i][0];
       tmds_shift_negedge_temp[i] <= tmds_shift[i][1];
    end
+   
    always_ff @(negedge clk_pixel_x5)
-     tmds[i] <= tmds_shift_negedge_temp[i];
-end
+     tmds_n[i] <= tmds_shift_negedge_temp[i];
 
+   assign tmds[i] = clk_pixel_x5?tmds_p[i]:tmds_n[i];   
+end
+endgenerate
+   
+reg tmds_clock_p;
+reg tmds_clock_n;
+   
 logic tmds_clock_negedge_temp;
 always_ff @(posedge clk_pixel_x5) begin
-   tmds_clock <= tmds_shift_clk_pixel[0];
+   tmds_clock_p <= tmds_shift_clk_pixel[0];
    tmds_clock_negedge_temp <= tmds_shift_clk_pixel[1];
 end
 
 always_ff @(negedge clk_pixel_x5)
-  tmds_clock <= tmds_shift_negedge_temp;
+  tmds_clock_n <= tmds_clock_negedge_temp;
+
+assign tmds_clock = clk_pixel_x5?tmds_clock_p:tmds_clock_n;   
 `endif
 
 endmodule
