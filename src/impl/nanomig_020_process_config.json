@@ -80,7 +80,7 @@
  "SerDes_retiming" : false,
  "Show_All_Warnings" : false,
  "Synthesize_tool" : "GowinSyn",
- "TclPre" : "C:/GitHub/NanoMig/src/scripts/update_xml_tang_nano20k_020.tcl",
+ "TclPre" : "scripts/update_xml_tang_nano20k_020.tcl",
  "TopModule" : "top",
  "USERCODE" : "default",
  "Unused_Pin" : "As_input_tri_stated_with_pull_up",
