@@ -10,7 +10,7 @@
 
 `define LATTICE
 // `define INFER_DPRAM
-// `define ENABLE_TG68K
+`define ENABLE_TG68K
 // `define DISABLE_IDE       // when using inferred ram, this exceeds the chip
 // `define HDMI_TEST_PATTERN  // display static test pattern on HDMI instead of amiga video
 // `define ENABLE_INT_ROM     // enable 2k internal test rom in nanomig.v
@@ -588,7 +588,7 @@ assign chip48_din = sdram_dout48;
 
 // pack config values into minimig config
 wire [5:0] chipset_config = { 2'b0,osd_chipset,osd_video_mode,1'b0 };
-wire [1:0] cpu_config = { cpu_config };
+wire [1:0] cpu_config = { osd_cpu };
 wire [7:0] memory_config = { 4'b0_000, osd_slowmem, osd_chipmem };
 wire [2:0] fastram_config = { 1'b0, osd_fastmem };
 wire [3:0] floppy_config = { osd_floppy_drives, osd_floppy_wrprot, osd_floppy_turbo };
