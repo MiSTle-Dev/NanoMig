@@ -157,6 +157,7 @@ wire       osd_floppy_wrprot;
 wire       osd_ide_enable;
 `endif
 wire [1:0] osd_chipset;         // 0=OCS-A500, 1=OCS-A1000, 2=ECS
+wire [1:0] osd_cpu;             // 0=68000, 1=68010, 2=68020
 wire       osd_video_mode;      // PAL (0=PAL, 1=NTSC)
 wire [1:0] osd_video_screen;    // 0=standard, 1=overscan, 2=wide screen (jailbars)
 wire [1:0] osd_video_filter;
@@ -168,8 +169,9 @@ wire       osd_stereo_mix;      // 0=off, 1=on
 wire	   rom_download_in_progress;
 
 // generate a reset for some time after rom has been initialized
-reg [15:0] reset_cnt;
-always @(posedge clk_28m) begin
+reg [15:0] reset_cnt = 16'hffff;
+
+always @(posedge clk_28m, posedge rst_28m) begin
     if(rst_28m || !rom_done || !reset_n || osd_reset || kbd_reset || rom_download_in_progress)
         reset_cnt <= 16'hffff;
     else if(reset_cnt != 0)
@@ -457,24 +459,25 @@ sysctrl sysctrl (
         .data_out(sys_data_out),
 
         // values controlled by the OSD
-		.system_reset(osd_reset),
-		.system_floppy_drives(osd_floppy_drives),
-		.system_floppy_turbo(osd_floppy_turbo),
-		.system_floppy_wrprot(osd_floppy_wrprot),
+        .system_reset(osd_reset),
+        .system_floppy_drives(osd_floppy_drives),
+        .system_floppy_turbo(osd_floppy_turbo),
+        .system_floppy_wrprot(osd_floppy_wrprot),
 `ifndef DISABLE_IDE
-		.system_ide_enable(osd_ide_enable),
+        .system_ide_enable(osd_ide_enable),
 `endif
-	    .system_chipset(osd_chipset),
-		.system_video_mode(osd_video_mode),
-		.system_video_screen(osd_video_screen),
-		.system_video_filter(osd_video_filter),
-		.system_video_scanlines(osd_video_scanlines),
-		.system_chipmem(osd_chipmem),
-		.system_slowmem(osd_slowmem),
-		.system_fastmem(osd_fastmem),
+        .system_chipset(osd_chipset),
+        .system_cpu(osd_cpu),
+        .system_video_mode(osd_video_mode),
+        .system_video_screen(osd_video_screen),
+        .system_video_filter(osd_video_filter),
+        .system_video_scanlines(osd_video_scanlines),
+        .system_chipmem(osd_chipmem),
+        .system_slowmem(osd_slowmem),
+        .system_fastmem(osd_fastmem),
         .system_joy_swap(osd_joy_swap),
-    	.system_volume(osd_volume),
-		.system_stereo_mix(osd_stereo_mix),
+        .system_volume(osd_volume),
+        .system_stereo_mix(osd_stereo_mix),
 
         .int_out_n(spi_intn),
         .int_in( { 4'b0000, sdc_int, 1'b0, hid_int, 1'b0 }),
@@ -561,13 +564,14 @@ wire [15:0] cpu_din, cpu_dout;
 wire [23:1] ram_a;
 wire [15:0] ram_din;
 wire [15:0] ram_dout;
-wire 	    ram_we_n;
+wire        ram_we_n;
 wire [1:0]  ram_be;
-wire 	    ram_oe_n;
-wire		ram_refresh;
+wire        ram_oe_n;
+wire        ram_refresh;
+wire [47:0] chip48_din;
 
 wire fastram_sel;
-wire [22:1] fastram_addr;
+wire [23:1] fastram_addr;
 wire fastram_lds;
 wire fastram_uds;
 wire [15:0] fastram_dout;
@@ -577,17 +581,24 @@ wire fastram_wr;
 wire fastram_ready;
 
 wire [15:0] sdram_dout;
+wire [47:0] sdram_dout48;
 
 assign ram_din = sdram_dout;
+assign chip48_din = sdram_dout48;
 
 // pack config values into minimig config
-wire [5:0] chipset_config = { 1'b0,osd_chipset,osd_video_mode,1'b0 };
+wire [5:0] chipset_config = { 2'b0,osd_chipset,osd_video_mode,1'b0 };
+wire [1:0] cpu_config = { cpu_config };
 wire [7:0] memory_config = { 4'b0_000, osd_slowmem, osd_chipmem };
 wire [2:0] fastram_config = { 1'b0, osd_fastmem };
 wire [3:0] floppy_config = { osd_floppy_drives, osd_floppy_wrprot, osd_floppy_turbo };
 wire [3:0] video_config = { osd_video_filter, osd_video_scanlines };
 `ifndef DISABLE_IDE
-wire [5:0] ide_config = { 5'b00000, osd_ide_enable };
+// FIXME - setting ide_config[5] prevents minimig from using
+// fast chipset bus for GAYLE, which is by default in use
+// when 68020 CPU is selected; we may connect fast chip bus
+// to GAYLE and set ide_config[5] to 0 to improve performance
+wire [5:0] ide_config = { 5'b10000, osd_ide_enable };
 `endif
 
 nanomig nanomig
@@ -607,6 +618,7 @@ nanomig nanomig
 
  .memory_config(memory_config),
  .fastram_config(fastram_config),
+ .cpu_config(cpu_config),
  .chipset_config(chipset_config),
  .floppy_config(floppy_config),
  .video_config(video_config),
@@ -657,7 +669,7 @@ nanomig nanomig
  ._ram_ble(ram_be[0]),      // sram lower byte select
  ._ram_we(ram_we_n),        // sram write enable
  ._ram_oe(ram_oe_n),        // sram output enable
- .chip48(48'd0),
+ .chip48(chip48_din),       // 64-bit chipram read data bus
  .refresh(ram_refresh),
 
  .fastram_sel(fastram_sel),
@@ -670,84 +682,102 @@ nanomig nanomig
  .fastram_ready(fastram_ready)
 );
 
+wire flash_ready;
+
+reg flash_ready_d1;
+reg flash_ready_d2;
+
+// synchronize flash_ready signal to 28MHz clock domain
+always @(posedge clk_28m, posedge rst_28m) begin
+   if (rst_28m) begin
+      flash_ready_d1 <= 1'b0;
+      flash_ready_d2 <= 1'b0;
+
+   end else begin
+      flash_ready_d1 <= flash_ready;
+      flash_ready_d2 <= flash_ready_d1;
+   end
+end
+
 /* -------------- state machine copying data from flash to sdram ---------------- */
-reg [21:0]  flash_addr;
+reg  [21:0] flash_addr = 22'h200000;
+reg  [17:0] flash_ram_addr = 18'h0;
+reg  [31:0] word_count = 32'h40000;
+
 wire [15:0] flash_dout;
-reg [15:0]  flash_doutD;
-reg		    flash_cs;
-reg [31:0]  word_count;
-reg [4:0]   state;
+reg         flash_cs;
 wire        flash_data_strobe;
 wire        flash_busy;
-wire        flash_ready;
-reg         start_rom_copy;
+reg         flash_ram_write;
 
 // once the copy counter has run to zero, all rom has been copied
-wire		rom_done = (word_count == 0);
+wire        rom_done = (word_count == 0);
 
 assign leds[3] = !rom_done || rom_download_in_progress;
 
-reg [17:0]  flash_ram_addr;
-reg         flash_ram_write;
-reg [5:0]   flash_cnt;
+localparam FLASH_STATE_INIT  = 0;
+localparam FLASH_STATE_READ  = 1;
+localparam FLASH_STATE_WAIT  = 2;
+localparam FLASH_STATE_WRITE = 3;
+localparam FLASH_STATE_NEXT  = 4;
 
-always @(posedge clk_85m, posedge rst_85m) begin
-    if(rst_85m || !flash_ready) begin
-       flash_addr <= 22'h200000;          // 4MB flash offset (word address)
-       flash_ram_addr <= 18'h0;           // write into 512k sdram segment used for kick rom
-       word_count <= 22'h40001;           // 512k bytes ROM data = 256k words
+reg [2:0] flash_state;
 
-       state <= 3'h0;
-       flash_ram_write <= 1'b0;
-       flash_cs <= 1'b0;
-       flash_cnt <= 6'd0;
+always @(posedge clk_28m, posedge rst_28m, negedge reset_n) begin
+  if (rst_28m || !reset_n) begin
+    flash_state <= FLASH_STATE_INIT;
 
-       start_rom_copy <= 1'b1;
-    end else begin
-        if((start_rom_copy || state == 23) && (word_count != 0)) begin
-            start_rom_copy <= 1'b0;
-            flash_cs <= 1'b1;
-            flash_cnt <= 6'd45; // >= 30 @ 32MHz -- AMR, increase to 45 @ 85.5MHz
-        end else begin
-            if(flash_cnt != 0) flash_cnt <= flash_cnt - 6'd1;
-            if(flash_busy)     flash_cs <= 1'b0;
+  end else begin
+    case (flash_state)
+      FLASH_STATE_INIT: begin
+        if (clk7n_en && flash_ready_d2) begin
+          flash_addr     <= 22'h200000;
+          flash_ram_addr <= 18'h0;
+          word_count     <= 32'h40000;
 
-            // ... static timing with fixed counter
-            if(flash_cnt == 6'd1) begin
-               state <= 1;
-               flash_addr <= flash_addr + 22'd1;
-               word_count <= word_count - 22'd1;
-
-               if ((flash_addr == 22'h2000aa || flash_addr == 22'h2200aa) && flash_dout == 16'h6678)
-				 // transform bne.b to bra.b in Kickstart ROM 1.2/1.3 @ $f80154 (mirror) and $fc0154
-				 // this forces memory detection on every reset
-				 flash_doutD <= flash_dout & 16'hf0ff;
-               else
-                 // we don't necessarily need to latch the data. But latching it here
-                 // allows to exactly determine the real access time by adjusting flash_cnt
-                 // to the lowest value that gives a stable image
-                 flash_doutD <= flash_dout;
-            end
+          flash_cs        <= 0;
+          flash_ram_write <= 0;
+          flash_state     <= FLASH_STATE_READ;
         end
-
-        // advance ram write state
-        if(state != 0)  state <= state + 3'd1;
-        if(state == 3)  flash_ram_write <= 1'b1;
-        if(state == 18)  flash_ram_write <= 1'b0;
-        if(state == 21)  flash_ram_addr <= flash_ram_addr + 18'd1;
-    end
+      end
+      FLASH_STATE_READ: begin
+        if (word_count != 0) begin
+          flash_cs    <= 1;
+          flash_state <= FLASH_STATE_WAIT;
+        end
+      end
+      FLASH_STATE_WAIT: begin
+        if (flash_busy) begin
+          flash_cs    <= 0;
+          flash_state <= FLASH_STATE_WRITE;
+        end
+      end
+      FLASH_STATE_WRITE: begin
+        if (!flash_busy && clk7_en) begin
+          flash_ram_write <= 1;
+          flash_state     <= FLASH_STATE_NEXT;
+        end
+      end
+      FLASH_STATE_NEXT: begin
+        if (clk7n_en) begin
+          flash_ram_write <= 0;
+          flash_ram_addr  <= flash_ram_addr + 1;
+          flash_addr      <= flash_addr + 1;
+          flash_state     <= FLASH_STATE_READ;
+          word_count      <= word_count - 1;
+        end
+      end
+      default: begin
+        flash_state <= FLASH_STATE_INIT;
+      end
+    endcase
+  end
 end
 
 // ----------------------------- SDRAM ---------------------------------
 
 // there's a total of 16 sdram segments of 512kBytes. The last
-// one is being used to store the kick romm
-
-// run a counter at 28Mhz synchonous to the 7Mhz bus cycle
-reg	    [1:0] cyc;
-always @(posedge clk_28m)
-  if(clk7_en) cyc <= 2'd0;
-  else        cyc <= cyc + 2'd1;
+// one is being used to store the kick rom
 
 wire        sdram_access  = (!ram_oe_n || !ram_we_n);
 wire	    sdram_rw      = !ram_we_n;
@@ -763,9 +793,7 @@ wire		sdram_cs      =
 			rom_download_in_progress?rom_data_word_we:
 			sdram_access;
 
-wire        sdram_sync    =
-			!rom_done?flash_ram_write:
-			!cyc;  // rom_download also runs in sync with clk7/cyc
+wire        sdram_sync    = clk7_en;
 
 wire		sdram_refresh =
 			!rom_done?1'b0:
@@ -773,7 +801,7 @@ wire		sdram_refresh =
 			ram_refresh;
 
 wire [15:0] sdram_din     =
-			!rom_done?flash_doutD:                   // initial rom download from flash
+			!rom_done?flash_dout:                    // initial rom download from flash
 			rom_download_in_progress?rom_data_word:  // rom download from sd card
 			ram_dout;                                // regular operation
 
@@ -801,7 +829,6 @@ wire [21:0] sdram_addr    =
 			ram_a[22:1];                                        // regular operation
 
 assign O_sdram_clk = clk_85m_shifted;
-assign O_sdram_cke = 1'b1;  // clock enable
 
 sdram sdram (
 	.sd_data    ( IO_sdram_dq   ), // 14 bit bidirectional data bus
@@ -812,6 +839,7 @@ sdram sdram (
 	.sd_we      ( O_sdram_wen_n ), // write enable
 	.sd_ras     ( O_sdram_ras_n ), // row address select
 	.sd_cas     ( O_sdram_cas_n ), // columns address select
+	.sd_cke     ( O_sdram_cke   ), // SDRAM clock enable
 
 	// cpu/chipset interface
 	.clk        ( clk_85m       ), // sdram is accessed at 85MHz
@@ -823,17 +851,19 @@ sdram sdram (
 
 	.din        ( sdram_din     ), // data input from chipset/cpu
 	.dout       ( sdram_dout    ),
+	.dout48     ( sdram_dout48  ),
+
 	.addr       ( sdram_addr    ), // 22 bit word address
 	.ds         ( sdram_be      ), // upper/lower data strobe
 	.cs         ( sdram_cs      ), // cpu/chipset requests read/wrie
-	.we         ( sdram_we      ),  // cpu/chipset requests write
+	.we         ( sdram_we      ), // cpu/chipset requests write
 
-	.p2_din        ( fastram_din     ), // data input from chipset/cpu
+	.p2_din        ( fastram_din     ), // data input from cpu
 	.p2_dout       ( fastram_dout    ),
 	.p2_addr       ( fastram_addr    ), // 22 bit word address
 	.p2_ds         ( fastram_be      ), // upper/lower data strobe
-	.p2_cs         ( fastram_sel     ), // cpu/chipset requests read/wrie
-	.p2_we         ( fastram_wr      ),  // cpu/chipset requests write
+	.p2_cs         ( fastram_sel     ), // cpu requests read/wrie
+	.p2_we         ( fastram_wr      ), // cpu requests write
 	.p2_ack        ( fastram_ready   )
 );
 
