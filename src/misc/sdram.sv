@@ -49,7 +49,9 @@ module sdram #(
   parameter RAS_WIDTH  = 13,
   parameter CAS_WIDTH  =  9,
   parameter RAM_CLOCK_SPEED  = 85_000_000,
-  parameter SYNC_CLOCK_SPEED =  7_080_000
+  parameter SYNC_CLOCK_SPEED =  7_080_000,
+  parameter CHIP48_BURST = 0,
+  parameter SYNC_DELAY = 4
 ) (
   input  wire clk,
   input  wire reset_n,  // init signal after FPGA config to initialize RAM
@@ -93,7 +95,8 @@ module sdram #(
 
 localparam WIDTH32 = (DATA_WIDTH == 32);
 
-localparam BURST_LENGTH   = 3'b010;  // 000 = 1, 001 = 2, 010 = 4, 011 = 8
+// 000 = 1, 001 = 2, 010 = 4, 011 = 8
+localparam BURST_LENGTH   = CHIP48_BURST ? 3'b010 : 3'b000;
 localparam ACCESS_TYPE    = 1'b0;    // 0 = sequential, 1 = interleaved
 localparam CAS_LATENCY    = 3'd2;    // 2/3 allowed
 localparam OP_MODE        = 2'b00;   // only 00 (standard operation) allowed
@@ -179,17 +182,17 @@ localparam STATE_WIDTH = $clog2(STATE_LAST + 1);
 
 reg [STATE_WIDTH-1:0] state;
 
-wire       sync_i;
-reg  [1:0] sync_d;
+wire                  sync_i;
+reg  [SYNC_DELAY-1:0] sync_d;
 
 always @(posedge clk, negedge reset_n) begin
   if (!reset_n)
     sync_d <= 0;
   else
-    sync_d <= {sync_d[0], sync};
+    sync_d <= {sync_d[SYNC_DELAY-2:0], sync};
 end
 
-assign sync_i = sync_d[1] && !sync_d[0];
+assign sync_i = sync_d[SYNC_DELAY-1] && !sync_d[SYNC_DELAY-2];
 assign ready  = (state != STATE_INIT);
 
 always @(posedge clk, negedge reset_n) begin

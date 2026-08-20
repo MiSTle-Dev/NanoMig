@@ -830,7 +830,10 @@ wire [21:0] sdram_addr    =
 
 assign O_sdram_clk = clk_85m_shifted;
 
-sdram sdram (
+sdram #(
+	.CHIP48_BURST(1),
+	.SYNC_DELAY(2)
+) sdram (
 	.sd_data    ( IO_sdram_dq   ), // 14 bit bidirectional data bus
 	.sd_addr    ( O_sdram_addr  ), // 13 bit multiplexed address bus
 	.sd_dqm     ( O_sdram_dqm   ), // two byte masks
