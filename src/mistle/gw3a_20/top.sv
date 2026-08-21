@@ -102,8 +102,6 @@ pll_142m pll_hdmi (
     .clkin(clk)
 );
 
-assign O_sdram_clk = clk_85m_shifted;
-
 wire clk_pixel;
 Gowin_CLKDIV clk_div_5 (
     .hclkin(clk_pixel_x5), // input hclkin
@@ -111,7 +109,27 @@ Gowin_CLKDIV clk_div_5 (
     .clkout(clk_pixel)     // output clkout
 );
 
-wire	clk_28m = clk_pixel;
+wire clk_28m = clk_pixel;
+
+wire rst_28m, rst_28m_n;
+wire rst_85m, rst_85m_n;
+wire rst_sdram, rst_sdram_n;
+
+wire sdram_ready;
+
+rst_sync rst_sync (
+  .clk_28m(clk_28m),
+  .clk_85m(clk_85m),
+  .pll_lock(pll_lock),
+  .sdram_ready(sdram_ready),
+  .rst_28m(rst_28m),
+  .rst_28m_n(rst_28m_n),
+  .rst_85m(rst_85m),
+  .rst_85m_n(rst_85m_n),
+  .rst_sdram(rst_sdram),
+  .rst_sdram_n(rst_sdram_n)
+);
+
 wire	clk7_en;   
 wire	clk7n_en;   
 
@@ -134,17 +152,17 @@ wire [2:0] osd_volume;          // Mute=0, 1=25%, 2=50%, 3=75%, 4=100%
 wire       osd_stereo_mix;      // 0=off, 1=on
 
 // generate a reset for some time after rom has been initialized
-reg [15:0] reset_cnt;
-always @(negedge clk_28m) begin
-    if(!pll_lock || !rom_done || reset || osd_reset || kbd_reset)
+reg [15:0] reset_cnt = 16'hffff;
+
+always @(posedge clk_28m, posedge rst_28m) begin
+    if(rst_28m || !rom_done || reset || osd_reset || kbd_reset)
         reset_cnt <= 16'hffff;
     else if(reset_cnt != 0)
-        reset_cnt = reset_cnt - 16'd1;
+        reset_cnt <= reset_cnt - 16'd1;
 end
 
 // this is the reset that goes into the nanomig itself
 wire cpu_reset = |reset_cnt;
-wire sdram_ready;
 
 // -------------------------- FPGA Companion MCU interface -----------------------
 
@@ -161,7 +179,7 @@ wire spi_io_clk = pmod_companion_clk;
 wire [23:0] ws2812_color;
 ws2812 ws2812_inst (
     .clk(clk_28m),
-    .reset(!pll_lock),
+    .reset(rst_28m),
     .color(ws2812_color),
     .data(ws2812)
 );
@@ -182,7 +200,7 @@ wire [7:0] sdc_data_out;
 
 mcu_spi mcu (
 	 .clk(clk_28m),
-	 .reset(!pll_lock),
+	 .reset(rst_28m),
 
 	 // SPI interface to FPGA Companion
      .spi_io_ss ( spi_io_ss ),
@@ -229,7 +247,7 @@ reg         sd_ready;
 sd_card #(
     .CLK_DIV(3'd0)                   // for 28 Mhz clock
 ) sd_card (
-    .rstn(pll_lock),                 // rstn active-low, 1:working, 0:reset
+    .rstn(rst_28m_n),                 // rstn active-low, 1:working, 0:reset
     .clk(clk_28m),                   // clock
   
     // SD card signals
@@ -275,7 +293,7 @@ wire       kbd_reset;      // keyboard reset (Ctrl+LAmiga+RAmiga)
 
 hid hid (
         .clk(clk_28m),
-        .reset(!pll_lock),
+        .reset(rst_28m),
 
          // interface to receive user data from MCU (mouse, kbd, ...)
         .data_in_strobe(mcu_hid_strobe),
@@ -302,7 +320,7 @@ hid hid (
 
 sysctrl sysctrl (
         .clk(clk_28m),
-        .reset(!pll_lock),
+        .reset(rst_28m),
 
          // interface to send and receive generic system control
         .data_in_strobe(mcu_sys_strobe),
@@ -349,7 +367,7 @@ wire [5:0] video_blue;
 
 osd_u8g2 osd_u8g2 (
         .clk(clk_28m),
-        .reset(!pll_lock),
+        .reset(rst_28m),
 
         .data_in_strobe(mcu_osd_strobe),
         .data_in_start(mcu_start),
@@ -419,7 +437,8 @@ wire 	    ram_we_n;
 wire [1:0]  ram_be;
 wire 	    ram_oe_n;
 wire		ram_refresh;   
-   
+wire [47:0] chip48_din;
+
 wire fastram_sel;
 wire [22:1] fastram_addr;
 wire fastram_lds;
@@ -431,22 +450,28 @@ wire fastram_wr;
 wire fastram_ready;
 
 wire [15:0] sdram_dout;
+wire [47:0] sdram_dout48;
 
 assign ram_din = sdram_dout;
+assign chip48_din = sdram_dout48;
 
 // pack config values into minimig config
-wire [5:0] chipset_config = { 1'b0,osd_chipset,osd_video_mode,1'b0 };
+wire [5:0] chipset_config = { 2'b0,osd_chipset,osd_video_mode,1'b0 };
 wire [7:0] memory_config = { 4'b0_000, osd_slowmem, osd_chipmem };   
 wire [2:0] fastram_config = { 1'b0, osd_fastmem };   
 wire [3:0] floppy_config = { osd_floppy_drives, osd_floppy_wrprot, osd_floppy_turbo };
 wire [3:0] video_config = { osd_video_filter, osd_video_scanlines };   
-wire [5:0] ide_config = { 5'b00000, osd_ide_enable };   
+// FIXME - setting ide_config[5] prevents minimig from using
+// fast chipset bus for GAYLE, which is by default in use
+// when 68020 CPU is selected; we may connect fast chip bus
+// to GAYLE and set ide_config[5] to 0 to improve performance
+wire [5:0] ide_config = { 5'b10000, osd_ide_enable };
 
 nanomig nanomig
 (
  .clk_sys(clk_28m),
  .reset(cpu_reset),
- .por(!pll_lock),
+ .por(rst_28m),
 
  .clk7_en(clk7_en),
  .clk7n_en(clk7n_en),
@@ -505,7 +530,7 @@ nanomig nanomig
  ._ram_ble(ram_be[0]),      // sram lower byte select
  ._ram_we(ram_we_n),        // sram write enable
  ._ram_oe(ram_oe_n),        // sram output enable
- .chip48(48'd0),
+ .chip48(48'd0),            // 64-bit chipram read data bus (AGA-only)
  .refresh(ram_refresh),
 
  .fastram_sel(fastram_sel),
@@ -518,88 +543,95 @@ nanomig nanomig
  .fastram_ready(fastram_ready)
 );
 
-wire           flash_ready;  
-wire           mem_ready = sdram_ready && flash_ready && pll_lock;  
-   
-reg            start_rom_copy;
-reg            mem_ready_D;
+wire flash_ready;
 
-// geneate a start_rom_copy signal once flash and SDRAM are initialized
-always @(posedge clk_28m or negedge pll_lock) begin
-   if(!pll_lock) begin
-      start_rom_copy <= 1'b0;
-      mem_ready_D <= 1'b0;
-         
+reg flash_ready_d1;
+reg flash_ready_d2;
+
+// synchronize flash_ready signal to 28MHz clock domain
+always @(posedge clk_28m, posedge rst_28m) begin
+   if (rst_28m) begin
+      flash_ready_d1 <= 1'b0;
+      flash_ready_d2 <= 1'b0;
    end else begin
-      mem_ready_D <= mem_ready;  
-      start_rom_copy <= 1'b0;         
-
-      if(mem_ready && !mem_ready_D)
-          start_rom_copy <= 1'b1;     
+      flash_ready_d1 <= flash_ready;
+      flash_ready_d2 <= flash_ready_d1;
    end
 end
 
 /* -------------- state machine copying data from flash to sdram ---------------- */
-reg [21:0]  flash_addr;  
+reg  [21:0] flash_addr = 22'h200000;
+reg  [17:0] flash_ram_addr = 18'h0;
+reg  [31:0] word_count = 32'h40000;
+
 wire [15:0] flash_dout;
-reg [15:0]  flash_doutD;
-reg		    flash_cs;  
-reg [31:0]  word_count;
-reg [4:0]   state;
+reg         flash_cs;
 wire        flash_data_strobe;
-wire        flash_busy;   
+wire        flash_busy;
+reg         flash_ram_write;
 
 // once the copy counter has run to zero, all rom has been copied
-wire		rom_done = (word_count == 0);
+wire        rom_done = (word_count == 0);
 
-assign leds[3] = !rom_done;  
+assign leds[3] = !rom_done;
 
-reg [21:0]  flash_ram_addr;   
-reg         flash_ram_write;
-reg [5:0]   flash_cnt;  
+localparam FLASH_STATE_INIT  = 0;
+localparam FLASH_STATE_READ  = 1;
+localparam FLASH_STATE_WAIT  = 2;
+localparam FLASH_STATE_WRITE = 3;
+localparam FLASH_STATE_NEXT  = 4;
 
-always @(posedge clk_85m or negedge mem_ready) begin
-    if(!mem_ready) begin
-       flash_addr <= 22'h200000;          // 4MB flash offset (word address)
-       flash_ram_addr <= { 4'hf, 18'h0 }; // write into 512k sdram segment used for kick rom
-       word_count <= 22'h40001;           // 512k bytes ROM data = 256k words
+reg [2:0] flash_state;
 
-       state <= 5'h0;
-       flash_ram_write <= 1'b0;
-       flash_cs <= 1'b0;        
-       flash_cnt <= 6'd0;
-    end else begin
-        if((start_rom_copy || state == 23) && (word_count != 0)) begin
-            flash_cs <= 1'b1;
-            flash_cnt <= 6'd45; // >= 45 @ 85MHz
-        end else begin
-            if(flash_cnt != 0) flash_cnt <= flash_cnt - 6'd1;
-            if(flash_busy)     flash_cs <= 1'b0;
+always @(posedge clk_28m, posedge rst_28m, posedge reset) begin
+  if (rst_28m || reset) begin
+    flash_state <= FLASH_STATE_INIT;
 
-            // ... static timing with fixed counter
-            if(flash_cnt == 6'd1) begin
-               state <= 1;
-               flash_addr <= flash_addr + 22'd1;
-               word_count <= word_count - 22'd1;
-			   
-               if ((flash_addr == 22'h2000aa || flash_addr == 22'h2200aa) && flash_dout == 16'h6678)
-				 // transform bne.b to bra.b in Kickstart ROM 1.2/1.3 @ $f80154 (mirror) and $fc0154
-				 // this forces memory detection on every reset
-				 flash_doutD <= flash_dout & 16'hf0ff;
-               else
-                 // we don't necessarily need to latch the data. But latching it here
-                 // allows to exactly determine the real access time by adjusting flash_cnt
-                 // to the lowest value that gives a stable image
-                 flash_doutD <= flash_dout;
-            end
+  end else begin
+    case (flash_state)
+      FLASH_STATE_INIT: begin
+        if (clk7n_en && flash_ready_d2) begin
+          flash_addr     <= 22'h200000;
+          flash_ram_addr <= 18'h0;
+          word_count     <= 32'h40000;
+
+          flash_cs        <= 0;
+          flash_ram_write <= 0;
+          flash_state     <= FLASH_STATE_READ;
         end
-
-        // advance ram write state
-        if(state != 0)  state <= state + 5'd1;
-        if(state == 3)  flash_ram_write <= 1'b1;
-        if(state == 18) flash_ram_write <= 1'b0;
-        if(state == 21) flash_ram_addr <= flash_ram_addr + 22'd1;
-    end
+      end
+      FLASH_STATE_READ: begin
+        if (word_count != 0) begin
+          flash_cs    <= 1;
+          flash_state <= FLASH_STATE_WAIT;
+        end
+      end
+      FLASH_STATE_WAIT: begin
+        if (flash_busy) begin
+          flash_cs    <= 0;
+          flash_state <= FLASH_STATE_WRITE;
+        end
+      end
+      FLASH_STATE_WRITE: begin
+        if (!flash_busy && clk7_en) begin
+          flash_ram_write <= 1;
+          flash_state     <= FLASH_STATE_NEXT;
+        end
+      end
+      FLASH_STATE_NEXT: begin
+        if (clk7n_en) begin
+          flash_ram_write <= 0;
+          flash_ram_addr  <= flash_ram_addr + 1;
+          flash_addr      <= flash_addr + 1;
+          flash_state     <= FLASH_STATE_READ;
+          word_count      <= word_count - 1;
+        end
+      end
+      default: begin
+        flash_state <= FLASH_STATE_INIT;
+      end
+    endcase
+  end
 end
 
 // ----------------------------- SDRAM ---------------------------------
@@ -607,57 +639,60 @@ end
 // there's a total of 16 sdram segments of 512kBytes. The last
 // one is being used to store the kick rom
 
-// run a counter at 28Mhz synchonous to the 7Mhz bus cycle
-reg	    [1:0] cyc;   
-always @(posedge clk_28m)
-  if(clk7_en) cyc <= 2'd0;
-  else        cyc <= cyc + 2'd1;
-
 wire        sdram_access  = (!ram_oe_n || !ram_we_n);  
 wire	    sdram_rw      = !ram_we_n;
    
 wire		sdram_cs      = rom_done?sdram_access:flash_ram_write;
 
-wire        sdram_sync    = rom_done?!cyc:flash_ram_write;
+wire        sdram_sync    = clk7_en;
    
 wire		sdram_refresh = rom_done?ram_refresh:1'b0;
    
 wire [21:0] sdram_addr    = rom_done?ram_a[22:1]:flash_ram_addr;
-wire [15:0] sdram_din     = rom_done?ram_dout:flash_doutD;
+wire [15:0] sdram_din     = rom_done?ram_dout:flash_dout;
 wire [1:0]  sdram_be      = rom_done?ram_be:2'b00;
 wire		sdram_we      = rom_done?sdram_rw:flash_ram_write; 
 
-sdram #(.RASCAS_DELAY(2)) sdram (
-	.sd_data    ( IO_sdram_dq   ), // 32 bit bidirectional data bus
-	.sd_addr    ( O_sdram_addr  ), // 11 bit multiplexed address bus
-	.sd_dqm     ( O_sdram_dqm   ), // two byte masks
-	.sd_ba      ( O_sdram_ba    ), // two banks
-	.sd_cs      ( O_sdram_cs_n  ), // a single chip select
-	.sd_we      ( O_sdram_wen_n ), // write enable
-	.sd_ras     ( O_sdram_ras_n ), // row address select
-	.sd_cas     ( O_sdram_cas_n ), // columns address select
+assign O_sdram_clk = clk_85m_shifted;
 
-	// cpu/chipset interface
-	.clk        ( clk_85m       ), // sdram is accessed at 85MHz
-	.reset_n    ( pll_lock      ), // init signal after FPGA config to initialize RAM
+sdram #(
+    .CHIP48_BURST(0),  // required only for AGA
+    .SYNC_DELAY(2)
+) sdram (
+    .sd_data    ( IO_sdram_dq   ), // 14 bit bidirectional data bus
+    .sd_addr    ( O_sdram_addr  ), // 13 bit multiplexed address bus
+    .sd_dqm     ( O_sdram_dqm   ), // two byte masks
+    .sd_ba      ( O_sdram_ba    ), // four banks
+    .sd_cs      ( O_sdram_cs_n  ), // a single chip select
+    .sd_we      ( O_sdram_wen_n ), // write enable
+    .sd_ras     ( O_sdram_ras_n ), // row address select
+    .sd_cas     ( O_sdram_cas_n ), // columns address select
+    .sd_cke     ( O_sdram_cke   ), // SDRAM clock enable
 
-	.ready      ( sdram_ready   ), // ram is ready and has been initialized
-	.sync       ( sdram_sync    ), // rising edge of sync is begin of a memory cycle
-	.refresh    ( sdram_refresh ), // refresh cycle
-	.din        ( sdram_din     ), // data input from chipset/cpu
-	.dout       ( sdram_dout    ),
-	.addr       ( sdram_addr    ), // 22 bit word address
-	.ds         ( sdram_be      ), // upper/lower data strobe
-	.cs         ( sdram_cs      ), // cpu/chipset requests read/wrie
-	.we         ( sdram_we      ), // cpu/chipset requests write
-			 
-	.p2_din        ( fastram_din     ), // data input from chipset/cpu
-	.p2_dout       ( fastram_dout    ),
-	.p2_addr       ( fastram_addr    ), // 22 bit word address
-	.p2_ds         ( fastram_be      ), // upper/lower data strobe
-	.p2_cs         ( fastram_sel     ), // cpu/chipset requests read/wrie
-	.p2_we         ( fastram_wr      ),  // cpu/chipset requests write
-	.p2_ack        ( fastram_ready   )
+    // cpu/chipset interface
+    .clk        ( clk_85m       ), // sdram is accessed at 85MHz
+    .reset_n    ( rst_sdram_n   ), // init signal after FPGA config to initialize RAM
+
+    .ready      ( sdram_ready   ), // ram is ready and has been initialized
+    .sync       ( sdram_sync    ), // rising edge of sync is begin of a memory cycle
+    .refresh    ( sdram_refresh ), // refresh cycle
+
+    .din        ( sdram_din     ), // data input from chipset/cpu
+    .dout       ( sdram_dout    ),
+    .dout48     ( sdram_dout48  ),
+
+    .addr       ( sdram_addr    ), // 22 bit word address
+    .ds         ( sdram_be      ), // upper/lower data strobe
+    .cs         ( sdram_cs      ), // cpu/chipset requests read/wrie
+    .we         ( sdram_we      ), // cpu/chipset requests write
+
+    .p2_din        ( fastram_din     ), // data input from cpu
+    .p2_dout       ( fastram_dout    ),
+    .p2_addr       ( fastram_addr    ), // 22 bit word address
+    .p2_ds         ( fastram_be      ), // upper/lower data strobe
+    .p2_cs         ( fastram_sel     ), // cpu requests read/wrie
+    .p2_we         ( fastram_wr      ), // cpu requests write
+    .p2_ack        ( fastram_ready   )
 );
 
 // run the flash a 85MHz. This is only used at power-up to copy kickstart
@@ -665,7 +700,7 @@ sdram #(.RASCAS_DELAY(2)) sdram (
 assign mspi_clk = clk_85m_shifted;   
 flash flash (
     .clk       ( clk_85m     ),
-    .resetn    ( pll_lock    ),
+    .resetn    ( rst_85m_n   ),
     .ready     ( flash_ready ),
 
     .address   ( flash_addr  ),

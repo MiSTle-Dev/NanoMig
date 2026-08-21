@@ -81,6 +81,7 @@ add_file misc/sdram.sv
 add_file misc/sysctrl.v
 add_file misc/video_analyzer.v
 add_file misc/ws2812.v
+add_file misc/rst_sync.v
 add_file mistle/gw3a_20/gowin_dp/ide_dpram.v
 add_file mistle/gw3a_20/gowin_dp/sector_dpram.v
 add_file mistle/gw3a_20/gowin_pll/pll_142m.v
