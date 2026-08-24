@@ -8,13 +8,13 @@ add_file mistle/gw5a_25/top.sv
 add_file nanomig.v
 add_file minimig-aga/amiga_clk.v
 add_file minimig-aga/cpu_wrapper.v
-add_file minimig-aga/minimig.v 
+add_file minimig-aga/minimig.v
 add_file minimig-aga/ciaa.v
 add_file minimig-aga/ciab.v
 add_file minimig-aga/cia_int.v
 add_file minimig-aga/cia_timera.v
 add_file minimig-aga/cia_timerb.v
-add_file minimig-aga/cia_timerd.v 
+add_file minimig-aga/cia_timerd.v
 add_file minimig-aga/paula.v
 add_file minimig-aga/paula_uart.v
 add_file minimig-aga/paula_audio_channel.v
@@ -80,6 +80,7 @@ add_file misc/sd_rw.v
 add_file misc/sdcmd_ctrl.v
 add_file misc/amiga_keymap.v
 add_file misc/flash_dspi.v
+add_file misc/rst_sync.v
 add_file tang/primer25k/gowin_clkdiv/gowin_clkdiv.v
 add_file tang/primer25k/gowin_pll/pll_142m.v
 add_file tang/primer25k/gowin_pll/pll_142m_mod.v
@@ -88,8 +89,8 @@ add_file tang/primer25k/gowin_dpb/sector_dpram.v
 add_file tang/primer25k/gowin_dpb/ide_dpram.v
 add_file misc/ws2812.v
 add_file misc/sdram.sv
-add_file mistle/gw3a_20/nanomig.cst
-add_file mistle/gw3a_20/nanomig.sdc
+add_file mistle/gw5a_25/nanomig.cst
+add_file mistle/gw5a_25/nanomig.sdc
 add_file fx68k/microrom.mem
 add_file fx68k/nanorom.mem
 add_file tg68k/TG68K_Pack.vhd

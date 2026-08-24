@@ -59,7 +59,7 @@ module nanomig (
    // RTC time information as e.g. received via NTP
    input [11:0]	 rtc,
 `endif
-		 
+
    // Interface MiSTeryNano sd card interface. This very simple connection allows the core
    // to request sectors from within a OSD selected image file
    input [7:0]	 sdc_img_mounted,
@@ -85,8 +85,8 @@ module nanomig (
    output	 _ram_we, // sram write enable
    output	 _ram_oe, // sram output enable
 
-   output reg	 fastram_sel,
-   output [22:1] fastram_addr,
+   output 	 fastram_sel,
+   output [23:1] fastram_addr,
    output	 fastram_lds,
    output	 fastram_uds,
    input [15:0]	 fastram_dout,
@@ -142,20 +142,44 @@ amiga_clk amiga_clk
         .reset_n  ( ~por       )
 );
 
-// TODO: cpu_ph1 and cpu_ph2 are derived from a 114Mhz clock in original
+// cpu_ph1 and cpu_ph2 are derived from a 114Mhz clock in original
 // minimig aga. Current setting is taken from simulation:
 // cpu_ph1 is valid before clk7_en and cpu_ph2 is after clk7_en
 // so order is: cpu_ph1, clk7_en, cpu_ph2, clk7n_en
-reg  cpu_ph1, cpu_ph2;
+reg cpu_ph1, cpu_ph2, cpu_sync;
+
+// == Timing model
+//
+// signal   | cycle
+// -------------------
+// c1       | 1 1 0 0
+// c3       | 0 1 1 0
+// -------------------
+// clk7_en  | 1 0 0 0
+// clk7n_en | 0 0 1 0
+// cpu_ph1  | 0 0 0 1
+// cpu_ph2  | 0 1 0 0
+// -------------------
+//             ^
+//             |--- SDRAM cycle starts somewhere in the middle
+//
+
+// set cpu_sync to 1 on ph2 to
+// ensure the cycle starts with ph1
 always @(posedge clk_sys) begin
+   if (~cpu_rst)
+      cpu_sync <= 1'b0;
+   else if (c1 && c3)
+      cpu_sync <= 1'b1;
+end
+
+always @(*) begin
    if (~cpu_rst) begin
-      cpu_ph1 <= 1'b0;
-      cpu_ph2 <= 1'b0;
-   end else begin 
-//      cpu_ph1 <= !c1 &&  c3;  // on negedge clk_sys
-//      cpu_ph2 <=  c1 && !c3;  // -"-
-      cpu_ph1 <=   c1 &&  c3;
-      cpu_ph2 <=  !c1 && !c3;
+      cpu_ph1 = 1'b0;
+      cpu_ph2 = 1'b0;
+   end else begin
+      cpu_ph1 = !c1 && !c3 && cpu_sync;
+      cpu_ph2 =  c1 &&  c3 && cpu_sync;
    end
 end
 
@@ -210,46 +234,26 @@ wire [28:1] ram_addr;
 wire	    ram_sel;
 wire	    ram_lds;
 wire	    ram_uds;
-   
-// ram_ready finally is the clkena for the tg68k
-reg	    ram_ready;
+wire	    ram_ready;
 
-// generate a ram_cs at the begin of the bus cycle, so the ram cycle starts
-// at the right time
-reg	    ram_cs_trigger;   
-reg	    ram_cs_triggerD;
-wire	    ram_cs = (cpu_ph2 && ram_sel) || ram_cs_trigger || ram_cs_triggerD; 
+reg fastram_ready_d;
 
-always @(negedge clk_sys)
-   if( cpu_ph2 )      ram_cs_trigger <= ram_sel;
-   else if( clk7_en ) ram_cs_trigger <= 1'b0;   
+// cpu_ph1 is just before clk7_en, so this is
+// the very last moment we can receive ACK from SDRAM;
+// if it didn't happen then it means our request
+// didn't go through and we need to retry in the next cycle
+assign ram_ready = cpu_ph1 && (fastram_ready != fastram_ready_d);
 
-always @(posedge clk_sys)
-  ram_cs_triggerD <= ram_cs_trigger;   
-   
-// neg/clk7
-    `ifdef ENABLE_TG68K  
-        reg frr_d=1'b0;
-        always @(posedge clk_sys) begin
-        ram_ready<=1'b0;
-        if(clk7_en) begin
-            if(fastram_ready!=frr_d)
-                ram_ready<=1'b1;
-            frr_d <= fastram_ready;
-        end
-	`else
-		reg frr_d=1'b0;
-        always @(posedge clk_sys) begin
-        if(!cpu_rst)
-            ram_ready<=1'b0;
-        else if(!ram_sel)
-            ram_ready<=1'b0;
-        else if(fastram_ready!=frr_d)
-            ram_ready<=1'b1;
-        frr_d <= fastram_ready;	
-    `endif
+// avoid selecting fastram when we didn't handle
+// ready signal yet (shouldn't happen but just
+// in case, it's better to keep it)
+assign fastram_sel = ram_sel && (fastram_ready == fastram_ready_d);
+
+always @(posedge clk_sys) begin
+  if (!cpu_rst || cpu_ph1)
+    fastram_ready_d <= fastram_ready;
 end
-   
+
 cpu_wrapper cpu_wrapper
 (
 	.reset        (cpu_rst         ),
@@ -283,7 +287,7 @@ cpu_wrapper cpu_wrapper
 	.fastramcfg   (fastram_config  ),
 	.bootrom      (1'b0            ),
 
-	.ramsel       (ram_sel         ),
+	.ramreq       (ram_sel         ),
 	.ramaddr      (ram_addr        ),
 	.ramlds       (ram_lds         ),
 	.ramuds       (ram_uds         ),
@@ -297,29 +301,6 @@ cpu_wrapper cpu_wrapper
 	.cacr         (cpu_cacr        ),
 	.nmi_addr     (cpu_nmi_addr    )
 );
-   
-`ifdef ENABLE_TG68K
-	reg ram_sel_d;
-	reg ram_ready_d;
-	always @(posedge clk_sys) begin
-		ram_ready_d <= ram_ready;
-	if( clk7n_en) begin
-			if(ram_sel && !ram_ready_d)
-				fastram_sel <= 1'b1;
-		end
-	if( fastram_ready != frr_d ) fastram_sel <= 1'b0;   
-	end
-`else
-	reg ram_sel_d;
-	always @(posedge clk_sys) begin
-	if( cpu_ph2) begin
-			if(!ram_sel_d)
-				fastram_sel <= ram_sel;
-			ram_sel_d <= ram_sel;
-		end
-	if( fastram_ready != frr_d ) fastram_sel <= 1'b0;   
-	end			
-`endif	
 
 assign fastram_addr = ram_addr;
 assign fastram_lds = ram_lds;
@@ -1136,7 +1117,6 @@ wire [15:0] JOY3 = 16'h0000;
 wire [15:0] JOYA0 = 16'h0000;
 wire [15:0] JOYA1 = 16'h0000;
 
-
 /* ======================================================================================== */
 /* =============================== internal ROM and RAM =================================== */
 /* ======================================================================================== */
@@ -1157,7 +1137,7 @@ initial $readmemh("flash_read.hex", rom);
 `else
 $error "Please specify a ROM to use internally"
 `endif
-	   
+
 reg [15:0] romD;
 always_ff @(posedge clk_sys)
   if(clk7n_en && !_ram_oe)
@@ -1272,6 +1252,7 @@ minimig minimig
 `ifdef ENABLE_RTC
 	.rtc          (rtc              ),
 `endif
+
 	//video
 	._hsync       (hs_in            ), // horizontal sync
 	._vsync       (vs_in            ), // vertical sync
