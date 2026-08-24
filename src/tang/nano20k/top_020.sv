@@ -147,7 +147,7 @@ wire [1:0] osd_floppy_drives;
 wire       osd_floppy_turbo;
 wire       osd_floppy_wrprot;
 wire       osd_ide_enable;
-wire [1:0] osd_chipset;         // 0=OCS-A500, 1=OCS-A1000, 2=ECS
+wire [2:0] osd_chipset;         // 0=OCS-A500, 1=OCS-A1000, 2=ECS, 6=AGA
 wire [1:0] osd_cpu;             // 0=68000, 1=68010, 2=68020
 wire       osd_video_mode;      // PAL (0=PAL, 1=NTSC)
 wire [1:0] osd_video_screen;    // 0=standard, 1=overscan, 2=wide screen (jailbars)
@@ -596,7 +596,7 @@ wire [15:0] sdram_dout;
 assign ram_din = sdram_dout;
 
 // pack config values into minimig config
-wire [5:0] chipset_config = { 2'b0,osd_chipset,osd_video_mode,1'b0 };
+wire [5:0] chipset_config = { 1'b0,osd_chipset,osd_video_mode,1'b0 };
 wire [1:0] cpu_config = { osd_cpu };
 wire [7:0] memory_config = { 4'b0_000, osd_slowmem, osd_chipmem };   
 wire [2:0] fastram_config = { 1'b0, osd_fastmem };   

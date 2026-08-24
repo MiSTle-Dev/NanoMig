@@ -151,7 +151,7 @@ wire [1:0] osd_floppy_drives;
 wire       osd_floppy_turbo;
 wire       osd_floppy_wrprot;
 wire       osd_ide_enable;
-wire [1:0] osd_chipset;         // 0=OCS-A500, 1=OCS-A1000, 2=ECS, 3=AGA
+wire [2:0] osd_chipset;         // 0=OCS-A500, 1=OCS-A1000, 2=ECS, 6=AGA
 wire       osd_video_mode;      // PAL (0=PAL, 1=NTSC)
 wire [1:0] osd_video_screen;    // 0=normal, 1=overscan, 2=wide screen (jailbars)
 wire [1:0] osd_video_filter;
@@ -328,7 +328,11 @@ hid hid (
          );   
 
 wire [11:0] rtc;                // rtc/time data
-sysctrl sysctrl (
+sysctrl #(
+`ifdef ENABLE_AGA
+        .AGA(1)
+`endif
+) sysctrl (
         .clk(clk_28m),
         .reset(rst_28m),
 
@@ -344,7 +348,7 @@ sysctrl sysctrl (
 		.system_floppy_turbo(osd_floppy_turbo),
 		.system_floppy_wrprot(osd_floppy_wrprot),
 		.system_ide_enable(osd_ide_enable),
-	    .system_chipset(osd_chipset),
+		.system_chipset(osd_chipset),
 		.system_video_mode(osd_video_mode),
 		.system_video_screen(osd_video_screen),
 		.system_video_filter(osd_video_filter),
@@ -354,9 +358,9 @@ sysctrl sysctrl (
 		.system_slowmem(osd_slowmem),
 		.system_fastmem(osd_fastmem),
 		.system_joy_swap(osd_joy_swap),
-        .system_volume(osd_volume),
+		.system_volume(osd_volume),
 		.system_stereo_mix(osd_stereo_mix),
-				 
+
         .int_out_n(spi_intn),
         .int_in( { 4'b0000, sdc_int, 1'b0, hid_int, 1'b0 }),
         .int_ack( int_ack ),
@@ -468,14 +472,7 @@ assign ram_din = sdram_dout;
 assign chip48_din = sdram_dout48;
    
 // pack config values into minimig config
-`ifdef ENABLE_AGA
-wire [2:0] osd_chipset_bits = (osd_chipset == 2'd3)?4'b0110:{2'b00, osd_chipset};
-`else
-// select ECS (2) if AGA is requested while AGA is disabled
-wire [2:0] osd_chipset_bits = (osd_chipset == 2'd3)?4'b0010:{2'b00, osd_chipset};
-`endif
-wire [5:0] chipset_config = { osd_chipset_bits,osd_video_mode,1'b0 };
-wire [1:0] cpu_config = osd_cpu;   
+wire [5:0] chipset_config = { 1'b0,osd_chipset,osd_video_mode,1'b0 };
 wire [7:0] memory_config = { 4'b0_000, osd_slowmem, osd_chipmem };   
 wire [2:0] fastram_config = { 1'b0, osd_fastmem };   
 wire [3:0] floppy_config = { osd_floppy_drives, osd_floppy_wrprot, osd_floppy_turbo };
@@ -681,8 +678,8 @@ assign O_sdram_clk = clk_85m_shifted;
 sdram #(
 `ifdef ENABLE_AGA
     .CHIP48_BURST(1),  // required only for AGA
-    .SYNC_DELAY(2)
 `endif
+    .SYNC_DELAY(2)
 ) sdram (
     .sd_data    ( IO_sdram_dq   ), // 14 bit bidirectional data bus
     .sd_addr    ( O_sdram_addr  ), // 13 bit multiplexed address bus
