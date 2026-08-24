@@ -4,8 +4,13 @@
 
 `define GOWIN
 `define ENABLE_TG68K // required for AGA
+`define ENABLE_AGA
 `define ENABLE_RTC
 
+//`define ENABLE_INT_ROM
+//`define ENABLE_INT_RAM
+//`define ENABLE_INT_ROM_FLASH_READ
+  
 module top(
   input			clk, // 50 MHz in
 
@@ -146,11 +151,11 @@ wire [1:0] osd_floppy_drives;
 wire       osd_floppy_turbo;
 wire       osd_floppy_wrprot;
 wire       osd_ide_enable;
-wire [1:0] osd_chipset;         // 0=OCS-A500, 1=OCS-A1000, 2=ECS
+wire [1:0] osd_chipset;         // 0=OCS-A500, 1=OCS-A1000, 2=ECS, 3=AGA
 wire       osd_video_mode;      // PAL (0=PAL, 1=NTSC)
 wire [1:0] osd_video_screen;    // 0=normal, 1=overscan, 2=wide screen (jailbars)
 wire [1:0] osd_video_filter;
-wire [1:0] osd_video_scanlines;
+wire [1:0] osd_video_scanlines; // 0=none, 1=light, 2=dim, 3=balanced
 wire       osd_joy_swap;        // 0=off, 1=on
 wire [2:0] osd_volume;          // Mute=0, 1=25%, 2=50%, 3=75%, 4=100%
 wire       osd_stereo_mix;      // 0=off, 1=on
@@ -447,7 +452,7 @@ wire		ram_refresh;
 wire [47:0] chip48_din;
 
 wire fastram_sel;
-wire [22:1] fastram_addr;
+wire [23:1] fastram_addr;
 wire fastram_lds;
 wire fastram_uds;
 wire [15:0] fastram_dout;
@@ -463,7 +468,12 @@ assign ram_din = sdram_dout;
 assign chip48_din = sdram_dout48;
    
 // pack config values into minimig config
+`ifdef ENABLE_AGA
 wire [2:0] osd_chipset_bits = (osd_chipset == 2'd3)?4'b0110:{2'b00, osd_chipset};
+`else
+// select ECS (2) if AGA is requested while AGA is disabled
+wire [2:0] osd_chipset_bits = (osd_chipset == 2'd3)?4'b0010:{2'b00, osd_chipset};
+`endif
 wire [5:0] chipset_config = { osd_chipset_bits,osd_video_mode,1'b0 };
 wire [1:0] cpu_config = osd_cpu;   
 wire [7:0] memory_config = { 4'b0_000, osd_slowmem, osd_chipmem };   
@@ -661,7 +671,7 @@ wire        sdram_sync    = clk7_en;
    
 wire		sdram_refresh = rom_done?ram_refresh:1'b0;
    
-wire [21:0] sdram_addr    = rom_done?ram_a[22:1]:flash_ram_addr;
+wire [21:0] sdram_addr    = rom_done?ram_a[22:1]:{4'b1111,flash_ram_addr};
 wire [15:0] sdram_din     = rom_done?ram_dout:flash_dout;
 wire [1:0]  sdram_be      = rom_done?ram_be:2'b00;
 wire		sdram_we      = rom_done?sdram_rw:flash_ram_write; 
@@ -669,8 +679,10 @@ wire		sdram_we      = rom_done?sdram_rw:flash_ram_write;
 assign O_sdram_clk = clk_85m_shifted;
 
 sdram #(
+`ifdef ENABLE_AGA
     .CHIP48_BURST(1),  // required only for AGA
     .SYNC_DELAY(2)
+`endif
 ) sdram (
     .sd_data    ( IO_sdram_dq   ), // 14 bit bidirectional data bus
     .sd_addr    ( O_sdram_addr  ), // 13 bit multiplexed address bus

@@ -1134,6 +1134,8 @@ initial $readmemh("pwr_led_blink.hex", rom);   // pwr_led_blink is a very basic 
 initial $readmemh("video_init.hex", rom);
 `elsif ENABLE_INT_ROM_FLASH_READ
 initial $readmemh("flash_read.hex", rom);
+`elsif ENABLE_INT_ROM_RAM_TEST
+initial $readmemh("ram_test.hex", rom);
 `else
 $error "Please specify a ROM to use internally"
 `endif
