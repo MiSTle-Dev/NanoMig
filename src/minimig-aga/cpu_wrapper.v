@@ -176,16 +176,10 @@ wire	  sel_autoconfig;
 reg [1:0] autocfg_card;
 reg [3:0] autocfg_data;
 
-reg  [31:0] cpu_addr;
-reg  [15:0] cpu_dout;
 wire [15:0] cpu_din = ramsel ? ramdat : fastchip_selack ? fastchip_dout : {sel_autoconfig ? autocfg_data : chip_data[15:12], chip_data[11:0]};
 reg         skip_fetch;
 wire        skip_fetch_i;
-reg         wr;
-reg         uds_in;
-reg         lds_in;
 reg  [15:0] chip_data;
-wire [15:0] cpu_din = ramsel ? ramdat : fastchip_selack ? fastchip_dout : {sel_autoconfig ? autocfg_data : chip_data[15:12], chip_data[11:0]};
 
 wire [15:0] cpu_dout_o;
 wire [23:1] cpu_addr_o;
@@ -298,6 +292,12 @@ reg         chipready;
 
 `ifdef ENABLE_TG68K
 
+reg tg68_armed;
+
+always @(posedge clk)
+    tg68_armed <= reset;
+
+
 TG68KdotC_Kernel
 `ifndef VERILATOR
 // verilator runs the verilog translated variant which doesn't support configuration but
@@ -312,7 +312,6 @@ TG68KdotC_Kernel
 	.MUL_Hardware(1)    // 0=>no,  	  1=>yes,
 )
 `endif
-
 cpu_inst_p
 (
   .clk(clk),
@@ -321,7 +320,7 @@ cpu_inst_p
 `else
   .nReset(reset),
 `endif
-  .clkena_in(~cpu_req | chipready | ramready | fastchip_ready),
+  .clkena_in((~cpu_req && tg68_armed) | chipready | ramready | fastchip_ready),
   .data_in(cpu_din),
   .IPL(cpu_ipl),
   .IPL_autovector(1'b1),
