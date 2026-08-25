@@ -200,7 +200,7 @@ wire [23:1] chip_addr;
 
 wire	    ovl;
    
-wire [1:0] cpucfg = (cpu_config == 2'd2) ? 2'b11 : cpu_config; //CPU-Type: 00 = 68000, 01 = 68010, 11 = 68020
+wire [1:0] cpucfg = cpu_config; // CPU-Type: 00 = 68000, 01 = 68010, 11 = 68020
 
 // cache bits: dcache, kick, chip
 // wire [2:0] cachecfg = { 1'b0, ~ovl, 1'b0 };

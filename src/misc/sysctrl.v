@@ -119,7 +119,7 @@ always @(posedge clk) begin
       system_floppy_drives <= 2'd0;
       system_floppy_turbo <= 1'b1;
       system_floppy_wrprot <= 1'b1;
-      system_cpu <= 2'b10;
+      system_cpu <= 2'b11;
       system_chipset <= AGA ? 3'd6 : 3'd2;
       system_video_mode <= 1'b0;
       system_video_screen <= 2'd0;
@@ -226,7 +226,7 @@ always @(posedge clk) begin
 		   // Value "C": chipset OCS-A500(0), OCS-A1000(1), ECS(2) or AGA(3)
 		   if(id == "C") system_chipset <= (AGA && data_in[1:0] == 2'd3) ? 3'd6 : {1'b0, data_in[1:0]};
 		   // Value "T": CPU 68000(0), 68010(1) or 68020(2)
-		   if(id == "T") system_cpu <= data_in[1:0];
+		   if(id == "T") system_cpu <= data_in[1:0] == 2'b10 ? 2'b11 : data_in[1:0];
 		   // Value "F": video filter none(0), h(1), v(2) or h+v(3)
 		   if(id == "F") system_video_filter <= data_in[1:0];
 		   // Value "V": PAL(0) or NTSC(1) video
