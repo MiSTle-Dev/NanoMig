@@ -11,6 +11,7 @@
 `define LATTICE
 // `define INFER_DPRAM
 `define ENABLE_TG68K
+`define ENABLE_AGA
 // `define DISABLE_IDE       // when using inferred ram, this exceeds the chip
 // `define HDMI_TEST_PATTERN  // display static test pattern on HDMI instead of amiga video
 // `define ENABLE_INT_ROM     // enable 2k internal test rom in nanomig.v
@@ -156,8 +157,8 @@ wire       osd_floppy_wrprot;
 `ifndef DISABLE_IDE
 wire       osd_ide_enable;
 `endif
-wire [1:0] osd_chipset;         // 0=OCS-A500, 1=OCS-A1000, 2=ECS
-wire [1:0] osd_cpu;             // 0=68000, 1=68010, 2=68020
+wire [2:0] osd_chipset;         // 0=OCS-A500, 1=OCS-A1000, 2=ECS, 6=AGA
+wire [1:0] osd_cpu;             // 00=68000, 01=68010, 11=68020
 wire       osd_video_mode;      // PAL (0=PAL, 1=NTSC)
 wire [1:0] osd_video_screen;    // 0=standard, 1=overscan, 2=wide screen (jailbars)
 wire [1:0] osd_video_filter;
@@ -448,7 +449,11 @@ hid hid (
         .joystick1(hid_joy1)
          );
 
-sysctrl sysctrl (
+sysctrl #(
+`ifdef ENABLE_AGA
+        .AGA(1)
+`endif
+) sysctrl (
         .clk(clk_28m),
         .reset(rst_28m),
 
@@ -587,7 +592,7 @@ assign ram_din = sdram_dout;
 assign chip48_din = sdram_dout48;
 
 // pack config values into minimig config
-wire [5:0] chipset_config = { 2'b0,osd_chipset,osd_video_mode,1'b0 };
+wire [5:0] chipset_config = { 1'b0,osd_chipset,osd_video_mode,1'b0 };
 wire [1:0] cpu_config = { osd_cpu };
 wire [7:0] memory_config = { 4'b0_000, osd_slowmem, osd_chipmem };
 wire [2:0] fastram_config = { 1'b0, osd_fastmem };
@@ -831,7 +836,9 @@ wire [21:0] sdram_addr    =
 assign O_sdram_clk = clk_85m_shifted;
 
 sdram #(
-	.CHIP48_BURST(1),
+`ifdef ENABLE_AGA
+	.CHIP48_BURST(1),  // required only for AGA
+`endif
 	.SYNC_DELAY(2)
 ) sdram (
 	.sd_data    ( IO_sdram_dq   ), // 14 bit bidirectional data bus

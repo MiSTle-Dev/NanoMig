@@ -43,12 +43,13 @@
 	<listentry label="68010" value="1"/>
 	<listentry label="68020" value="2"/>
       </list>
-      <list label="Chipset:" id="C" default="2" action="reset">
+      <list label="Chipset:" id="C" default="3" action="reset">
 	<listentry label="OCS-A500" value="0"/>
 	<listentry label="OCS-A1000" value="1"/>
 	<listentry label="ECS" value="2"/>
+	<listentry label="AGA" value="3"/>
       </list>
-      <list label="Chipmem:" id="Y" default="0" action="reset">
+      <list label="Chipmem:" id="Y" default="3" action="reset">
 	<listentry label="512kB" value="0"/>
 	<listentry label="1MB" value="1"/>
 	<listentry label="1.5MB" value="2"/>

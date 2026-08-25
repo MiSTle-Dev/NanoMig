@@ -153,15 +153,6 @@
         <Source name="../../minimig-aga/cpu_wrapper.v" type="Verilog" type_short="Verilog">
             <Options/>
         </Source>
-        <Source name="../../minimig-aga/denise.v" type="Verilog" type_short="Verilog">
-            <Options/>
-        </Source>
-        <Source name="../../minimig-aga/denise_bitplane_shifter.v" type="Verilog" type_short="Verilog">
-            <Options/>
-        </Source>
-        <Source name="../../minimig-aga/denise_bitplanes.v" type="Verilog" type_short="Verilog">
-            <Options/>
-        </Source>
         <Source name="../../minimig-aga/denise_collision.v" type="Verilog" type_short="Verilog">
             <Options/>
         </Source>
@@ -178,12 +169,6 @@
             <Options/>
         </Source>
         <Source name="../../minimig-aga/denise_spritepriority.v" type="Verilog" type_short="Verilog">
-            <Options/>
-        </Source>
-        <Source name="../../minimig-aga/denise_sprites.v" type="Verilog" type_short="Verilog">
-            <Options/>
-        </Source>
-        <Source name="../../minimig-aga/denise_sprites_shifter.v" type="Verilog" type_short="Verilog">
             <Options/>
         </Source>
         <Source name="../../minimig-aga/gary.v" type="Verilog" type_short="Verilog">
@@ -274,6 +259,27 @@
             <Options/>
         </Source>
         <Source name="../paula_floppy_dma_buf.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../minimig-aga-ebr/denise.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../minimig-aga-ebr/denise_bitplane_shifter.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../minimig-aga-ebr/denise_bitplanes.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../minimig-aga-ebr/denise_sprites.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../minimig-aga-ebr/denise_sprites_shifter.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../bitplane_ram.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../sprite_ram.v" type="Verilog" type_short="Verilog">
             <Options/>
         </Source>
         <Source name="nanomig.lpf" type="Logic Preference" type_short="LPF">
