@@ -103,12 +103,6 @@ module nanomig (
    
 wire cpu_rst;
 wire [15:0] ram_din;
-wire uart_cts;
-wire uart_rts;
-wire uart_dsr;
-wire uart_dtr;
-wire field1;
-wire lace;
 
 reg reset_d;
 always @(posedge clk_sys, posedge reset) begin
@@ -186,7 +180,6 @@ end
 
 wire  [1:0] cpu_state;
 wire        cpu_clkena;
-// wire        cpu_nrst_out;
 wire  [3:0] cpu_cacr;
 wire [31:0] cpu_nmi_addr;
 
@@ -306,6 +299,7 @@ cpu_wrapper cpu_wrapper
 	.chip_dtack   (chip_dtack      ),
 	.chip_ipl     (chip_ipl        ),
 
+ `ifdef FASTCHIP_DEPRECATED
 	.fastchip_dout   (  ),
 	.fastchip_sel    (  ),
 	.fastchip_lds    (  ),
@@ -314,7 +308,8 @@ cpu_wrapper cpu_wrapper
 	.fastchip_selack (  ),
 	.fastchip_ready  ( 1'b0 ),
 	.fastchip_lw     (  ),
-
+`endif
+ 
 	.cpucfg       (cpucfg          ),
 	.cachecfg     (cachecfg        ),
 	.fastramcfg   (fastram_config  ),
@@ -1509,12 +1504,12 @@ minimig minimig
 	//rs232 pins
 	.rxd          (uart_rx          ), // RS232 receive
 	.txd          (uart_tx          ), // RS232 send
-	.cts          (uart_cts         ), // RS232 clear to send
-	.rts          (uart_rts         ), // RS232 request to send
-	.dtr          (uart_dtr         ), // RS232 Data Terminal Ready
-	.dsr          (uart_dsr         ), // RS232 Data Set Ready
-	.cd           (uart_dsr         ), // RS232 Carrier Detect
-	.ri           (1                ), // RS232 Ring Indicator
+	.cts          (1'b1             ), // RS232 clear to send
+	.rts          (                 ), // RS232 request to send
+	.dtr          (                 ), // RS232 Data Terminal Ready
+	.dsr          (1'b1             ), // RS232 Data Set Ready
+	.cd           (                 ), // RS232 Carrier Detect
+	.ri           (1'b1             ), // RS232 Ring Indicator
 
 	//I/O
 	._joy1        (~JOY0            ), // joystick 1 [fire4,fire3,fire2,fire,up,down,left,right] (default mouse port)
@@ -1536,8 +1531,8 @@ minimig minimig
 	//video
 	._hsync       (hs_in            ), // horizontal sync
 	._vsync       (vs_in            ), // vertical sync
-	.field1       (field1           ),
-	.lace         (lace             ),
+	.field1       (                 ),
+	.lace         (                 ),
 	.red          (red              ), // red
 	.green        (green            ), // green
 	.blue         (blue             ), // blue
@@ -1554,8 +1549,6 @@ minimig minimig
 
 	//user i/o
 	.cpucfg       (cpucfg ), // CPU config
-	.cachecfg     (cachecfg ), // Cache config
-	.memcfg       ( ), // memory config
 
 `ifndef DISABLE_IDE
 	.hdd_led      ( hdd_led         ),

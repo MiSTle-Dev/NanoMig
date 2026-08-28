@@ -43,53 +43,57 @@
 
 module cpu_wrapper
 (
-	input             reset,
-	output reg        reset_out,
+	input		  reset,
+	output reg	  reset_out,
 
-	input             clk,
-	input             ph1,
-	input             ph2,
+	input		  clk,
+	input		  ph1,
+	input		  ph2,
 
-	input       [1:0] cpucfg,
-	input       [2:0] fastramcfg,
-	input       [2:0] cachecfg,
-	input             bootrom,
+	input [1:0]	  cpucfg,
+	input [2:0]	  fastramcfg,
+	input [2:0]	  cachecfg,
+	input		  bootrom,
 
 	output reg [23:1] chip_addr,
-	input      [15:0] chip_dout,
+	input [15:0]	  chip_dout,
 	output reg [15:0] chip_din,
-	output reg        chip_as,
-	output reg        chip_uds,
-	output reg        chip_lds,
-	output reg        chip_rw,
-	input             chip_dtack,
-	input       [2:0] chip_ipl,
+	output reg	  chip_as,
+	output reg	  chip_uds,
+	output reg	  chip_lds,
+	output reg	  chip_rw,
+	input		  chip_dtack,
+	input [2:0]	  chip_ipl,
 
-	input      [15:0] fastchip_dout,
-	output reg        fastchip_sel,
-	output            fastchip_lds,
-	output            fastchip_uds,
-	output            fastchip_rnw,
-	output reg        fastchip_lw,
-	input             fastchip_selack,
-	input             fastchip_ready,
+ `ifdef FASTCHIP_DEPRECATED
+	input [15:0]	  fastchip_dout,
+	output reg	  fastchip_sel,
+	output		  fastchip_lds,
+	output		  fastchip_uds,
+	output		  fastchip_rnw,
+	output reg	  fastchip_lw,
+	input		  fastchip_selack,
+	input		  fastchip_ready,
+`endif
+ 
+	output		  ramreq,
+	output [28:1]	  ramaddr,
+	output [15:0]	  ramdin,
+	input [15:0]	  ramdout,
+	input		  ramready,
+	output		  ramlds,
+	output		  ramuds,
+	output		  ramshared,
 
-	output            ramreq,
-	output     [28:1] ramaddr,
-	output     [15:0] ramdin,
-	input      [15:0] ramdout,
-	input             ramready,
-	output            ramlds,
-	output            ramuds,
-	output            ramshared,
-
-	output reg        toccata_ena,
-	output reg  [7:0] toccata_base,
-
-	output reg  [1:0] cpustate,
-	output reg  [3:0] cacr,
+`ifdef ENABLE_TOCCATA
+	output reg	  toccata_ena,
+	output reg [7:0]  toccata_base,
+`endif
+ 
+	output reg [1:0]  cpustate,
+	output reg [3:0]  cacr,
 	output reg [31:0] nmi_addr,
-	output            cpu_clkena  // the tg68k advances on this enable (bus handshake consumption)
+	output		  cpu_clkena  // the tg68k advances on this enable (bus handshake consumption)
 );
 
 wire cpu_req = cpustate != 1 && !skip_fetch;
@@ -174,15 +178,21 @@ assign ramaddr[23:21] = (fastramcfg == 1 || fastramcfg == 2) ? {1'b0, cpu_addr[2
 
 assign ramaddr[20:1] = cpu_addr[20:1];
 
+`ifdef FASTCHIP_DEPRECATED
 assign fastchip_lds = lds_in;
 assign fastchip_uds = uds_in;
 assign fastchip_rnw = wr;
-
+`endif
+   
 wire	  sel_autoconfig;
 reg [1:0] autocfg_card;
 reg [3:0] autocfg_data;
 
-wire [15:0] cpu_din = ramsel ? ramdat : fastchip_selack ? fastchip_dout : {sel_autoconfig ? autocfg_data : chip_data[15:12], chip_data[11:0]};
+wire [15:0] cpu_din = ramsel ? ramdat :
+`ifdef FASTCHIP_DEPRECATED
+	    fastchip_selack ? fastchip_dout :
+`endif
+	    {sel_autoconfig ? autocfg_data : chip_data[15:12], chip_data[11:0]};
 reg         skip_fetch;
 wire        skip_fetch_i;
 reg  [15:0] chip_data;
@@ -219,12 +229,16 @@ always @* begin
 		skip_fetch   = skip_fetch_i;
 `ifdef TG68K_A24
 		cpu_addr     = { 8'h00, cpu_addr_p[23:0] };
+`ifdef FASTCHIP_DEPRECATED
 		fastchip_sel = 0;
 		fastchip_lw  = 0;
+`endif
 `else
 		cpu_addr     = cpu_addr_p;
+`ifdef FASTCHIP_DEPRECATED
 		fastchip_sel = cpu_req & !cpu_addr_p[31:24];
 		fastchip_lw  = longword;
+`endif
 `endif
 `endif
 `ifdef CPU_SWITCHABLE
@@ -250,8 +264,10 @@ always @* begin
 		chip_addr    = cpu_addr_o[23:1];
 		chip_din     = cpu_dout_o;
 		chip_data    = chip_dout;
+`ifdef FASTCHIP_DEPRECATED
 		fastchip_sel = 0;
 		fastchip_lw  = 0;
+`endif
 		skip_fetch   = 0;
 `endif
 `ifdef CPU_SWITCHABLE
@@ -312,7 +328,11 @@ always @(posedge clk) tg68_armed <= reset;
 // the earliest opportunity and no average alignment latency is added.
 reg  gap;       // previous clk cycle advanced the cpu
 reg  readyhold;
-wire ready_now = chipready | ramready | fastchip_ready;
+wire ready_now = chipready | ramready
+`ifdef FASTCHIP_DEPRECATED
+     | fastchip_ready
+`endif
+     ;
 wire clkena_slow = ~gap & ((~cpu_req & tg68_armed) | ready_now | readyhold);
 assign cpu_clkena = clkena_slow;
 always @(posedge clk) begin
@@ -321,7 +341,11 @@ always @(posedge clk) begin
 	else if (ready_now & cpu_req)  readyhold <= 1'b1;
 end
 `else
-assign cpu_clkena = (~cpu_req & tg68_armed) | chipready | ramready | fastchip_ready;
+assign cpu_clkena = (~cpu_req & tg68_armed) | chipready | ramready
+`ifdef FASTCHIP_DEPRECATED
+		    | fastchip_ready
+`endif
+;
 `endif
 
 `ifdef ENABLE_TG68K
@@ -452,8 +476,10 @@ always @(posedge clk) begin
 end
 
 wire cfg_z3 = fastramcfg[2] & cpucfg[1];
+`ifdef ENABLE_TOCCATA
 reg       ac_toccata;
-
+`endif
+   
 always @(*) begin
 	autocfg_data = 4'b1111;
 
@@ -524,8 +550,10 @@ always @(posedge clk) begin
 		z3ram_ena1 <= 0;
 		z3ram_base0 <= 1;
 		z3ram_base1 <= 1;
+`ifdef ENABLE_TOCCATA
 		ac_toccata<=1'b0;
 		toccata_ena<=1'b0;
+`endif
 	end
 	else if (sel_autoconfig && ~chip_rw && ~chip_uds && old_uds) begin
 `ifdef ENABLE_TOCCATA
@@ -557,8 +585,12 @@ always @(posedge clk) begin
 	end
 end
 
-wire chipreq = cpu_req & ~ramsel & ~fastchip_selack;
-
+wire chipreq = cpu_req & ~ramsel
+`ifdef FASTCHIP_DEPRECATED
+     & ~fastchip_selack
+`endif
+;
+   
 reg [15:0] chipdout_i;
 reg        c_as,c_rw,c_uds,c_lds;
 

@@ -57,18 +57,7 @@ module minimig_m68k_bridge
 	input  [15:0] cpudatain,
 	output [15:0] data_out,      // internal data bus output
 	input  [15:0] data_in,       // internal data bus input
-	output        rd_cyc,        // early rd signal can be used to delay DTACK
-
-	// UserIO interface
-	input         _cpu_reset,
-	input         cpu_halt,
-	input         host_cs,
-	input  [23:1] host_adr,
-	input         host_we,
-	input   [1:0] host_bs,
-	input  [15:0] host_wdat,
-	output [15:0] host_rdat,
-	output        host_ack
+	output        rd_cyc         // early rd signal can be used to delay DTACK
 );
 
 /*
@@ -103,15 +92,6 @@ DOUT   -------------------------------------------------<___________________>---
           .....   .   .   .   .   .   .   .....   .   .   .   .   .   .   .....
 */
 
-// halt is enabled when halt request comes in and cpu bus is idle
-reg halt=0;
-always @ (posedge clk) begin
-	if (clk7_en) begin
-		if (_as && cpu_halt) halt <= #1 1'b1;
-		else if (_as && !cpu_halt) halt <= #1 1'b0;
-	end
-end
-
 //latched valid peripheral address
 reg lvpa; // latched valid peripheral address (CIAs)
 always @(posedge clk) if (clk7_en) lvpa <= vpa;
@@ -129,19 +109,19 @@ end
 reg lr_w,l_as,l_dtack; // synchronised inputs
 always @ (posedge clk) begin
 	if (clk7_en) begin
-		lr_w <= !halt ? r_w : !host_we;
-		l_as <= !halt ? _as : !host_cs;
+		lr_w <= r_w;
+		l_as <= _as;
 		l_dtack <= _dtack;
 	end
 end
 
 reg l_uds,l_lds;
 always @(posedge clk) begin
-  l_uds <= !halt ? _uds : !(host_bs[1]);
-  l_lds <= !halt ? _lds : !(host_bs[0]);
+  l_uds <= _uds;
+  l_lds <= _lds;
 end
 
-wire _as_and_cs = !halt ? _as : !host_cs;
+wire _as_and_cs = _as;
 
 // data transfer acknowledge in normal mode
 reg _ta_n; // transfer acknowledge
@@ -152,7 +132,6 @@ always @(posedge clk or posedge _as_and_cs) begin
 	end
 end
 
-assign host_ack = !_ta_n;
 assign _dtack   = _ta_n;
 
 // synchronous control signals
@@ -169,7 +148,7 @@ reg [15:0] cpudatain_r;
 always @(posedge clk) cpudatain_r <= cpudatain;
 
 // data_out multiplexer and latch   
-assign data_out = !halt ? cpudatain_r : host_wdat;
+assign data_out = cpudatain_r;
 
 reg [15:0] ldata_in;	// latched data_in
 always @(posedge clk) if (!c1 && c3 && enable) ldata_in <= data_in;
@@ -178,12 +157,11 @@ always @(posedge clk) if (!c1 && c3 && enable) ldata_in <= data_in;
 
 // CPU data bus tristate buffers and output data multiplexer
 assign data[15:0] = ldata_in;
-assign host_rdat  = ldata_in;
 
 reg [23:1] address_r;
 always @(posedge clk) address_r <= address;
 
-assign address_out[23:1] = !halt ? address_r : host_adr[23:1];
+assign address_out[23:1] = address_r;
 
 endmodule
 

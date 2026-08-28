@@ -278,9 +278,7 @@ module minimig
 	output [15:0] ide_readdata,
 `endif
 	//user i/o
-	input [1:0]   cpucfg,
-	input [2:0]   cachecfg,
-	output [6:0]  memcfg
+	input [1:0]   cpucfg
 	);
 `ifndef GATEMATE
  `ifndef LATTICE
@@ -420,15 +418,6 @@ wire	[7:0] bank;					//memory bank select
 
 reg         ntsc = NTSC;		//PAL/NTSC video mode selection
 
-// host interface
-wire        host_cs;
-wire [23:0] host_adr;
-wire        host_we;
-wire [ 1:0] host_bs;
-wire [15:0] host_wdat;
-wire [15:0] host_rdat;
-wire        host_ack;
-
 wire        sys_reset;    		//reset output from minimig_syscontrol.v
 wire        rom_readonly; 		//writeprotect $f8-ff in gary.v
 
@@ -438,9 +427,6 @@ wire        reset = sys_reset | ~_cpu_reset_in; // both tg68k and minimig_syscon
 //--------------------------------------------------------------------------------------
 
 assign pwr_led = ~_led;
-
-assign memcfg = {memory_config[7],memory_config[5:0]};
-// assign cachecfg = {cachecfg_pre[2], ~ovl, ~ovl};
 
 // NTSC/PAL switching is controlled by OSD menu, change requires reset to take effect
 always @(posedge clk) if (clk7_en && reset) ntsc <= chipset_config[1];
@@ -563,7 +549,6 @@ paula PAULA1
 	.floppy_drives(floppy_config[3:2])
 );
 
-wire [2:0] cachecfg_pre;
 //instantiate user IO
 userio USERIO1 
 (	
@@ -702,16 +687,7 @@ minimig_m68k_bridge CPU1
 	.cpudatain(cpudata_in),
 	.data(cpu_data),
 	.data_out(cpu_data_out),
-	.data_in(cpu_data_in),
-	._cpu_reset (_cpu_reset),
-	.cpu_halt (cpuhlt),
-	.host_cs (host_cs),
-	.host_adr (host_adr[23:1]),
-	.host_we (host_we),
-	.host_bs (host_bs),
-	.host_wdat (host_wdat),
-	.host_rdat (host_rdat),
-	.host_ack (host_ack)
+	.data_in(cpu_data_in)
 );
 
 //instantiate RAM banks mapper
