@@ -41,6 +41,8 @@ add_file minimig-aga/agnus_copper.v
 add_file minimig-aga/agnus_spritedma.v
 add_file minimig-aga/denise.v
 add_file minimig-aga/denise_bitplane_shifter.v
+add_file minimig-aga/bitplane_ram.v
+add_file minimig-aga/sprite_ram.v
 add_file minimig-aga/denise_collision.v
 add_file minimig-aga/denise_colortable.v
 add_file minimig-aga/denise_playfields.v
@@ -107,4 +109,5 @@ set_option -multi_boot 0
 set_option -mspi_jump 0
 set_option -loading_rate 25.000
 
+set_option -place_option 1
 run all
