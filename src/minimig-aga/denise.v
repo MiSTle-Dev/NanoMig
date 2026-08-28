@@ -90,10 +90,45 @@ wire  [15:0] rgb_out;      // RGB data_out (rdram)
 
 reg    display_ena;          // in OCS sprites are visible between first write to BPL1DAT and end of scanline
 
+`ifdef DENISE_EBR
+reg   [63:0] data64_in_r;
+
+reg   [15:0] chip16_r;
+reg    [1:0] chip16_idx;
+
 //--------------------------------------------------------------------------------------
 
 // data out multiplexer
 assign data_out = col_out | deniseid_out | rgb_out;
+
+// register full 64-bit word for sprites and bitplanes
+always @ (posedge clk) begin
+  chip16_idx <= chip16_idx + 1;
+
+  if (clk7_en) begin
+    data64_in_r <= {data_in, chip48};
+    chip16_idx  <= 0;
+  end
+end
+
+// provide 16-bit CHIP word according to index
+always @(*) begin
+  chip16_r = data64_in_r[63:48];
+
+  case (chip16_idx)
+    0: chip16_r = data64_in_r[63:48];
+    1: chip16_r = data64_in_r[47:32];
+    2: chip16_r = data64_in_r[31:16];
+    3: chip16_r = data64_in_r[15: 0];
+    default: ;
+  endcase
+end
+`else
+//--------------------------------------------------------------------------------------
+
+// data out multiplexer
+assign data_out = col_out | deniseid_out | rgb_out;
+`endif
 
 //--------------------------------------------------------------------------------------
 
@@ -182,6 +217,12 @@ always @(posedge clk) begin
 end
 
 assign rdram = bplcon2[8] & aga;
+`ifdef DENISE_EBR
+assign rgb_out = (reg_address_in[8:6] == COLORBASE[8:6]) && rdram
+                   ? {4'b0000, loct ? {clut_rgb[19:16], clut_rgb[11:8], clut_rgb[3:0]}
+                                    : {clut_rgb[23:20], clut_rgb[15:12], clut_rgb[7:4]}}
+                   : 16'h0000;
+`endif
 assign killehb = bplcon2[9] & ecs;
 
 // BPLCON3 register
@@ -311,7 +352,12 @@ denise_bitplanes bplm0
   .aga(aga),
   .reg_address_in(reg_address_in),
   .data_in(data_in),
+`ifdef DENISE_EBR
+  .chip16_r(chip16_r),
+  .chip16_idx(chip16_idx),
+`else
   .chip48(chip48),
+`endif
   .hires(hires),
   .shres(shres & ecs),
   .hpos(hpos),
@@ -355,7 +401,12 @@ denise_sprites sprm0
   .reg_address_in(reg_address_in),
   .hpos(hpos),
   .data_in(data_in),
+`ifdef DENISE_EBR
+  .chip16_r(chip16_r),
+  .chip16_idx(chip16_idx),
+`else
   .chip48(chip48),
+`endif
   .sprena(display_ena | brdsprt),
   .esprm(esprm),
   .osprm(osprm),
@@ -378,11 +429,13 @@ wire  [24-1:0] clut_rgb;    // colour table rgb data out
 wire           ehb_en;      // ehb enable
 
 assign ehb_en = !killehb && !a1k && !ham && !dpf && (l_bpu == 4'd6);
+`ifndef DENISE_EBR
 
 assign rgb_out = (reg_address_in[8:6] == COLORBASE[8:6]) && rdram
                    ? {4'b0000, loct ? {clut_rgb[19:16], clut_rgb[11:8], clut_rgb[3:0]}
                                     : {clut_rgb[23:20], clut_rgb[15:12], clut_rgb[7:4]}}
                    : 16'h0000;
+`endif
 
 denise_colortable clut0
 (

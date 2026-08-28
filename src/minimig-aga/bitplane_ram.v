@@ -14,8 +14,10 @@ reg [15:0] mem [0:7];
 
 reg [3:0] addrb_r;
 
-assign doutb = addrb_r[0] ? mem[addrb_r[3:1]][15:8] :
-                            mem[addrb_r[3:1]][ 7:0];
+// bitplane words are shifted out msb first, so the first (even) byte column
+// of a word is its upper byte
+assign doutb = addrb_r[0] ? mem[addrb_r[3:1]][ 7:0] :
+                            mem[addrb_r[3:1]][15:8];
 
 always @(posedge clk) begin
   if (wea)

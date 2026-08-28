@@ -12,6 +12,7 @@
 // `define INFER_DPRAM
 `define ENABLE_TG68K
 `define ENABLE_AGA
+`define DENISE_EBR   // use the block ram based bitplane and sprite buffers
 // `define DISABLE_IDE       // when using inferred ram, this exceeds the chip
 // `define HDMI_TEST_PATTERN  // display static test pattern on HDMI instead of amiga video
 // `define ENABLE_INT_ROM     // enable 2k internal test rom in nanomig.v
