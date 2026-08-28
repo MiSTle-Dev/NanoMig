@@ -117,13 +117,20 @@ always @(posedge clk) begin
 	        // too fast	       
                 if(state == 4'd0) mouse_buttons <= data_in[2:0];
                 if(state == 4'd1) begin
+		   // x-axis
 		   kbd_mouse_level <= !kbd_mouse_level;
-		   kbd_mouse_type <= 2'd0;
+		   kbd_mouse_type <= 2'd0;     // mark start of mouse info
 		   kbd_mouse_data <= data_in;
 		end
                 if(state == 4'd2) begin
+		   // y-axis
 		   kbd_mouse_level <= !kbd_mouse_level;
-		   kbd_mouse_type <= 2'd1;
+		   kbd_mouse_type <= 2'd1;     // mark continuation of mouse info
+		   kbd_mouse_data <= data_in;
+		end
+                if(state == 4'd3) begin
+		   // optional scroll wheel
+		   kbd_mouse_level <= !kbd_mouse_level;
 		   kbd_mouse_data <= data_in;
 		end
             end
