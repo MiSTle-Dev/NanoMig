@@ -22,7 +22,7 @@ TG68K_FILES=TG68KdotC_Kernel.v
 
 # Minimig-AGA
 MINIMIG_DIR=../src/minimig-aga
-MINIMIG_FILES=../nanomig.v amiga_clk.v cpu_wrapper.v minimig.v 
+MINIMIG_FILES=../nanomig.v amiga_clk.v cpu_wrapper.v cpu_cache_new.v dpram.v minimig.v 
 MINIMIG_FILES+=ciaa.v ciab.v cia_int.v cia_timera.v cia_timerb.v cia_timerd.v 
 MINIMIG_FILES+=paula.v paula_uart.v paula_audio_channel.v paula_audio_mixer.v paula_audio.v paula_audio_volume.v paula_floppy_fifo.v paula_floppy.v paula_intcontroller.v
 MINIMIG_FILES+=agnus.v agnus_audiodma.v agnus_blitter_adrgen.v agnus_blitter_minterm.v agnus_diskdma.v agnus_beamcounter.v agnus_blitter_barrelshifter.v agnus_blitter.v agnus_refresh.v agnus_bitplanedma.v agnus_blitter_fill.v agnus_copper.v agnus_spritedma.v
@@ -32,13 +32,13 @@ MINIMIG_FILES+=../minimig/Amber.v userio.v
 TB=nanomig_tb
 
 MISC_DIR=../src/misc
-MISC_FILES=sd_card.v sd_rw.v sdcmd_ctrl.v
+MISC_FILES=sd_card.v sd_rw.v sdcmd_ctrl.v sdram.sv
 
 VERILATOR_DIR=/usr/local/share/verilator/include
 VERILATOR_FILES=verilated.cpp verilated_vcd_c.cpp verilated_threads.cpp
 
-HDL_FILES=$(TB).v $(MINIMIG_FILES:%=$(MINIMIG_DIR)/%) $(FX68K_FILES:%=$(FX68K_DIR)/%)
-HDL_FILES+=$(MISC_FILES:%=$(MISC_DIR)/%) 
+HDL_FILES=$(TB).v sdr_chip_model.v $(MINIMIG_FILES:%=$(MINIMIG_DIR)/%) $(FX68K_FILES:%=$(FX68K_DIR)/%)
+HDL_FILES+=$(MISC_FILES:%=$(MISC_DIR)/%)
 HDL_FILES+=$(TG68K_FILES:%=$(TG68K_DIR)/%)
 
 EXTRA_CFLAGS = `sdl2-config --cflags`
