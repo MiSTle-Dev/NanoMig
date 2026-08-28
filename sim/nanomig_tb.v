@@ -376,7 +376,7 @@ sdram #(.DATA_WIDTH(32), .RAS_WIDTH(11), .CAS_WIDTH(8), .CHIP48_BURST(1) ) sdram
 
 	.din        ( ram_data  ),
 	.dout       ( sdram_dout ),
-	.chip48     ( chip48_sdram ),
+	.dout48     ( chip48_sdram ),
 	.addr       ( ram_address[22:1] ),
 	.ds         ( { _ram_bhe, _ram_ble } ),
 	.cs         ( sdram_access ),
@@ -384,7 +384,7 @@ sdram #(.DATA_WIDTH(32), .RAS_WIDTH(11), .CAS_WIDTH(8), .CHIP48_BURST(1) ) sdram
 
 	.p2_din     ( fastram_din    ),
 	.p2_dout    ( fastram_dout   ),
-	.p2_chip48  ( fastram_chip48 ),
+	.p2_dout48  ( fastram_chip48 ),
 	.p2_addr    ( fastram_addr   ),
 	.p2_ds      ( { fastram_uds, fastram_lds } ),
 	.p2_cs      ( fastram_sel    ),
