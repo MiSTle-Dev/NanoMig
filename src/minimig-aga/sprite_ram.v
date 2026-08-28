@@ -15,7 +15,10 @@ reg [15:0] mem1 [0:7];
 
 reg [2:0] addrb_r;
 
-assign doutb = {mem0[addrb_r], mem1[addrb_r]};
+// mem0 holds the DATA (A) words, mem1 the DATB (B) words. The shifter loads
+// shifta (A) from doutb[15:0] and shiftb (B) from doutb[31:16], so A has to
+// be in the low half
+assign doutb = {mem1[addrb_r], mem0[addrb_r]};
 
 always @(posedge clk) begin
   if (wea && !addra[0])
