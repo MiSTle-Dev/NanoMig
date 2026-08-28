@@ -10,6 +10,15 @@
 */
 
 `define ENABLE_TG68K
+`define ENABLE_AGA   // offer the AGA chipset in the menu
+`define ENABLE_AGA   // offer the AGA chipset in the menu
+`define CPU_SLOW14   // run TG68K at 14MHz effective (A1200 speed) for timing closure
+`define ENABLE_CACHE // MiSTer cpu cache between the cpu and the sdram (cached kickstart + fast ram)
+// `define TURBO_KICK   // bisect build: turbo kick via the plain fast path, no cache
+// `define DISABLE_IDE  // v32 experiment: cache + ide together
+`define NO_WS2812   // drop the rgb status led to make room for cache + ide
+`define DENISE_EBR   // block ram based bitplane and sprite buffers, saves logic
+`define CHIPRAM_CACHE // cache chip ram instruction fetches too (a1200 68ec020 style) with chip bus snooping
 
 module top(
   input			clk,
@@ -84,7 +93,8 @@ wire [5:0] db9_joy1 = { !js1[5], !js1[0], !js1[2], !js1[1], !js1[4], !js1[3] };
 wire [5:0]	leds;
 assign leds[5] = |sd_wr;
 assign leds[4] = |sd_rd;
-assign leds_n = ~leds;  
+assign leds_n = ~leds;
+
 
 // ============================== clock generation ===========================
    
@@ -208,14 +218,19 @@ wire spi_io_din = spi_ext?m0s[1]:spi_dat;
 wire spi_io_ss = spi_ext?m0s[2]:spi_csn;
 wire spi_io_clk = spi_ext?m0s[3]:spi_sclk;
 
-// connect to ws2812 led
+// connect to ws2812 led. The rgb status led costs ~150 luts which the cache
+// plus ide combination needs, so it is dropped when space is tight.
 wire [23:0] ws2812_color;
+`ifdef NO_WS2812
+assign ws2812 = 1'b0;
+`else
 ws2812 ws2812_inst (
     .clk(clk_28m),
 	.reset(rst_28m),
     .color(ws2812_color),
     .data(ws2812)
 );
+`endif
 
 // interface to M0S MCU
 wire       mcu_sys_strobe;        // mcu message byte valid for sysctrl
@@ -458,7 +473,11 @@ hid hid (
         .joystick1(hid_joy1)
          );   
 
-sysctrl sysctrl (
+sysctrl #(
+`ifdef ENABLE_AGA
+        .AGA(1)
+`endif
+        ) sysctrl (
         .clk(clk_28m),
         .reset(rst_28m),
 
@@ -592,6 +611,8 @@ wire fastram_wr;
 wire fastram_ready;
    
 wire [15:0] sdram_dout;
+wire [47:0] chip48;   // upper 48 bits of 64 bit aligned chipram reads (AGA fmode>0)
+wire [47:0] fastram_chip48; // wide read data of the cpu cache port
 
 assign ram_din = sdram_dout;
 
@@ -619,7 +640,9 @@ nanomig nanomig
 
  .pwr_led(leds[0]),
  .fdd_led(leds[1]),
+`ifndef DISABLE_IDE
  .hdd_led(leds[2]),
+`endif
  
  .memory_config(memory_config),
  .fastram_config(fastram_config),
@@ -627,7 +650,9 @@ nanomig nanomig
  .chipset_config(chipset_config),
  .floppy_config(floppy_config),
  .video_config(video_config),
+`ifndef DISABLE_IDE
  .ide_config(ide_config),
+`endif
 
  // video
  .hs(hs_n), // horizontal sync
@@ -672,7 +697,7 @@ nanomig nanomig
  ._ram_ble(ram_be[0]),      // sram lower byte select
  ._ram_we(ram_we_n),        // sram write enable
  ._ram_oe(ram_oe_n),        // sram output enable
- .chip48(48'd0),
+ .chip48(chip48),
  .refresh(ram_refresh),
  
  .fastram_sel(fastram_sel),
@@ -680,6 +705,9 @@ nanomig nanomig
  .fastram_lds(fastram_lds),
  .fastram_uds(fastram_uds),
  .fastram_dout(fastram_dout),
+ .fastram_chip48(fastram_chip48),
+`ifdef ENABLE_CACHE
+`endif
  .fastram_din(fastram_din),
  .fastram_wr(fastram_wr),
  .fastram_ready(fastram_ready)
@@ -832,7 +860,9 @@ wire [21:0] sdram_addr    =
 
 assign O_sdram_clk = clk_85m_shifted;
 
-sdram #(.DATA_WIDTH(32), .RAS_WIDTH(11), .CAS_WIDTH(8) ) sdram (
+sdram #(.DATA_WIDTH(32), .RAS_WIDTH(11), .CAS_WIDTH(8),
+        .CHIP48_BURST(1)   // the wide 64 bit fetch AGA needs
+        ) sdram (
 	.sd_data    ( IO_sdram_dq   ), // 32 bit bidirectional data bus
 	.sd_addr    ( O_sdram_addr  ), // 11 bit multiplexed address bus
 	.sd_dqm     ( O_sdram_dqm   ), // two byte masks
@@ -853,6 +883,7 @@ sdram #(.DATA_WIDTH(32), .RAS_WIDTH(11), .CAS_WIDTH(8) ) sdram (
 
 	.din        ( sdram_din     ), // data input from chipset/cpu
 	.dout       ( sdram_dout    ),
+	.dout48     ( chip48        ), // wide fetch data for AGA fmode>0
 	.addr       ( sdram_addr    ), // 22 bit word address
 	.ds         ( sdram_be      ), // upper/lower data strobe
 	.cs         ( sdram_cs      ), // cpu/chipset requests read/wrie
@@ -860,6 +891,7 @@ sdram #(.DATA_WIDTH(32), .RAS_WIDTH(11), .CAS_WIDTH(8) ) sdram (
 
 	.p2_din        ( fastram_din     ), // data input from chipset/cpu
 	.p2_dout       ( fastram_dout    ),
+	.p2_dout48     ( fastram_chip48  ), // wide read data for the cache line fills
 	.p2_addr       ( fastram_addr    ), // 22 bit word address
 	.p2_ds         ( fastram_be      ), // upper/lower data strobe
 	.p2_cs         ( fastram_sel     ), // cpu/chipset requests read/wrie
@@ -892,7 +924,7 @@ flash flash (
 // latch audio, so it's stable during 48khz transfer
 reg [15:0] audio_reg [2]; // 16 bit signed audio for HDMI
 
-// Sign-extend inputs to 16-bit BEFORE mixing – intermediate sum
+// Sign-extend inputs to 16-bit BEFORE mixing  intermediate sum
 // cannot overflow, result always fits back in 15 bit.
 wire signed [15:0] audio_left_s  = {{1{audio_left[14]}},  audio_left};
 wire signed [15:0] audio_right_s = {{1{audio_right[14]}}, audio_right};
@@ -932,7 +964,7 @@ always @(posedge clk_pixel) begin
 
     // --- Volume scaling ----------------------------------------
         // mixed_audio_* are reg signed [14:0], so >>> is always
-        // arithmetic – no $signed() wrapper required.
+        // arithmetic â€“ no $signed() wrapper required.
         case (osd_volume) 
             3'b100: begin // 100%
                 scaled_audio_left  <= mixed_audio_left;
@@ -961,7 +993,7 @@ always @(posedge clk_pixel) begin
         endcase
 
         // --- HDMI audio register ----------------------------------
-        // Convert signed two's complement → offset binary:
+        // Convert signed two's complement â†’ offset binary:
         // flip sign bit (bit 14).  Bit 15 = 0 (15-bit audio in 16-bit slot).
         // Explicit per-element assignment avoids unpacked-array ambiguity.
         audio_reg[0] <= {1'b0, ~scaled_audio_left[14],  scaled_audio_left[13:0]};
@@ -974,6 +1006,7 @@ wire [2:0] tmds;
 wire tmds_clock;
 
 wire vreset, vpal, interlace, short_frame;
+
 video_analyzer video_analyzer (
     .clk         ( clk_28m   ),
     .hs          ( hs_n      ),

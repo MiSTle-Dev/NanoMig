@@ -23,6 +23,7 @@
 #include "Vnanomig_tb_minimig.h"
 #include "Vnanomig_tb_paula.h"
 #include "Vnanomig_tb_paula_floppy.h"
+#include "Vnanomig_tb_sdr_chip_model.h"
 
 #include "verilated.h"
 #include "verilated_fst_c.h"
@@ -327,10 +328,13 @@ static uint64_t GetTickCountMs() {
 unsigned short ram[8*512*1024];  // 8 Megabytes
 
 void load_kick(void) {
-  printf("Loading kick into last 512k of 8MB ram\n");
-  FILE *fd = fopen(KICK, "rb");
+  // the KICK environment variable overrides the compiled-in rom name
+  const char *kick = getenv("KICK");
+  if(!kick) kick = KICK;
+  printf("Loading kick '%s' into last 512k of 8MB ram\n", kick);
+  FILE *fd = fopen(kick, "rb");
   if(!fd) { perror("load kick"); exit(-1); }
-  
+
   int len = fread(ram+(0x780000/2), 1024, 512, fd);
   if(len != 512) {
     if(len != 256) {
@@ -343,6 +347,28 @@ void load_kick(void) {
     }
   }
   fclose(fd);
+}
+
+// copy the ram[] array (kick rom) into the verilog sdram chip model.
+// ram[] holds raw big endian bytes, the 32 bit sdram word c is
+// { 16 bit word 2c, 16 bit word 2c+1 } with big endian words.
+// With RANDMEM=1 in the environment everything outside the kickstart
+// image is filled with pseudo random junk like real power-up sdram,
+// instead of the zeroes of the ram[] array.
+void preload_sdram_model(void) {
+  unsigned char *b = (unsigned char*)ram;
+  int randmem = getenv("RANDMEM") != NULL;
+  unsigned lcg = 0x12345678;
+  for(unsigned c=0;c<2097152;c++) {
+    unsigned v = ((unsigned)b[4*c+0]<<24) | ((unsigned)b[4*c+1]<<16) |
+                 ((unsigned)b[4*c+2]<< 8) |  (unsigned)b[4*c+3];
+    if(randmem && (c < (0x780000/4) || c >= (0x800000/4))) {
+      lcg = lcg * 1664525u + 1013904223u;
+      v = lcg;
+    }
+    tb->nanomig_tb->__PVT__sdram_chip->mem[c] = v;
+  }
+  printf("SDRAM chip model preloaded%s\n", randmem ? " (random junk outside kick)" : "");
 }
 
 // The amiga does MFM data encoding in software and the floppy controller
@@ -627,6 +653,23 @@ void tick(int c) {
 	// big edian read
 	tb->ramdata_in = 256*ram_b[0] + ram_b[1];
 
+	// AGA wide fetch: words 1..3 of the 64 bit aligned group around the
+	// current address, like the burst read of the TN20k sdram controller
+	unsigned char *cb = (unsigned char*)(ram+(tb->ram_address & ~3u));
+	tb->chip48 = ((uint64_t)((cb[2]<<8)|cb[3])<<32) |
+	             ((uint64_t)((cb[4]<<8)|cb[5])<<16) |
+	              (uint64_t)((cb[6]<<8)|cb[7]);
+
+	// optionally log bitplane area DMA reads for a short time window
+	static int dmalog = -1;
+	if(dmalog < 0) dmalog = getenv("DMALOG") != NULL;
+	if(dmalog) {
+	  uint32_t ba = tb->ram_address<<1;
+	  if(ba >= 0x800 && ba < 0x14800 &&
+	     simulation_time > 1.0 && simulation_time < 1.0008)
+	    printf("DMA RD %.6fms %06x\n", simulation_time*1000, ba);
+	}
+
 	// ===== check for kick 1.3 fatal error routine being executed =====
 	// these blink the power led
 	static int fatal = 0;
@@ -657,7 +700,15 @@ void tick(int c) {
   
   }
 
-  tb->eval();
+  // generate three 85MHz half-periods per 28MHz half-period. The first
+  // 85MHz edge is aligned with the 28MHz edge like on the real board where
+  // both clocks come from the same PLL (clk28 = clk85 / 3)
+  static int clk85_state = 0;
+  for(int k=0;k<3;k++) {
+    clk85_state = !clk85_state;
+    tb->clk85 = clk85_state;
+    tb->eval();
+  }
 
   if(c) capture_video();
 
@@ -697,14 +748,29 @@ int main(int argc, char **argv) {
   tb->trace(trace, 99);
   trace->open("nanomig.fst");
 
+  tb->clk85 = 0;
+  preload_sdram_model();
+
   sd_init();
   
   tb->por = 1;
   tb->reset = 1;
-  tb->memory_config = 0x00; // 0x00=512k, 0x01=1M, 0x0f=3.5M
-  tb->fastram_config = 0;   // 0=none, 1=2MB, 2=4MB
+  // CHIPMEM selects the chip ram size the same way the menu does
+  // (0=512k, 1=1M, 2=1.5M, 3=2M in the low two bits)
+  tb->memory_config = getenv("CHIPMEM") ? atoi(getenv("CHIPMEM")) : 0x00;
+  tb->fastram_config = getenv("FASTRAM") ? atoi(getenv("FASTRAM")) : 0;   // 0=none, 1=2MB, 2=4MB
   tb->floppy_config = 0x5;  // 1 = one fast drive, 5 = two fast drives
   tb->ide_config = 0x0;     // 0=no drive, 7=two drives
+
+  // AGA=1 in the environment enables the AGA chipset and the 68020
+  int aga_mode = getenv("AGA") != NULL;
+  // CHIPSET/CPU override the coupled AGA default so chipset and cpu effects
+  // can be told apart (CHIPSET=0 ocs / 1 aga, CPU=0 68000 / 2 68020)
+  int chipset_aga = getenv("CHIPSET") ? atoi(getenv("CHIPSET")) : aga_mode;
+  int cpu_sel     = getenv("CPU")     ? atoi(getenv("CPU"))     : (aga_mode ? 2 : 0);
+  tb->chipset_config = chipset_aga ? 0x18 : 0x00;  // bits 4:3 = 11 -> AGA
+  tb->cpu_config = cpu_sel;                        // 2 = 68020
+  printf("config: chipset=%s cpu=%s\n", chipset_aga?"AGA":"OCS", cpu_sel==2?"68020":"68000");
 
   /* run for a while */
   while(

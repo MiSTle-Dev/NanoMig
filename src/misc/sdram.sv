@@ -85,6 +85,7 @@ module sdram #(
   // cpu interface
   input  wire [15:0] p2_din,   // data input from cpu
   output reg  [15:0] p2_dout,  // data output to cpu
+  output reg  [47:0] p2_dout48, // upper 48 bits of a 64 bit aligned cpu read
 
   input  wire [22:0] p2_addr,  // 23 bit word address
   input  wire  [1:0] p2_ds,    // upper/lower data strobe
@@ -412,6 +413,7 @@ generate
         STATE_READ_0: begin
           case (sdram_port)
             PORT_1: dout48[47:32] <= ram_dout_lo;
+            PORT_2: p2_dout48[47:32] <= ram_dout_lo;
             default: ;
           endcase
         end
@@ -423,6 +425,12 @@ generate
               else
                 dout48[31: 0] <= {ram_dout_hi, ram_dout_lo};
             end
+            PORT_2: begin
+              if (addr_0)
+                p2_dout48[47:16] <= {ram_dout_hi, ram_dout_lo};
+              else
+                p2_dout48[31: 0] <= {ram_dout_hi, ram_dout_lo};
+            end
             default: ;
           endcase
         end
@@ -431,6 +439,12 @@ generate
             PORT_1: begin
               if (addr_0)
                 dout48[15:0] <= {ram_dout_hi};
+              else
+                /* no-op */;
+            end
+            PORT_2: begin
+              if (addr_0)
+                p2_dout48[15:0] <= {ram_dout_hi};
               else
                 /* no-op */;
             end
@@ -456,18 +470,21 @@ generate
         STATE_READ_1: begin
           case (sdram_port)
             PORT_1: dout48[47:32] <= ram_dout;
+            PORT_2: p2_dout48[47:32] <= ram_dout;
             default: ;
           endcase
         end
         STATE_READ_2: begin
           case (sdram_port)
             PORT_1: dout48[31:16] <= ram_dout;
+            PORT_2: p2_dout48[31:16] <= ram_dout;
             default: ;
           endcase
         end
         STATE_READ_3: begin
           case (sdram_port)
             PORT_1: dout48[15: 0] <= ram_dout;
+            PORT_2: p2_dout48[15: 0] <= ram_dout;
             default: ;
           endcase
         end

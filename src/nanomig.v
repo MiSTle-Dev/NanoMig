@@ -90,6 +90,7 @@ module nanomig (
    output	 fastram_lds,
    output	 fastram_uds,
    input [15:0]	 fastram_dout,
+   input [47:0]	 fastram_chip48, // upper 48 bits of a 64 bit aligned read (cache line fill)
    output [15:0] fastram_din,
    output	 fastram_wr,
    input	 fastram_ready
@@ -184,6 +185,7 @@ always @(*) begin
 end
 
 wire  [1:0] cpu_state;
+wire        cpu_clkena;
 // wire        cpu_nrst_out;
 wire  [3:0] cpu_cacr;
 wire [31:0] cpu_nmi_addr;
@@ -204,7 +206,25 @@ wire [1:0] cpucfg = cpu_config; // CPU-Type: 00 = 68000, 01 = 68010, 11 = 68020
 
 // cache bits: dcache, kick, chip
 // wire [2:0] cachecfg = { 1'b0, ~ovl, 1'b0 };
-wire [2:0] cachecfg = 3'b000;  // no turbo chip and kick, no caches   
+`ifdef ENABLE_CACHE
+ `ifdef CHIPRAM_CACHE
+// chip ram is cached as well. Instruction fetches only (dcache bit clear),
+// which mirrors the 68EC020 of a real A1200: it has an instruction cache but
+// no data cache, so loops run from the cache while all data accesses keep
+// their original chip bus timing. Chip bus writes are snooped so cached
+// lines stay coherent with blitter/copper/cpu writes.
+// turbo chip must be off while the kickstart overlay maps the rom to
+// $000000, otherwise instruction fetches would read chip ram instead of
+// the rom. cpu_wrapper only samples these bits between bus cycles.
+wire [2:0] cachecfg = { 1'b1, 1'b1, ~ovl };  // data cache, turbo kick, turbo chip when no overlay
+ `else
+wire [2:0] cachecfg = 3'b110;  // data cache + turbo kick (cached kickstart via the direct ram path), chip accesses stay on the chip bus
+ `endif
+`elsif TURBO_KICK
+wire [2:0] cachecfg = 3'b010;  // turbo kick only, no cache: kick reads use the plain direct ram path
+`else
+wire [2:0] cachecfg = 3'b000;  // no turbo chip and kick, no caches
+`endif
 // wire [2:0] cachecfg = 3'b010;  // permanent turbo kick
 
 wire	   pwr_led_bright;
@@ -234,8 +254,20 @@ wire [28:1] ram_addr;
 wire	    ram_sel;
 wire	    ram_lds;
 wire	    ram_uds;
-wire	    ram_ready;
+   
+// ram_ready finally is the clkena for the tg68k
+`ifdef ENABLE_CACHE
+// ram_ready follows the cache acknowledge level directly instead of being
+// re-registered: cache_cs drops in the same cycle (see cache_cs below), which
+// makes the cache clear its ack, so this stays a single cycle pulse but
+// arrives one clock earlier - on every single cpu memory access.
+reg         ram_write_ready;   // write accepted into the write buffer
+wire        ram_ready = cache_ack | ram_write_ready;
+`else
+reg	    ram_ready;
+`endif
 
+`ifndef ENABLE_CACHE
 reg fastram_ready_d;
 
 // cpu_ph1 is just before clk7_en, so this is
@@ -253,6 +285,7 @@ always @(posedge clk_sys) begin
   if (!cpu_rst || cpu_ph1)
     fastram_ready_d <= fastram_ready;
 end
+`endif
 
 cpu_wrapper cpu_wrapper
 (
@@ -298,16 +331,259 @@ cpu_wrapper cpu_wrapper
 
 	//custom CPU signals
 	.cpustate     (cpu_state       ),
+	.cpu_clkena   (cpu_clkena      ),
 	.cacr         (cpu_cacr        ),
 	.nmi_addr     (cpu_nmi_addr    )
 );
+   
+`ifdef ENABLE_CACHE
+// ----------------------- cpu cache (MiSTer cpu_cache_new) -----------------------
+// The cache sits between the cpu's direct ram path and the sdram. Reads are
+// served from the cache on a hit, a miss fetches a full 64 bit line from the
+// sdram (critical word first). Writes are write-through with a one entry
+// write buffer, the cpu is acknowledged as soon as the cache accepted the
+// write. All chip bus writes (cpu or dma) are snooped to keep cached
+// chip ram / kickstart data coherent.
+// A chip bus write updates memory behind the cache's back (blitter, copper,
+// disk dma or - with the data cache disabled - the cpu itself). Pulse the
+// snoop port at the start of every such write; address and data stay valid
+// for the whole 7MHz bus cycle, which covers the three clk_sys cycles the
+// snoop state machine needs to look up and update the cached copy.
+`ifdef CHIPRAM_CACHE
+// Chip bus writes have to reach the cache or freshly loaded code keeps
+// executing from stale cache lines. Two problems have to be solved:
+//   - the write strobe is only asserted for about two of the four clocks of a
+//     7MHz bus cycle, while the cache samples the snoop address and data three
+//     clocks after being told about the write, so the live bus signals would
+//     hand it the following access instead,
+//   - the cache needs three clocks per snoop while the chip bus can deliver a
+//     write every four, so a write arriving while the snoop machine is still
+//     busy would be dropped silently.
+// Writes are therefore queued and handed over at a fixed one-per-four-clocks
+// pace, with address, data and byte selects held stable until the cache has
+// consumed them.
+reg         ram_we_n_d;
+reg  [22:1] snoop_adr_r;
+reg  [15:0] snoop_dat_r;
+reg  [1:0]  snoop_bs_r;
+reg         snoop_act;
 
+// two entries are enough: the chip bus delivers a write at most every four
+// clocks and one is handed over every four, so the queue only has to absorb
+// the case where a write arrives while the previous one is still being passed
+reg  [22:1] sq_adr [0:1];
+reg  [15:0] sq_dat [0:1];
+reg  [1:0]  sq_bs  [0:1];
+reg  [1:0]  sq_wr, sq_rd;
+reg  [1:0]  sq_pace;
+wire        sq_empty = (sq_wr == sq_rd);
+wire        sq_full  = ((sq_wr - sq_rd) == 2'd2);
+wire        sq_push  = ram_we_n_d && !_ram_we;
+
+always @(posedge clk_sys) begin
+  ram_we_n_d <= _ram_we;
+  snoop_act  <= 1'b0;
+
+  if(sq_push && !sq_full) begin
+    sq_adr[sq_wr[0]] <= ram_address[22:1];
+    sq_dat[sq_wr[0]] <= ram_data;
+    sq_bs [sq_wr[0]] <= {~_ram_bhe, ~_ram_ble};
+    sq_wr              <= sq_wr + 2'd1;
+  end
+
+  if(sq_pace != 2'd0)
+    sq_pace <= sq_pace - 2'd1;
+  else if(!sq_empty) begin
+    snoop_adr_r <= sq_adr[sq_rd[0]];
+    snoop_dat_r <= sq_dat[sq_rd[0]];
+    snoop_bs_r  <= sq_bs [sq_rd[0]];
+    snoop_act   <= 1'b1;
+    sq_rd       <= sq_rd + 2'd1;
+    sq_pace     <= 2'd3;
+  end
+
+  if(!cpu_rst) begin
+    sq_wr   <= 2'd0;
+    sq_rd   <= 2'd0;
+    sq_pace <= 2'd0;
+  end
+end
+
+`else
+wire        snoop_act = 1'b0;   // nothing cached that the chip bus can modify
+wire [22:1] snoop_adr_r = 22'd0;
+wire [15:0] snoop_dat_r = 16'd0;
+wire [1:0]  snoop_bs_r  = 2'd0;
+`endif
+
+wire        cache_ack;
+wire        cache_wb_en;
+wire        cache_req;
+wire [15:0] cache_dat_r;
+// The TG68K starts its next bus cycle right after clkena without dropping
+// its request, but the cache needs to see its cpu_cs deasserted after every
+// acknowledged access. Blanking it during the ready cycle itself (instead of
+// the cycle after, as an extra register did) saves one clock on every single
+// cpu memory access - the same trick minimig uses on mister.
+wire        cache_cs = ram_sel & ~ram_ready;
+reg         cache_fill_ack;
+reg  [15:0] cache_fill_dat;
+
+cpu_cache_new cpu_cache (
+  .clk            (clk_sys),
+  .rst            (!cpu_rst),
+  .cpu_cache_ctrl (cpu_cacr),
+  .cache_inhibit  (1'b0),
+  .cpu_cs         (cache_cs),
+  .cpu_adr        ({6'b000000, ram_addr[22:1]}),
+  .cpu_bs         ({~ram_uds, ~ram_lds}),
+  .cpu_we         (cpu_state == 2'd3),
+  .cpu_ir         (cpu_state == 2'd0),
+  .cpu_dr         (cpu_state == 2'd2),
+  .cpu_dat_w      (ram_din),
+  .cpu_dat_r      (cache_dat_r),
+  .cpu_ack        (cache_ack),
+  .wb_en          (cache_wb_en),
+  .sdr_dat_r      (cache_fill_dat),
+  .sdr_read_req   (cache_req),
+  .sdr_read_ack   (cache_fill_ack),
+  // Snooping is not needed in this configuration: chip ram is not cached
+  // (turbo chip off), kickstart is read only and fast ram is only written
+  // through the cache itself. Disabling it avoids undefined cross port
+  // read-during-write behaviour of the tag block rams on real hardware.
+  .snoop_act      (snoop_act),
+  .snoop_adr      ({6'b000000, snoop_adr_r}),
+  .snoop_dat_w    (snoop_dat_r),
+  .snoop_bs       (snoop_bs_r)
+);
+
+// line fill / write buffer sequencer driving the sdram's second port
+reg  [1:0]  fill_state;     // 0 idle, 1 line read issued, 2 delivering words
+reg  [63:0] fill_line;      // w0..w3 of the aligned 64 bit line
+reg  [1:0]  fill_idx;       // requested (critical) word index
+reg  [1:0]  fill_cnt;
+reg         wbuf_pending;   // a write is in flight on the sdram port
+reg         write_acked;
+reg         wb_req;    // latched pending cache write
+reg         wb_en_d;   // wb_en edge detect
+reg         wr_lock;   // ack delivered, waiting for the cpu to consume it    // current cpu write has been acknowledged
+reg         cache_ack_d;
+reg         fastram_done_d;
+reg         fastram_sel_r;
+reg         fastram_wr_r;
+reg  [22:1] fastram_addr_r;
+reg  [15:0] fastram_din_r;
+reg         fastram_lds_r;
+reg         fastram_uds_r;
+reg         frr_d;               // previous state of the port 2 ack toggle
+wire        fastram_done = (fastram_ready != frr_d);
+wire [1:0]  fill_word = fill_idx + fill_cnt;
+
+always @(posedge clk_sys) begin
+  frr_d           <= fastram_ready;
+  cache_fill_ack  <= 1'b0;
+  ram_write_ready <= 1'b0;
+  cache_ack_d     <= cache_ack;
+
+  if(!cpu_rst) begin
+    fill_state    <= 2'd0;
+    wbuf_pending  <= 1'b0;
+    ram_write_ready <= 1'b0;
+    wb_req        <= 1'b0;
+    wb_en_d       <= 1'b0;
+    wr_lock       <= 1'b0;
+    fastram_sel_r <= 1'b0;
+    fastram_wr_r  <= 1'b0;
+  end else begin
+    // sdram port transaction finished. The read data is sampled one cycle
+    // after the ack has been seen to give the clock domain crossing from
+    // the 85MHz sdram controller a full cycle of settling time.
+    fastram_done_d <= fastram_done;
+    if(fastram_done) begin
+      fastram_sel_r <= 1'b0;
+      wbuf_pending  <= 1'b0;
+    end
+    if(fastram_done_d && (fill_state == 2'd1)) begin
+      fill_line  <= { fastram_dout, fastram_chip48 };
+      fill_cnt   <= 2'd0;
+      fill_state <= 2'd2;
+    end
+
+    case(fill_state)
+      2'd0: if(cache_req && !wbuf_pending && !fastram_sel_r) begin
+              // fetch the aligned 64 bit line containing the requested word
+              fastram_addr_r <= { ram_addr[22:3], 2'b00 };
+              fill_idx       <= ram_addr[2:1];
+              fastram_wr_r   <= 1'b0;
+              fastram_lds_r  <= 1'b0;
+              fastram_uds_r  <= 1'b0;
+              fastram_sel_r  <= 1'b1;
+              fill_state     <= 2'd1;
+            end
+      2'd1: ;  // waiting for the sdram
+      2'd2: begin
+              // deliver the four words starting with the requested one
+              cache_fill_ack <= 1'b1;
+              case(fill_word)
+                2'd0: cache_fill_dat <= fill_line[63:48];
+                2'd1: cache_fill_dat <= fill_line[47:32];
+                2'd2: cache_fill_dat <= fill_line[31:16];
+                2'd3: cache_fill_dat <= fill_line[15: 0];
+              endcase
+              fill_cnt <= fill_cnt + 2'd1;
+              if(fill_cnt == 2'd3) fill_state <= 2'd0;
+            end
+      default: fill_state <= 2'd0;
+    endcase
+
+    // write buffer: the cache raises wb_en once per write (its fsm cycles
+    // through IDLE/WRITE/WB for every accepted cpu write), so the rising
+    // edge marks a new write even when the tg68k keeps ram_sel asserted
+    // between back to back bus cycles (e.g. the two halves of a move.l).
+    // The request is latched so it survives a busy sdram port or a still
+    // draining line fill.
+    wb_en_d <= cache_wb_en;
+    // wr_lock covers [accept .. consuming clkena]: while the (slowed) cpu
+    // still presents the already acknowledged write, the cache fsm may
+    // recycle through IDLE/WRITE and raise wb_en again; those stale edges
+    // must not produce a second acknowledge for the same bus cycle.
+    if(cpu_clkena)              wr_lock <= 1'b0;
+    if(cpu_state != 2'd3)       wb_req  <= 1'b0;   // stale request dies with the write cycle
+    if(cache_wb_en && !wb_en_d && !wr_lock) wb_req <= 1'b1;
+    if((wb_req || (cache_wb_en && !wb_en_d)) && (cpu_state == 2'd3) && !wr_lock &&
+       !wbuf_pending && !fastram_sel_r && (fill_state == 2'd0)) begin
+      fastram_addr_r <= ram_addr[22:1];
+      fastram_din_r  <= ram_din;
+      fastram_lds_r  <= ram_lds;
+      fastram_uds_r  <= ram_uds;
+      fastram_wr_r   <= 1'b1;
+      fastram_sel_r  <= 1'b1;
+      wbuf_pending   <= 1'b1;
+      wb_req         <= 1'b0;
+      wr_lock        <= 1'b1;
+      ram_write_ready<= 1'b1;
+    end
+
+  end
+end
+
+
+
+assign fastram_sel = fastram_sel_r;
+assign fastram_addr = fastram_addr_r;
+assign fastram_lds  = fastram_lds_r;
+assign fastram_uds  = fastram_uds_r;
+assign fastram_din  = fastram_din_r;
+assign fastram_wr   = fastram_wr_r;
+assign ram_dout     = cache_dat_r;
+`else
 assign fastram_addr = ram_addr;
-assign fastram_lds = ram_lds;
-assign fastram_uds = ram_uds;
-assign ram_dout = fastram_dout;
-assign fastram_din = ram_din;
-assign fastram_wr = (cpu_state[1:0]==2'b11) ? 1'b1 : 1'b0;
+assign fastram_lds  = ram_lds;
+assign fastram_uds  = ram_uds;
+assign ram_dout     = fastram_dout;
+assign fastram_din  = ram_din;
+assign fastram_wr   = (cpu_state[1:0]==2'b11) ? 1'b1 : 1'b0;
+`endif
 
 wire [7:0] sdc_byte_out_data_fdc;   
 wire [31:0] sdc_sector_fdc;  // from inside minimig/floppy
@@ -1117,6 +1393,8 @@ wire [15:0] JOY3 = 16'h0000;
 wire [15:0] JOYA0 = 16'h0000;
 wire [15:0] JOYA1 = 16'h0000;
 
+/* ======================================================================================== */
+/* =============================== internal ROM and RAM =================================== */
 /* ======================================================================================== */
 /* =============================== internal ROM and RAM =================================== */
 /* ======================================================================================== */

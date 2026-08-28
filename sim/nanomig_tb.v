@@ -2,7 +2,8 @@
 
 module nanomig_tb
   (
-   input	 clk, // 28mhz
+   input	 clk,   // 28mhz
+   input	 clk85, // 85mhz, 3x clk, edge aligned (like the PLL on the real board)
    output	 clk_7m, 
    output	 clk7_en,
    output	 clk7n_en,
@@ -30,6 +31,8 @@ module nanomig_tb
    input [2:0]	 fastram_config,
    input [3:0]	 floppy_config,
    input [5:0]	 ide_config,
+   input [5:0]	 chipset_config, // bit 4:3 = 11 -> AGA
+   input [1:0]	 cpu_config,     // 0=68000, 2=68020
    
    output	 sdclk,
    output	 sdcmd,
@@ -49,6 +52,7 @@ module nanomig_tb
    // external ram/rom interface
    output [15:0] ram_data, // sram data bus
    input [15:0]	 ramdata_in, // sram data bus in
+   input [47:0]	 chip48, // upper 48 bit of a 64 bit aligned read (AGA wide fetch)
    output [23:1] ram_address, // sram address bus
    output	 _ram_bhe, // sram upper byte select
    output	 _ram_ble, // sram lower byte select
@@ -261,12 +265,18 @@ nanomig nanomig (
 
 		 .pwr_led(pwr_led),
 		 .fdd_led(fdd_led),
+`ifndef DISABLE_IDE
 		 .hdd_led(hdd_led),
+`endif
 
 		 .memory_config(memory_config),
 		 .fastram_config(fastram_config),
 		 .floppy_config(floppy_config),
+`ifndef DISABLE_IDE
 		 .ide_config(ide_config),
+`endif
+		 .chipset_config(chipset_config),
+		 .cpu_config(cpu_config),
 		 
 		 .hs(hs_n),
 		 .vs(vs_n),
@@ -294,13 +304,104 @@ nanomig nanomig (
 		 
 		 // (s(d))ram interface
 		 .ram_data(ram_data_i),       // sram data bus
-		 .ramdata_in(ramdata_in),     // sram data bus in
-		 .chip48(48'h0),              // big chip read, needed for AGA only
+		 .ramdata_in(sdram_dout),     // sram data bus in (from the real sdram controller)
+		 .chip48(chip48_sdram),       // big chip read, needed for AGA only
 		 .ram_address(ram_address_i), // sram address bus
 		 ._ram_bhe(_ram_bhe_i),       // sram upper byte select
 		 ._ram_ble(_ram_ble_i),       // sram lower byte select
 		 ._ram_we(_ram_we_i),         // sram write enable
-		 ._ram_oe(_ram_oe_i)          // sram output enable
+		 ._ram_oe(_ram_oe_i),         // sram output enable
+		 .refresh(ram_refresh),       // refresh cycle request
+
+		 // direct (fast) ram path of the cpu, served by the sdram's second port
+		 .fastram_sel(fastram_sel),
+		 .fastram_addr(fastram_addr),
+		 .fastram_lds(fastram_lds),
+		 .fastram_uds(fastram_uds),
+		 .fastram_dout(fastram_dout),
+		 .fastram_chip48(fastram_chip48),
+		 .fastram_din(fastram_din),
+		 .fastram_wr(fastram_wr),
+		 .fastram_ready(fastram_ready)
 		 );
-   
+
+wire        fastram_sel;
+wire [22:1] fastram_addr;
+wire        fastram_lds, fastram_uds, fastram_wr, fastram_ready;
+wire [15:0] fastram_dout, fastram_din;
+wire [47:0] fastram_chip48;
+
+// ---------------------------------------------------------------------------
+// ------ the real sdram controller of the tang nano 20k + a chip model ------
+// ---------------------------------------------------------------------------
+// This replicates the glue logic of src/tang/nano20k/top_020.sv so the
+// simulation exercises the exact same 85 MHz burst datapath as the hardware
+// (including the AGA chip48 wide fetch).
+
+wire        ram_refresh;
+wire [15:0] sdram_dout;
+wire [47:0] chip48_sdram;
+
+// run a counter at 28Mhz synchronous to the 7Mhz bus cycle (like top_020.sv)
+reg  [1:0]  cyc;
+always @(posedge clk)
+  if(clk7_en) cyc <= 2'd0;
+  else        cyc <= cyc + 2'd1;
+
+wire        sdram_access = (!_ram_oe || !_ram_we);
+wire        sdram_sync   = !cyc;
+
+wire [31:0] sd_dq;
+wire [10:0] sd_addr;
+wire [3:0]  sd_dqm;
+wire [1:0]  sd_ba;
+wire        sd_cs_n, sd_ras_n, sd_cas_n, sd_we_n;
+
+sdram #(.DATA_WIDTH(32), .RAS_WIDTH(11), .CAS_WIDTH(8), .CHIP48_BURST(1) ) sdram (
+	.sd_data    ( sd_dq     ),
+	.sd_addr    ( sd_addr   ),
+	.sd_dqm     ( sd_dqm    ),
+	.sd_ba      ( sd_ba     ),
+	.sd_cs      ( sd_cs_n   ),
+	.sd_we      ( sd_we_n   ),
+	.sd_ras     ( sd_ras_n  ),
+	.sd_cas     ( sd_cas_n  ),
+
+	.clk        ( clk85     ),
+	.reset_n    ( ~por      ),
+
+	.ready      (           ),
+	.sync       ( sdram_sync ),
+	.refresh    ( ram_refresh ),
+
+	.din        ( ram_data  ),
+	.dout       ( sdram_dout ),
+	.chip48     ( chip48_sdram ),
+	.addr       ( ram_address[22:1] ),
+	.ds         ( { _ram_bhe, _ram_ble } ),
+	.cs         ( sdram_access ),
+	.we         ( !_ram_we  ),
+
+	.p2_din     ( fastram_din    ),
+	.p2_dout    ( fastram_dout   ),
+	.p2_chip48  ( fastram_chip48 ),
+	.p2_addr    ( fastram_addr   ),
+	.p2_ds      ( { fastram_uds, fastram_lds } ),
+	.p2_cs      ( fastram_sel    ),
+	.p2_we      ( fastram_wr     ),
+	.p2_ack     ( fastram_ready  )
+);
+
+sdr_chip_model sdram_chip (
+	.clk   ( clk85    ),
+	.dq    ( sd_dq    ),
+	.addr  ( sd_addr  ),
+	.dqm   ( sd_dqm   ),
+	.ba    ( sd_ba    ),
+	.cs_n  ( sd_cs_n  ),
+	.ras_n ( sd_ras_n ),
+	.cas_n ( sd_cas_n ),
+	.we_n  ( sd_we_n  )
+);
+
 endmodule

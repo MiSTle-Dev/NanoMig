@@ -88,7 +88,8 @@ module cpu_wrapper
 
 	output reg  [1:0] cpustate,
 	output reg  [3:0] cacr,
-	output reg [31:0] nmi_addr
+	output reg [31:0] nmi_addr,
+	output            cpu_clkena  // the tg68k advances on this enable (bus handshake consumption)
 );
 
 wire cpu_req = cpustate != 1 && !skip_fetch;
@@ -124,9 +125,14 @@ wire sel_dd     = (cpu_addr[31:16] == 16'h00DD) && (cpu_addr[15:13] == 'b010);
 wire sel_rtg    = (cpu_addr[31:24] == 8'h02);
 
 // don't sel_kickram when writing
-wire	cchip;
-wire	ckick;
-wire sel_kickram   = !cpu_addr[31:24] && (&cpu_addr[23:19] || (cpu_addr[23:19] == 5'b11100)) && ckick && wr;	// $f8xxxx, e0xxxx
+wire	cchip;   
+wire	ckick;   
+// NanoMig: only the real $f8xxxx kickstart range is served from sdram in
+// turbo kick mode. The $e0xxxx extended rom area of the MiSTer mapping is
+// NOT initialized in sdram here, so those reads must keep going to the
+// chip bus (which returns zeros = no extension rom) instead of reading
+// random uninitialized sdram content.
+wire sel_kickram   = !cpu_addr[31:24] && (&cpu_addr[23:19]) && ckick && wr;	// $f8xxxx
 wire sel_kicklower = !cpu_addr[31:24] && (cpu_addr[23:18] == 6'b111110);
 wire sel_chipram   = !cpu_addr[31:21] && cchip; 		             //$000000 - $1FFFFF
 
@@ -290,14 +296,35 @@ wire        longword;
 reg [2:0]   cpu_ipl;
 reg         chipready;
 
+// tg68_armed keeps the cpu from being clocked before the reset has been
+// released for at least one cycle, otherwise the TG68K can hang on startup
+reg  tg68_armed;
+always @(posedge clk) tg68_armed <= reset;
+
+`ifdef CPU_SLOW14
+// Advance the TG68K at most every second clk cycle (14MHz effective on a
+// 28MHz clock, matching the 14MHz 68EC020 of a real A1200). This makes all
+// TG68K internal register-to-register paths true two-cycle paths which is
+// required for timing closure on slow devices. The single cycle ready
+// strobes of the bus interfaces are latched so no handshake is ever lost.
+// Instead of a fixed phase enable only a minimum gap of one idle cycle
+// after every advance is enforced, so memory handshakes are consumed at
+// the earliest opportunity and no average alignment latency is added.
+reg  gap;       // previous clk cycle advanced the cpu
+reg  readyhold;
+wire ready_now = chipready | ramready | fastchip_ready;
+wire clkena_slow = ~gap & ((~cpu_req & tg68_armed) | ready_now | readyhold);
+assign cpu_clkena = clkena_slow;
+always @(posedge clk) begin
+	gap <= clkena_slow;
+	if (clkena_slow)               readyhold <= 1'b0;
+	else if (ready_now & cpu_req)  readyhold <= 1'b1;
+end
+`else
+assign cpu_clkena = (~cpu_req & tg68_armed) | chipready | ramready | fastchip_ready;
+`endif
+
 `ifdef ENABLE_TG68K
-
-reg tg68_armed;
-
-always @(posedge clk)
-    tg68_armed <= reset;
-
-
 TG68KdotC_Kernel
 `ifndef VERILATOR
 // verilator runs the verilog translated variant which doesn't support configuration but
@@ -314,13 +341,35 @@ TG68KdotC_Kernel
 `endif
 cpu_inst_p
 (
+`ifdef VERILATOR
+  // the verilog translation of the kernel used for simulation has
+  // all-lowercase port names
   .clk(clk),
-`ifdef ENABLE_FX68K
-  .nReset(reset && cpucfg[1]),
+  .nreset(reset),
+  .clkena_in(cpu_clkena),
+  .data_in(cpu_din),
+  .ipl(cpu_ipl),
+  .ipl_autovector(1),
+  .regin_out(),
+  .addr_out(cpu_addr_p),
+  .data_write(cpu_dout_p),
+  .nwr(wr_p),
+  .nuds(uds_p),
+  .nlds(lds_p),
+  .nresetout(reset_out_p),
+  .longword(longword),
+  .cpu(cpucfg),
+  .busstate(cpustate_p),		// 0: fetch code, 1: no memaccess, 2: read data, 3: write data
+  .cacr_out(cacr_p),
+  .vbr_out(vbr_p)
 `else
+  .clk(clk),
+ `ifdef ENABLE_FX68K
+  .nReset(reset && cpucfg[1]),
+ `else
   .nReset(reset),
-`endif
-  .clkena_in((~cpu_req && tg68_armed) | chipready | ramready | fastchip_ready),
+ `endif
+  .clkena_in(cpu_clkena),
   .data_in(cpu_din),
   .IPL(cpu_ipl),
   .IPL_autovector(1'b1),
@@ -340,6 +389,7 @@ cpu_inst_p
   .regin_out(),
   .CACR_out(cacr_p),
   .VBR_out(vbr_p)
+`endif
 );
 `endif
 
