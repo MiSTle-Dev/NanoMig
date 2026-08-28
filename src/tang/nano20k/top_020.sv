@@ -93,7 +93,10 @@ assign leds_n = ~leds;
 // SDRAM and flash clock: 85 MHz
 // Amiga clock: 7.09379 (Pixel/4)
    
-`define PIXEL_CLOCK 28375160
+// 27MHz crystal * 19/6 = 85.5MHz, divided by 3. The nominal PAL clock would
+// be 28.37516MHz, but this is the one the hardware actually runs at, and the
+// audio rate below is derived from it.
+`define PIXEL_CLOCK 28500000
 
 wire clk_pixel_x5;   
 wire pll_lock;   
@@ -903,17 +906,25 @@ reg signed [14:0] scaled_audio_left;
 reg signed [14:0] scaled_audio_right;
 
 // generate 48khz audio clock
-reg clk_audio;
-reg [8:0] aclk_cnt;
+// An integer divider cannot hit 48kHz: 28500000 / 48000 / 2 = 296.88, and the
+// truncation leaves the stream running fast, which makes sinks drop a chunk of
+// audio every few seconds. A phase accumulator keeps the fractional part.
+localparam [31:0] AUDIO_INC = (64'd48000 <<< 32) / `PIXEL_CLOCK;
+reg [31:0] aclk_acc;
+reg        clk_audio;
+reg        aclk_tick;
 
 always @(posedge clk_pixel) begin
-    // divisor = pixel clock / 48000 / 2 - 1
-    if(aclk_cnt < `PIXEL_CLOCK / 48000 / 2 -1)
-      aclk_cnt <= aclk_cnt + 9'd1;
-    else begin
-       aclk_cnt <= 9'd0;
-       clk_audio <= ~clk_audio;
+    aclk_acc  <= aclk_acc + AUDIO_INC;
+    clk_audio <= aclk_acc[31];                 // msb of the accumulator = 48kHz
+    aclk_tick <= (clk_audio != aclk_acc[31]);  // high the cycle after each edge
 
+    // The sample word must not change on the same clk_pixel edge that toggles
+    // clk_audio: the hdmi module latches it on that very edge, so data and
+    // clock would race and the captured word could pick up wrong bits, which
+    // is audible as noisy samples. Updating one cycle later leaves the word
+    // stable for a full audio half period before it is sampled.
+    if(aclk_tick) begin
         // --- Stereo Mix (75/25)-------------------------------------------
         // 16-bit signed wires prevent any overflow; the result
         // always fits in 15 bit and is truncated safely on assignment. 
@@ -964,8 +975,8 @@ always @(posedge clk_pixel) begin
         // Convert signed two's complement → offset binary:
         // flip sign bit (bit 14).  Bit 15 = 0 (15-bit audio in 16-bit slot).
         // Explicit per-element assignment avoids unpacked-array ambiguity.
-        audio_reg[0] <= {1'b0, ~scaled_audio_left[14],  scaled_audio_left[13:0]};
-        audio_reg[1] <= {1'b0, ~scaled_audio_right[14], scaled_audio_right[13:0]};	
+        audio_reg[0] <= {scaled_audio_left[14],  scaled_audio_left[14:0]};
+        audio_reg[1] <= {scaled_audio_right[14], scaled_audio_right[14:0]};	
 
     end
 end
