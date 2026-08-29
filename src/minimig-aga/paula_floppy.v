@@ -210,7 +210,7 @@ reg 	  fifo_is_writing;
 always @(posedge clk) begin
    if(!fd_dma_is_writing) begin
       if(clk7_en && fifo_wr) begin
-	 logic [7:0] fd_dma_rd_ptr = fifo_word_counter - 10'd31;  
+	 static logic [7:0] fd_dma_rd_ptr = fifo_word_counter - 10'd31;  
 
 	 // permanently read 16 bits from the sector buffer
 	 // to be written to the FIFO

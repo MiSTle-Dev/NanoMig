@@ -397,7 +397,7 @@ cpu_inst_p
   .data_in(cpu_din),
   .IPL(cpu_ipl),
   .IPL_autovector(1'b1),
-  .berr(),
+  .berr(1'b0),
   .CPU(cpucfg),
   .addr_out(cpu_addr_p),
   .data_write(cpu_dout_p),

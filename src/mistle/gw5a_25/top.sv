@@ -3,9 +3,16 @@
 */ 
 
 `define GOWIN
-`define ENABLE_TG68K // required for AGA
+
 `define ENABLE_AGA
+`define ENABLE_TG68K  // required for AGA as that expects a 020 cpu
+`define ENABLE_CACHE  // required for AGA as the 020 has caches
+`define CPU_SLOW14    // run TG68K at 14MHz effective (A1200 speed) for timing closure
+// `define DENISE_EBR    // block ram based bitplane and sprite buffers, saves logic
+`define CHIPRAM_CACHE // cache chip ram instruction fetches too (a1200 68ec020 style) with chip bus snooping
+// `define NO_WS2812     // drop the rgb status led to make room for cache + ide
 `define ENABLE_RTC
+`define DISABLE_ROM_IMAGE
 
 //`define ENABLE_INT_ROM
 //`define ENABLE_INT_RAM
@@ -160,30 +167,14 @@ wire       osd_joy_swap;        // 0=off, 1=on
 wire [2:0] osd_volume;          // Mute=0, 1=25%, 2=50%, 3=75%, 4=100%
 wire       osd_stereo_mix;      // 0=off, 1=on
 
-// generate a reset for some time after rom has been initialized
-reg [15:0] reset_cnt = 16'hffff;
-
-always @(posedge clk_28m, posedge rst_28m) begin
-    if(rst_28m || !rom_done || reset || osd_reset || kbd_reset)
-        reset_cnt <= 16'hffff;
-    else if(reset_cnt != 0)
-        reset_cnt <= reset_cnt - 16'd1;
-end
-
 // this is the reset that goes into the nanomig itself
-wire cpu_reset = |reset_cnt;
+wire cpu_reset = rst_28m || !rom_done || reset || osd_reset || kbd_reset;   
 
 // -------------------------- FPGA Companion MCU interface -----------------------
 
-// map output data onto both spi outputs
-wire spi_io_dout;
-wire spi_intn;
-assign pmod_companion_dout = spi_io_dout;
-assign pmod_companion_intn = spi_intn; 
-wire spi_io_din = pmod_companion_din;
-wire spi_io_ss = pmod_companion_ss;
-wire spi_io_clk = pmod_companion_clk;
-
+`ifdef NO_WS2812
+assign ws2812 = 1'b0;
+`else   
 // connect to ws2812 led
 wire [23:0] ws2812_color;
 ws2812 #(.CLK_FRE(`PIXEL_CLOCK)) ws2812_inst (
@@ -192,7 +183,8 @@ ws2812 #(.CLK_FRE(`PIXEL_CLOCK)) ws2812_inst (
     .color(ws2812_color),
     .data(ws2812)
 );
-
+`endif
+   
 // interface to FPGA Companion
 wire       mcu_sys_strobe;        // mcu message byte valid for sysctrl
 wire       mcu_hid_strobe;        // -"- hid
@@ -212,10 +204,10 @@ mcu_spi mcu (
 	 .reset(rst_28m),
 
 	 // SPI interface to FPGA Companion
-     .spi_io_ss ( spi_io_ss ),
-     .spi_io_clk( spi_io_clk  ),
-     .spi_io_din( spi_io_din  ),
-     .spi_io_dout( spi_io_dout ),
+     .spi_io_ss ( pmod_companion_ss    ),
+     .spi_io_clk( pmod_companion_clk   ),
+     .spi_io_din( pmod_companion_din   ),
+     .spi_io_dout( pmod_companion_dout ),
 
 	 // byte wide data in/out to the submodules
      .mcu_sys_strobe(mcu_sys_strobe),
@@ -285,7 +277,8 @@ sd_card #(
     .rsector(sd_sector),
     .rbusy(sd_busy),
     .rdone(sd_done),
-
+	.rsrc(),
+		   
     // sector data output interface (sync with clk32)
     .inbyte(sd_wr_data),
     .outen(sd_rd_byte_strobe), // when outen=1, a byte of sector content is read out from outbyte
@@ -327,7 +320,10 @@ hid hid (
         .joystick1(hid_joy1)
          );   
 
+`ifdef ENABLE_RTC
 wire [11:0] rtc;                // rtc/time data
+`endif
+
 sysctrl #(
 `ifdef ENABLE_AGA
         .AGA(1)
@@ -335,6 +331,7 @@ sysctrl #(
 ) sysctrl (
         .clk(clk_28m),
         .reset(rst_28m),
+ 	    .jtagsel(),
 
          // interface to send and receive generic system control
         .data_in_strobe(mcu_sys_strobe),
@@ -360,15 +357,23 @@ sysctrl #(
 		.system_joy_swap(osd_joy_swap),
 		.system_volume(osd_volume),
 		.system_stereo_mix(osd_stereo_mix),
+        .system_lcd_v_pos(),
+		   
+        .int_out_n(pmod_companion_intn),
 
-        .int_out_n(spi_intn),
         .int_in( { 4'b0000, sdc_int, 1'b0, hid_int, 1'b0 }),
         .int_ack( int_ack ),
 
+`ifdef ENABLE_RTC
 		.rtc(rtc),
+`endif
         .buttons( {!user_n, reset } ),
         .leds(),
+`ifdef NO_WS2812
+        .color()
+`else
         .color(ws2812_color)
+`endif
 );
    
 // digital 12 bit video
@@ -453,7 +458,8 @@ wire 	    ram_we_n;
 wire [1:0]  ram_be;
 wire 	    ram_oe_n;
 wire		ram_refresh;   
-wire [47:0] chip48_din;
+wire [47:0] chip48;
+wire [47:0] fastram_chip48; // wide read data of the cpu cache port
 
 wire fastram_sel;
 wire [23:1] fastram_addr;
@@ -466,13 +472,12 @@ wire fastram_wr;
 wire fastram_ready;
 
 wire [15:0] sdram_dout;
-wire [47:0] sdram_dout48;
 
 assign ram_din = sdram_dout;
-assign chip48_din = sdram_dout48;
    
 // pack config values into minimig config
 wire [5:0] chipset_config = { 1'b0,osd_chipset,osd_video_mode,1'b0 };
+wire [1:0] cpu_config = { osd_cpu };
 wire [7:0] memory_config = { 4'b0_000, osd_slowmem, osd_chipmem };   
 wire [2:0] fastram_config = { 1'b0, osd_fastmem };   
 wire [3:0] floppy_config = { osd_floppy_drives, osd_floppy_wrprot, osd_floppy_turbo };
@@ -487,6 +492,8 @@ nanomig nanomig
 (
  .clk_sys(clk_28m),
  .reset(cpu_reset),
+ .cpu_nrst_out(),
+ 
  .por(rst_28m),
 
  .clk7_en(clk7_en),
@@ -511,8 +518,10 @@ nanomig nanomig
  .g(green),
  .b(blue),
 
+`ifdef ENABLE_RTC
  // real time clock (from ntp)
  .rtc(rtc),
+`endif
 
  .audio_left(audio_left),
  .audio_right(audio_right),
@@ -550,7 +559,7 @@ nanomig nanomig
  ._ram_ble(ram_be[0]),      // sram lower byte select
  ._ram_we(ram_we_n),        // sram write enable
  ._ram_oe(ram_oe_n),        // sram output enable
- .chip48(chip48_din),       // 64-bit chipram read data bus (AGA-only)
+ .chip48(chip48),           // 64-bit chipram read data bus (AGA-only)
  .refresh(ram_refresh),
 
  .fastram_sel(fastram_sel),
@@ -558,6 +567,7 @@ nanomig nanomig
  .fastram_lds(fastram_lds),
  .fastram_uds(fastram_uds),
  .fastram_dout(fastram_dout),
+ .fastram_chip48(fastram_chip48),
  .fastram_din(fastram_din),
  .fastram_wr(fastram_wr),
  .fastram_ready(fastram_ready)
@@ -701,20 +711,22 @@ sdram #(
 
     .din        ( sdram_din     ), // data input from chipset/cpu
     .dout       ( sdram_dout    ),
-    .dout48     ( sdram_dout48  ),
+    .dout48     ( chip48        ),
 
     .addr       ( sdram_addr    ), // 22 bit word address
     .ds         ( sdram_be      ), // upper/lower data strobe
     .cs         ( sdram_cs      ), // cpu/chipset requests read/wrie
     .we         ( sdram_we      ), // cpu/chipset requests write
-
-    .p2_din        ( fastram_din     ), // data input from cpu
-    .p2_dout       ( fastram_dout    ),
-    .p2_addr       ( fastram_addr    ), // 22 bit word address
-    .p2_ds         ( fastram_be      ), // upper/lower data strobe
-    .p2_cs         ( fastram_sel     ), // cpu requests read/wrie
-    .p2_we         ( fastram_wr      ), // cpu requests write
-    .p2_ack        ( fastram_ready   )
+	.ack        (               ),
+		 
+    .p2_din     ( fastram_din   ), // data input from cpu
+    .p2_dout    ( fastram_dout  ),
+	.p2_dout48  ( fastram_chip48), // wide read data for the cache line fills
+    .p2_addr    ( fastram_addr  ), // 22 bit word address
+    .p2_ds      ( fastram_be    ), // upper/lower data strobe
+    .p2_cs      ( fastram_sel   ), // cpu requests read/wrie
+    .p2_we      ( fastram_wr    ), // cpu requests write
+    .p2_ack     ( fastram_ready )
 );
 
 // run the flash a 85MHz. This is only used at power-up to copy kickstart

@@ -337,7 +337,6 @@ wire        _led;					//power led
 wire  [3:0] sel_chip;			//chip ram select
 wire  [2:0] sel_slow;			//slow ram select
 wire        sel_kick;			//rom select
-wire        sel_kick1mb;      // 1MB upper rom select
 wire        sel_kick256kmirror;// mirror f8-fb to fc-ff in a1k mode    
 wire        sel_cia;				//CIA address space
 wire        sel_reg;				//chip register select
@@ -387,7 +386,7 @@ wire        _change;				//disk has been removed from drive
 wire        _ready;				//disk is ready
 wire        _wprot;				//disk is write-protected
 
-wire  [1:0] blver;
+wire  [1:0] blver = 2'b00;     // part of mister video config, originally set by MCU
 wire        hbl, hde;
 assign      hblank = blver ? ~hde : hbl;
 
@@ -396,14 +395,13 @@ assign      hblank = blver ? ~hde : hbl;
 wire        bls;					//blitter slowdown - required for sharing bus cycles between Blitter and CPU
 
 wire        cpurst = 1'b0;    // TODO: check why this is unused
-wire        cpuhlt;
+wire        cpuhlt = 1'b0;
 
 wire        int7;					//int7 interrupt request from Action Replay
 wire  [2:0] _iplx;			   //interrupt request lines from Paula
 wire        sel_cart;			//Action Replay RAM select
 wire [15:0] cart_data_out;
 
-wire        usrrst;				//user reset from osd interface
 wire        hires;				//hires signal from Denise for interpolation filter enable in Amber
 
 `ifndef DISABLE_IDE
@@ -701,10 +699,8 @@ minimig_bankmapper BMAP1
 	.slow1(sel_slow[1]),
 	.slow2(sel_slow[2]),
 	.kick(sel_kick),
-	.kick1mb(sel_kick1mb),
 	.kick256kmirror(sel_kick256kmirror),
- 	.cart(sel_cart),
-	.memory_config(memory_config[3:0]),
+	.memory_config(memory_config[1:0]),  // chip config
 	.bank(bank)
 );
 
@@ -802,7 +798,6 @@ gary GARY1
 	.sel_chip(sel_chip),
 	.sel_slow(sel_slow),
 	.sel_kick(sel_kick),
-	.sel_kick1mb(sel_kick1mb),
 	.sel_kick256kmirror(sel_kick256kmirror),
 	.sel_cia(sel_cia),
 	.sel_reg(sel_reg),
@@ -818,6 +813,7 @@ gary GARY1
 `ifdef ENABLE_TOCCATA
 	.sel_toccata(sel_toccata),
 `endif
+        .sel_rtg(),
 	.reset(reset),
 	.clk(clk),
 	.rom_readonly(rom_readonly),
@@ -838,6 +834,7 @@ gayle GAYLE1
 	.sel_gayle(sel_gayle),
 	.irq(gayle_irq),
 	.nrdy(gayle_nrdy),
+	.longword(1'b0),
 
 	.ide_req(ide_req),
 	.ide_address(ide_address),
@@ -856,7 +853,7 @@ minimig_syscontrol CONTROL1
 	.clk(clk),
 	.clk7_en(clk7_en),
 	.cnt(sof),
-	.mrst(usrrst | rst_ext),
+	.mrst(rst_ext),
 	.reset(sys_reset)
 );
 
@@ -925,7 +922,7 @@ always @(*) begin
 end
    
 always @(posedge clk) begin
-   reg old_flg = 1'b0;
+   static reg old_flg = 1'b0;
    reg [31:0] cnt;
 
    // check if new value is being provided externally

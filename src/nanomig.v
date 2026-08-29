@@ -1470,6 +1470,7 @@ minimig minimig
 	._cpu_reset   (cpu_rst          ), // M68K reset
 	._cpu_reset_in(cpu_nrst_out     ), // M68K reset out
 	.nmi_addr     (cpu_nmi_addr     ), // M68K NMI address
+	.ovr          (                 ), // M68K NMI address decoding override
 
         .memory_config (memory_config   ), // ram sizes
         .chipset_config(chipset_config  ), 
@@ -1504,12 +1505,12 @@ minimig minimig
 	//rs232 pins
 	.rxd          (uart_rx          ), // RS232 receive
 	.txd          (uart_tx          ), // RS232 send
-	.cts          (1'b1             ), // RS232 clear to send
+	.cts          (1'b0             ), // RS232 clear to send (0=ready to receive)
 	.rts          (                 ), // RS232 request to send
 	.dtr          (                 ), // RS232 Data Terminal Ready
-	.dsr          (1'b1             ), // RS232 Data Set Ready
-	.cd           (                 ), // RS232 Carrier Detect
-	.ri           (1'b1             ), // RS232 Ring Indicator
+	.dsr          (1'b1             ), // RS232 Data Set Ready (1=ready)
+	.cd           (1'b1             ), // RS232 Carrier Detect (1=carrier detected)
+	.ri           (1'b1             ), // RS232 Ring Indicator (1=idle/not ringing)
 
 	//I/O
 	._joy1        (~JOY0            ), // joystick 1 [fire4,fire3,fire2,fire,up,down,left,right] (default mouse port)
@@ -1531,6 +1532,7 @@ minimig minimig
 	//video
 	._hsync       (hs_in            ), // horizontal sync
 	._vsync       (vs_in            ), // vertical sync
+	._csync       (                 ), // composite sync
 	.field1       (                 ),
 	.lace         (                 ),
 	.red          (red              ), // red
@@ -1540,6 +1542,7 @@ minimig minimig
 	.vblank       (vbl              ),
 	.res          (res              ),
         .htotal       (htotal           ),
+        .ce_pix       (                 ),
 
 	//audio
 	.ldata        (audio_left       ), // left DAC data

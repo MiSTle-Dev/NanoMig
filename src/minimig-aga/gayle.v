@@ -149,6 +149,7 @@ ide ide0
 	.io_readdata({ide0_data[23:16],ide0_data[31:24],ide0_data[7:0],ide0_data[15:8]}),
 	.io_writedata({16'd0,data_in[7:0],data_in[15:8]}),
 	.io_32(io_32),
+        .io_wait(),
 
 	.request(ide_req[2:0]),
 	.drq(ide0_drq),
@@ -182,6 +183,7 @@ ide ide1
 	.io_readdata({ide1_data[23:16],ide1_data[31:24],ide1_data[7:0],ide1_data[15:8]}),
 	.io_writedata({16'd0,data_in[7:0],data_in[15:8]}),
 	.io_32(io_32),
+        .io_wait(),
 
 	.request(ide_req[5:3]),
 	.drq(ide1_drq),

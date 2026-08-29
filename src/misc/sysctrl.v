@@ -298,7 +298,7 @@ always @(posedge clk) begin
                   if(rtc_cmd == 8'd0) begin
 		     // byte 1 is the flags field (data source, dst), currently unused
                      if(state >= 4'd2) begin
-			logic [2:0] rtc_index = state-3'd2;
+			static logic [2:0] rtc_index = state-3'd2;
 			rtc <= { !rtc[11], rtc_index, data_in };
 		     end
 		  end
