@@ -8,7 +8,16 @@
    or a single copy of e.g. a 512k diag rom
      openFPGALoader --external-flash -o 0x400000 DiagROM
 */
- 
+
+// `define ENABLE_TG68K
+// `define ENABLE_AGA   // offer the AGA chipset in the menu
+// `define CPU_SLOW14   // run TG68K at 14MHz effective (A1200 speed) for timing closure
+// `define ENABLE_CACHE // MiSTer cpu cache between the cpu and the sdram (cached kickstart + fast ram)
+// `define CHIPRAM_CACHE
+// `define DISABLE_IDE  // v32 experiment: cache + ide together
+// `define NO_WS2812   // drop the rgb status led to make room for cache + ide
+// `define DENISE_EBR   // block ram based bitplane and sprite buffers, saves logic
+
 module top(
   input			clk,
 
@@ -82,7 +91,8 @@ wire [5:0] db9_joy1 = { !js1[5], !js1[0], !js1[2], !js1[1], !js1[4], !js1[3] };
 wire [5:0]	leds;
 assign leds[5] = |sd_wr;
 assign leds[4] = |sd_rd;
-assign leds_n = ~leds;  
+assign leds_n = ~leds;
+
 
 // ============================== clock generation ===========================
    
@@ -149,28 +159,27 @@ wire       osd_floppy_turbo;
 wire       osd_floppy_wrprot;
 wire       osd_ide_enable;
 wire [2:0] osd_chipset;         // 0=OCS-A500, 1=OCS-A1000, 2=ECS, 6=AGA
+wire [1:0] osd_cpu;             // 00=68000, 01=68010, 11=68020
 wire       osd_video_mode;      // PAL (0=PAL, 1=NTSC)
 wire [1:0] osd_video_screen;    // 0=standard, 1=overscan, 2=wide screen (jailbars)
 wire [1:0] osd_video_filter;
 wire [1:0] osd_video_scanlines;
+wire [2:0] osd_turbo;           // 001=turbochip, 010=turbokick, 100=chipcache
 wire       osd_joy_swap;        // 0=off, 1=on
 wire [2:0] osd_volume;          // Mute=0, 1=25%, 2=50%, 3=75%, 4=100%
 wire       osd_stereo_mix;      // 0=off, 1=on
 
 wire	   rom_download_in_progress;
 
-// generate a reset for some time after rom has been initialized
-reg [15:0] reset_cnt = 16'hffff;
+// this is the reset that goes into the nanomig itself
+reg nanomig_reset = 1;
 
 always @(posedge clk_28m, posedge rst_28m) begin
-    if(rst_28m || !rom_done || reset || osd_reset || kbd_reset || rom_download_in_progress)
-        reset_cnt <= 16'hffff;
-    else if(reset_cnt != 0)
-        reset_cnt <= reset_cnt - 16'd1;
+    if (rst_28m)
+        nanomig_reset <= 1'b1;
+    else
+        nanomig_reset <= !rom_done || reset || osd_reset || kbd_reset || rom_download_in_progress;
 end
-
-// this is the reset that goes into the nanomig itself
-wire cpu_reset = |reset_cnt;
 
 // -------------------------- M0S MCU interface -----------------------
 // intn and dout are outputs driven by the FPGA to the MCU
@@ -208,14 +217,19 @@ wire spi_io_din = spi_ext?m0s[1]:spi_dat;
 wire spi_io_ss = spi_ext?m0s[2]:spi_csn;
 wire spi_io_clk = spi_ext?m0s[3]:spi_sclk;
 
-// connect to ws2812 led
+// connect to ws2812 led. The rgb status led costs ~150 luts which the cache
+// plus ide combination needs, so it is dropped when space is tight.
 wire [23:0] ws2812_color;
+`ifdef NO_WS2812
+assign ws2812 = 1'b0;
+`else
 ws2812 ws2812_inst (
     .clk(clk_28m),
 	.reset(rst_28m),
     .color(ws2812_color),
     .data(ws2812)
 );
+`endif
 
 // interface to M0S MCU
 wire       mcu_sys_strobe;        // mcu message byte valid for sysctrl
@@ -458,7 +472,11 @@ hid hid (
         .joystick1(hid_joy1)
          );   
 
-sysctrl sysctrl (
+sysctrl #(
+`ifdef ENABLE_AGA
+        .AGA(1)
+`endif
+        ) sysctrl (
         .clk(clk_28m),
         .reset(rst_28m),
 
@@ -469,23 +487,25 @@ sysctrl sysctrl (
         .data_out(sys_data_out),
 
         // values controlled by the OSD
-		.system_reset(osd_reset),
-		.system_floppy_drives(osd_floppy_drives),
-		.system_floppy_turbo(osd_floppy_turbo),
-		.system_floppy_wrprot(osd_floppy_wrprot),
-		.system_ide_enable(osd_ide_enable),
-	    .system_chipset(osd_chipset),
-		.system_video_mode(osd_video_mode),
-		.system_video_screen(osd_video_screen),
-		.system_video_filter(osd_video_filter),
-		.system_video_scanlines(osd_video_scanlines),
-		.system_chipmem(osd_chipmem),
-		.system_slowmem(osd_slowmem),
-		.system_fastmem(osd_fastmem),
-        .system_joy_swap(osd_joy_swap),
-    	.system_volume(osd_volume),
-		.system_stereo_mix(osd_stereo_mix),
-				 
+	.system_reset(osd_reset),
+	.system_floppy_drives(osd_floppy_drives),
+	.system_floppy_turbo(osd_floppy_turbo),
+	.system_floppy_wrprot(osd_floppy_wrprot),
+	.system_ide_enable(osd_ide_enable),
+	.system_chipset(osd_chipset),
+	.system_cpu(osd_cpu),
+	.system_video_mode(osd_video_mode),
+	.system_video_screen(osd_video_screen),
+	.system_video_filter(osd_video_filter),
+	.system_video_scanlines(osd_video_scanlines),
+	.system_chipmem(osd_chipmem),
+	.system_slowmem(osd_slowmem),
+	.system_fastmem(osd_fastmem),
+	.system_turbo(osd_turbo),
+	.system_joy_swap(osd_joy_swap),
+	.system_volume(osd_volume),
+	.system_stereo_mix(osd_stereo_mix),
+
         .int_out_n(spi_intn),
         .int_in( { 4'b0000, sdc_int, 1'b0, hid_int, 1'b0 }),
         .int_ack( int_ack ),
@@ -591,21 +611,29 @@ wire fastram_wr;
 wire fastram_ready;
    
 wire [15:0] sdram_dout;
+wire [47:0] chip48;         // upper 48 bits of 64 bit aligned chipram reads (AGA fmode>0)
+wire [47:0] fastram_dout48; // wide read data of the cpu cache port
 
 assign ram_din = sdram_dout;
 
 // pack config values into minimig config
 wire [5:0] chipset_config = { 1'b0,osd_chipset,osd_video_mode,1'b0 };
+wire [1:0] cpu_config = { osd_cpu };
 wire [7:0] memory_config = { 4'b0_000, osd_slowmem, osd_chipmem };   
 wire [2:0] fastram_config = { 1'b0, osd_fastmem };   
+wire [2:0] turbo_config = { osd_turbo };
 wire [3:0] floppy_config = { osd_floppy_drives, osd_floppy_wrprot, osd_floppy_turbo };
 wire [3:0] video_config = { osd_video_filter, osd_video_scanlines };   
-wire [5:0] ide_config = { 5'b00000, osd_ide_enable };   
+// FIXME - setting ide_config[5] prevents minimig from using
+// fast chipset bus for GAYLE, which is by default in use
+// when 68020 CPU is selected; we may connect fast chip bus
+// to GAYLE and set ide_config[5] to 0 to improve performance
+wire [5:0] ide_config = { 5'b10000, osd_ide_enable };   
    
 nanomig nanomig
 (
  .clk_sys(clk_28m),
- .reset(cpu_reset),
+ .reset(nanomig_reset),
  .por(rst_28m),
 
  .clk7_en(clk7_en),
@@ -613,14 +641,20 @@ nanomig nanomig
 
  .pwr_led(leds[0]),
  .fdd_led(leds[1]),
+`ifndef DISABLE_IDE
  .hdd_led(leds[2]),
+`endif
  
  .memory_config(memory_config),
  .fastram_config(fastram_config),
+ .cpu_config(cpu_config),
  .chipset_config(chipset_config),
  .floppy_config(floppy_config),
  .video_config(video_config),
+ .turbo_config(turbo_config),
+`ifndef DISABLE_IDE
  .ide_config(ide_config),
+`endif
 
  // video
  .hs(hs_n), // horizontal sync
@@ -665,7 +699,11 @@ nanomig nanomig
  ._ram_ble(ram_be[0]),      // sram lower byte select
  ._ram_we(ram_we_n),        // sram write enable
  ._ram_oe(ram_oe_n),        // sram output enable
- .chip48(48'd0),
+`ifdef ENABLE_AGA
+ .chip48(chip48),
+`else
+ .chip48(48'b0),
+`endif
  .refresh(ram_refresh),
  
  .fastram_sel(fastram_sel),
@@ -673,6 +711,11 @@ nanomig nanomig
  .fastram_lds(fastram_lds),
  .fastram_uds(fastram_uds),
  .fastram_dout(fastram_dout),
+`ifdef ENABLE_CACHE
+ .fastram_dout48(fastram_dout48),
+`else
+ .fastram_dout48(48'b0),
+`endif
  .fastram_din(fastram_din),
  .fastram_wr(fastram_wr),
  .fastram_ready(fastram_ready)
@@ -825,7 +868,21 @@ wire [21:0] sdram_addr    =
 
 assign O_sdram_clk = clk_85m_shifted;
 
-sdram #(.DATA_WIDTH(32), .RAS_WIDTH(11), .CAS_WIDTH(8) ) sdram (
+localparam CHIP48_BURST = 0
+`ifdef ENABLE_AGA
+    | 1
+`endif
+`ifdef ENABLE_CACHE
+    | 1
+`endif
+;
+
+sdram #(
+    .DATA_WIDTH(32),
+    .RAS_WIDTH(11),
+    .CAS_WIDTH(8),
+    .CHIP48_BURST(CHIP48_BURST)   // the wide 64 bit fetch AGA or cache needs
+) sdram (
 	.sd_data    ( IO_sdram_dq   ), // 32 bit bidirectional data bus
 	.sd_addr    ( O_sdram_addr  ), // 11 bit multiplexed address bus
 	.sd_dqm     ( O_sdram_dqm   ), // two byte masks
@@ -846,6 +903,7 @@ sdram #(.DATA_WIDTH(32), .RAS_WIDTH(11), .CAS_WIDTH(8) ) sdram (
 
 	.din        ( sdram_din     ), // data input from chipset/cpu
 	.dout       ( sdram_dout    ),
+	.dout48     ( chip48        ), // wide fetch data for AGA fmode>0
 	.addr       ( sdram_addr    ), // 22 bit word address
 	.ds         ( sdram_be      ), // upper/lower data strobe
 	.cs         ( sdram_cs      ), // cpu/chipset requests read/wrie
@@ -853,6 +911,7 @@ sdram #(.DATA_WIDTH(32), .RAS_WIDTH(11), .CAS_WIDTH(8) ) sdram (
 
 	.p2_din        ( fastram_din     ), // data input from chipset/cpu
 	.p2_dout       ( fastram_dout    ),
+	.p2_dout48     ( fastram_dout48  ), // wide read data for the cache line fills
 	.p2_addr       ( fastram_addr    ), // 22 bit word address
 	.p2_ds         ( fastram_be      ), // upper/lower data strobe
 	.p2_cs         ( fastram_sel     ), // cpu/chipset requests read/wrie
@@ -885,7 +944,7 @@ flash flash (
 // latch audio, so it's stable during 48khz transfer
 reg [15:0] audio_reg [2]; // 16 bit signed audio for HDMI
 
-// Sign-extend inputs to 16-bit BEFORE mixing – intermediate sum
+// Sign-extend inputs to 16-bit BEFORE mixing  intermediate sum
 // cannot overflow, result always fits back in 15 bit.
 wire signed [15:0] audio_left_s  = {{1{audio_left[14]}},  audio_left};
 wire signed [15:0] audio_right_s = {{1{audio_right[14]}}, audio_right};
@@ -899,15 +958,19 @@ reg signed [14:0] scaled_audio_right;
 // An integer divider cannot hit 48kHz: 28500000 / 48000 / 2 = 296.88, and the
 // truncation leaves the stream running fast, which makes sinks drop a chunk of
 // audio every few seconds. A phase accumulator keeps the fractional part.
-localparam [31:0] AUDIO_INC = (64'd48000 <<< 32) / `PIXEL_CLOCK;
-reg [31:0] aclk_acc;
-reg        clk_audio;
-reg        aclk_tick;
+localparam integer AUDIO_RATE = 48000;
+localparam integer AUDIO_ACC_WIDTH = $clog2(`PIXEL_CLOCK + AUDIO_RATE);
+
+localparam [AUDIO_ACC_WIDTH-1:0] AUDIO_INC = ((AUDIO_ACC_WIDTH*2)'(AUDIO_RATE) <<< AUDIO_ACC_WIDTH) / `PIXEL_CLOCK;
+
+reg [AUDIO_ACC_WIDTH-1:0] aclk_acc;
+reg                       clk_audio;
+reg                       aclk_tick;
 
 always @(posedge clk_pixel) begin
     aclk_acc  <= aclk_acc + AUDIO_INC;
-    clk_audio <= aclk_acc[31];                 // msb of the accumulator = 48kHz
-    aclk_tick <= (clk_audio != aclk_acc[31]);  // high the cycle after each edge
+    clk_audio <= aclk_acc[AUDIO_ACC_WIDTH-1];                 // msb of the accumulator = 48kHz
+    aclk_tick <= (clk_audio != aclk_acc[AUDIO_ACC_WIDTH-1]);  // high the cycle after each edge
 
     // The sample word must not change on the same clk_pixel edge that toggles
     // clk_audio: the hdmi module latches it on that very edge, so data and
@@ -918,7 +981,7 @@ always @(posedge clk_pixel) begin
         // --- Stereo Mix (75/25)-------------------------------------------
         // 16-bit signed wires prevent any overflow; the result
         // always fits in 15 bit and is truncated safely on assignment. 
-	    case (osd_stereo_mix)
+        case (osd_stereo_mix)
             1'b0: begin   // no mix
                 mixed_audio_left  <= audio_left;
                 mixed_audio_right <= audio_right;
@@ -931,9 +994,9 @@ always @(posedge clk_pixel) begin
             end
         endcase
 
-    // --- Volume scaling ----------------------------------------
+        // --- Volume scaling ----------------------------------------
         // mixed_audio_* are reg signed [14:0], so >>> is always
-        // arithmetic – no $signed() wrapper required.
+        // arithmetic â€“ no $signed() wrapper required.
         case (osd_volume) 
             3'b100: begin // 100%
                 scaled_audio_left  <= mixed_audio_left;
@@ -962,12 +1025,11 @@ always @(posedge clk_pixel) begin
         endcase
 
         // --- HDMI audio register ----------------------------------
-        // Convert signed two's complement → offset binary:
+        // Convert signed two's complement â†’ offset binary:
         // flip sign bit (bit 14).  Bit 15 = 0 (15-bit audio in 16-bit slot).
         // Explicit per-element assignment avoids unpacked-array ambiguity.
         audio_reg[0] <= {scaled_audio_left[14],  scaled_audio_left[14:0]};
         audio_reg[1] <= {scaled_audio_right[14], scaled_audio_right[14:0]};	
-
     end
 end
    
@@ -975,6 +1037,7 @@ wire [2:0] tmds;
 wire tmds_clock;
 
 wire vreset, vpal, interlace, short_frame;
+
 video_analyzer video_analyzer (
     .clk         ( clk_28m   ),
     .hs          ( hs_n      ),
@@ -987,7 +1050,8 @@ video_analyzer video_analyzer (
 );
 
 hdmi #(
-    .AUDIO_RATE(48000), .AUDIO_BIT_WIDTH(16),
+    .AUDIO_RATE(AUDIO_RATE),
+    .AUDIO_BIT_WIDTH(16),
     .VENDOR_NAME( { "MiSTle", 16'd0} ),
     .PRODUCT_DESCRIPTION( {"Nanomig", 72'd0} )
 ) hdmi(

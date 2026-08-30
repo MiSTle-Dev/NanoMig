@@ -10,13 +10,14 @@
 
 `define LATTICE
 // `define INFER_DPRAM
+`define ENABLE_RAM32
 `define ENABLE_TG68K
 `define ENABLE_AGA
 `define NO_WS2812    // drop the rgb status led to make room for cache + ide
 `define DENISE_EBR   // use the block ram based bitplane and sprite buffers
+// `define CPU_SLOW14   // run TG68K at 14MHz effective (A1200 speed) for timing closure
 `define ENABLE_CACHE
 `define CHIPRAM_CACHE
-// `define CPU_SLOW14   // run TG68K at 14MHz effective (A1200 speed) for timing closure
 // `define DISABLE_IDE       // when using inferred ram, this exceeds the chip
 // `define HDMI_TEST_PATTERN  // display static test pattern on HDMI instead of amiga video
 // `define ENABLE_INT_ROM     // enable 2k internal test rom in nanomig.v
@@ -168,6 +169,7 @@ wire       osd_video_mode;      // PAL (0=PAL, 1=NTSC)
 wire [1:0] osd_video_screen;    // 0=standard, 1=overscan, 2=wide screen (jailbars)
 wire [1:0] osd_video_filter;
 wire [1:0] osd_video_scanlines; // 0=off, 1=dim, 2=black, 3=balanced
+wire [2:0] osd_turbo;           // 001=turbochip, 010=turbokick, 100=chipcache
 wire       osd_joy_swap;        // 0=off, 1=on
 wire [2:0] osd_volume;          // Mute=0, 1=25%, 2=50%, 3=75%, 4=100%
 wire       osd_stereo_mix;      // 0=off, 1=on
@@ -486,6 +488,7 @@ sysctrl #(
         .system_chipmem(osd_chipmem),
         .system_slowmem(osd_slowmem),
         .system_fastmem(osd_fastmem),
+        .system_turbo(osd_turbo),
         .system_joy_swap(osd_joy_swap),
         .system_volume(osd_volume),
         .system_stereo_mix(osd_stereo_mix),
@@ -597,7 +600,7 @@ wire fastram_ready;
 
 wire [15:0] sdram_dout;
 wire [47:0] sdram_dout48;
-wire [47:0] fastram_chip48;
+wire [47:0] fastram_dout48;
 
 assign ram_din = sdram_dout;
 assign chip48_din = sdram_dout48;
@@ -609,6 +612,7 @@ wire [7:0] memory_config = { 4'b0_000, osd_slowmem, osd_chipmem };
 wire [2:0] fastram_config = { 1'b0, osd_fastmem };
 wire [3:0] floppy_config = { osd_floppy_drives, osd_floppy_wrprot, osd_floppy_turbo };
 wire [3:0] video_config = { osd_video_filter, osd_video_scanlines };
+wire [2:0] turbo_config = { osd_turbo };
 `ifndef DISABLE_IDE
 // FIXME - setting ide_config[5] prevents minimig from using
 // fast chipset bus for GAYLE, which is by default in use
@@ -638,6 +642,7 @@ nanomig nanomig
  .chipset_config(chipset_config),
  .floppy_config(floppy_config),
  .video_config(video_config),
+ .turbo_config(turbo_config),
 `ifndef DISABLE_IDE
  .ide_config(ide_config),
 `endif
@@ -693,7 +698,7 @@ nanomig nanomig
  .fastram_lds(fastram_lds),
  .fastram_uds(fastram_uds),
  .fastram_dout(fastram_dout),
- .fastram_chip48(fastram_chip48),
+ .fastram_dout48(fastram_dout48),
  .fastram_din(fastram_din),
  .fastram_wr(fastram_wr),
  .fastram_ready(fastram_ready)
@@ -847,11 +852,18 @@ wire [21:0] sdram_addr    =
 
 assign O_sdram_clk = clk_85m_shifted;
 
-sdram #(
+localparam CHIP48_BURST = 0
 `ifdef ENABLE_AGA
-	.CHIP48_BURST(1),  // required only for AGA
+    | 1
 `endif
-	.SYNC_DELAY(2)
+`ifdef ENABLE_CACHE
+    | 1
+`endif
+;
+
+sdram #(
+	.SYNC_DELAY(2),
+    .CHIP48_BURST(CHIP48_BURST)   // the wide 64 bit fetch AGA or cache needs
 ) sdram (
 	.sd_data    ( IO_sdram_dq   ), // 14 bit bidirectional data bus
 	.sd_addr    ( O_sdram_addr  ), // 13 bit multiplexed address bus
@@ -882,7 +894,7 @@ sdram #(
 
 	.p2_din        ( fastram_din     ), // data input from cpu
 	.p2_dout       ( fastram_dout    ),
-	.p2_dout48     ( fastram_chip48  ), // wide read data for the cache line fills
+	.p2_dout48     ( fastram_dout48  ), // wide read data for the cache line fills
 	.p2_addr       ( fastram_addr    ), // 22 bit word address
 	.p2_ds         ( fastram_be      ), // upper/lower data strobe
 	.p2_cs         ( fastram_sel     ), // cpu requests read/wrie
