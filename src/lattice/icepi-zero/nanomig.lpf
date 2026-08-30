@@ -265,3 +265,7 @@ BLOCK PATH FROM CELL "sysctrl/system_chipmem*" ;
 BLOCK PATH FROM CELL "sysctrl/system_slowmem*" ;
 BLOCK PATH FROM CELL "sysctrl/system_fastmem*" ;
 BLOCK PATH FROM CELL "sysctrl/system_volume*" ;
+
+BLOCK PATH FROM CELL "*packet_picker/audio_sample_word_transfer*" ;
+
+MULTICYCLE FROM CELL "*PAULA1/pf1/dsklen*" TO CELL "*AGNUS1/bl1/*" 4X ;
