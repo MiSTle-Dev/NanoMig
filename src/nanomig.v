@@ -35,6 +35,7 @@ module nanomig (
    input [5:0]	 chipset_config,
    input [3:0]	 floppy_config,
    input [3:0]	 video_config,
+   input [2:0]  turbo_config,
 `ifndef DISABLE_IDE
    input [5:0]	 ide_config,
    output	 hdd_led,
@@ -90,7 +91,7 @@ module nanomig (
    output	 fastram_lds,
    output	 fastram_uds,
    input [15:0]	 fastram_dout,
-   input [47:0]	 fastram_chip48, // upper 48 bits of a 64 bit aligned read (cache line fill)
+   input [47:0]	 fastram_dout48, // upper 48 bits of a 64 bit aligned read (cache line fill)
    output [15:0] fastram_din,
    output	 fastram_wr,
    input	 fastram_ready
@@ -196,29 +197,11 @@ wire [23:1] chip_addr;
 wire	    ovl;
    
 wire [1:0] cpucfg = cpu_config; // CPU-Type: 00 = 68000, 01 = 68010, 11 = 68020
+wire [1:0] chipram_config = memory_config[1:0];
+wire [1:0] slowram_config = memory_config[3:2];
 
-// cache bits: dcache, kick, chip
-// wire [2:0] cachecfg = { 1'b0, ~ovl, 1'b0 };
-`ifdef ENABLE_CACHE
- `ifdef CHIPRAM_CACHE
-// chip ram is cached as well. Instruction fetches only (dcache bit clear),
-// which mirrors the 68EC020 of a real A1200: it has an instruction cache but
-// no data cache, so loops run from the cache while all data accesses keep
-// their original chip bus timing. Chip bus writes are snooped so cached
-// lines stay coherent with blitter/copper/cpu writes.
-// turbo chip must be off while the kickstart overlay maps the rom to
-// $000000, otherwise instruction fetches would read chip ram instead of
-// the rom. cpu_wrapper only samples these bits between bus cycles.
-wire [2:0] cachecfg = { 1'b1, 1'b1, ~ovl };  // data cache, turbo kick, turbo chip when no overlay
- `else
-wire [2:0] cachecfg = 3'b110;  // data cache + turbo kick (cached kickstart via the direct ram path), chip accesses stay on the chip bus
- `endif
-`elsif TURBO_KICK
-wire [2:0] cachecfg = 3'b010;  // turbo kick only, no cache: kick reads use the plain direct ram path
-`else
-wire [2:0] cachecfg = 3'b000;  // no turbo chip and kick, no caches
-`endif
-// wire [2:0] cachecfg = 3'b010;  // permanent turbo kick
+// cache bits: data, kick, chip
+wire [2:0] turbocfg = turbo_config & { 1'b1, 1'b1, ~ovl };  // turbo data, turbo kick, turbo chip when no overlay
 
 wire	   pwr_led_bright;
 
@@ -311,8 +294,10 @@ cpu_wrapper cpu_wrapper
 `endif
  
 	.cpucfg       (cpucfg          ),
-	.cachecfg     (cachecfg        ),
+	.turbocfg     (turbocfg        ),
 	.fastramcfg   (fastram_config  ),
+	.chipramcfg   (chipram_config  ),
+	.slowramcfg   (slowram_config  ),
 	.bootrom      (1'b0            ),
 
 	.ramreq       (ram_sel         ),
@@ -470,12 +455,12 @@ reg  [22:1] fastram_addr_r;
 reg  [15:0] fastram_din_r;
 reg         fastram_lds_r;
 reg         fastram_uds_r;
-reg         frr_d;               // previous state of the port 2 ack toggle
-wire        fastram_done = (fastram_ready != frr_d);
+reg         fastram_ready_d;  // previous state of the port 2 ack toggle
+wire        fastram_done = (fastram_ready != fastram_ready_d);
 wire [1:0]  fill_word = fill_idx + fill_cnt;
 
 always @(posedge clk_sys) begin
-  frr_d           <= fastram_ready;
+  fastram_ready_d <= fastram_ready;
   cache_fill_ack  <= 1'b0;
   ram_write_ready <= 1'b0;
   cache_ack_d     <= cache_ack;
@@ -499,7 +484,7 @@ always @(posedge clk_sys) begin
       wbuf_pending  <= 1'b0;
     end
     if(fastram_done_d && (fill_state == 2'd1)) begin
-      fill_line  <= { fastram_dout, fastram_chip48 };
+      fill_line  <= { fastram_dout, fastram_dout48 };
       fill_cnt   <= 2'd0;
       fill_state <= 2'd2;
     end

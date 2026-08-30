@@ -8,6 +8,7 @@ create_clock -name clk_hdmi -period 7 -waveform {0 3} [get_nets {clk_pixel_x5}] 
 create_clock -name clk_osc -period 37 -waveform {0 18} [get_ports {clk}] -add
 create_clock -name clk_spi -period 14.085 -waveform {0 7.04} [get_ports {mspi_clk}] -add
 create_generated_clock -name clk28 -source [get_pins {amigaclks/sysclk_inst/CLKOUT}] -master_clock clk85 -divide_by 3 [get_pins {amigaclks/sysclk_inst/CLKOUTD3}]
+
 // every multi cycle setup exception needs its hold counterpart, otherwise the
 // hold analysis still assumes a single cycle relationship between the two
 // domains and reports thousands of meaningless violations
@@ -22,6 +23,7 @@ set_false_path -from [get_cells {sysctrl/system_video*}]
 set_false_path -from [get_cells {sysctrl/system_chipmem*}]
 set_false_path -from [get_cells {sysctrl/system_slowmem*}]
 set_false_path -from [get_cells {sysctrl/system_fastmem*}]
+set_false_path -from [get_cells {sysctrl/system_turbo*}]
 set_false_path -from [get_cells {sysctrl/system_volume*}]
 
 // the TG68K advances at most every second clk28 cycle (CPU_SLOW14 in

@@ -81,6 +81,16 @@
 	<listentry label="8MB" value="3"/>
 	<!--END-->
       </list>	
+      <list label="Turbo:" id="Z" default="3">
+    <listentry label="None" value="0"/>
+    <listentry label="Chip" value="1"/>
+    <listentry label="Kick" value="2"/>
+    <listentry label="Both" value="3"/>
+      </list>
+      <list label="Turbo data:" id="U" default="0">
+    <listentry label="Disabled" value="0"/>
+    <listentry label="Enabled" value="1"/>
+      </list>
       <list label="Video:" id="V" default="0">
 	<listentry label="PAL" value="0"/>
 	<listentry label="NTSC" value="1"/>

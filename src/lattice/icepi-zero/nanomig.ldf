@@ -288,6 +288,9 @@
         <Source name="../sprite_ram.v" type="Verilog" type_short="Verilog">
             <Options/>
         </Source>
+        <Source name="../dpram_be_1024x16.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
         <Source name="nanomig.lpf" type="Logic Preference" type_short="LPF">
             <Options/>
         </Source>

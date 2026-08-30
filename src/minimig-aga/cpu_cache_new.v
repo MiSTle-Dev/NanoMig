@@ -22,7 +22,7 @@ module cpu_cache_new
   input       [3:0] cpu_cache_ctrl, // CPU cache control
   input             cache_inhibit,  // cache inhibit
 
-  // cpu    
+  // cpu
   input             cpu_cs,         // cpu activity
   input      [28:1] cpu_adr,        // cpu address
   input       [1:0] cpu_bs,         // cpu byte selects
@@ -43,7 +43,7 @@ module cpu_cache_new
 
   // snoop
   input             snoop_act,      // snoop act (write only - just update existing data in cache)
-  input      [28:1] snoop_adr,      // chip address                      
+  input      [28:1] snoop_adr,      // chip address
   input      [15:0] snoop_dat_w,    // snoop write data
   input       [1:0] snoop_bs
 );
@@ -227,7 +227,7 @@ always @ (posedge clk) begin
 		//cc_fr  <= cpu_cache_freeze;
 		cc_clr <= cpu_cache_clear;
 	end
-end 
+end
 
 // slice up cpu address
 assign cpu_adr_blk = cpu_adr[2:1];    // cache block address (inside cache row), 2 bits for 4x16 rows
@@ -343,7 +343,7 @@ always @ (posedge clk) begin
       end
       CPU_SM_FILL1 : begin
         fill <= 1'b1;
-        cpu_sm_adr <= cpu_adr[10:1]; 
+        cpu_sm_adr <= cpu_adr[10:1];
         if (!sdr_read_ack) begin
           sdr_read_req <= 1'b1;
         end else begin
@@ -354,7 +354,7 @@ always @ (posedge clk) begin
           if (cache_inhibit) begin
             // don't update cache if caching is inhibited
             cpu_sm_state <= CPU_SM_FILLW;
-          end else begin      
+          end else begin
             // update tag ram
             if (cpu_ir) begin
               if (itag_lru) begin
@@ -667,52 +667,6 @@ dpram_be_1024x16 ddram1 (
   .wren_b     (ddram1_sdr_we    ),
   .data_b     (ddram1_sdr_dat_w ),
   .q_b        (ddram1_sdr_dat_r )
-);
-
-endmodule
-
-
-module dpram_be_1024x16
-(
-	input         clock,
-
-	input	  [9:0] address_a,
-	input	  [1:0] byteena_a,
-	input	 [15:0] data_a,
-	input         wren_a,
-	output [15:0] q_a,
-
-	input	  [9:0] address_b,
-	input	  [1:0] byteena_b,
-	input	 [15:0] data_b,
-	input	        wren_b,
-	output [15:0] q_b
-);
-
-dpram #(10,8) ram_l
-(
-	.clock(clock),
-	.address_a(address_a),
-	.data_a(data_a[7:0]),
-	.wren_a(byteena_a[0] & wren_a),
-	.q_a(q_a[7:0]),
-	.address_b(address_b),
-	.data_b(data_b[7:0]),
-	.wren_b(byteena_b[0] & wren_b),
-	.q_b(q_b[7:0])
-);
-
-dpram #(10,8) ram_u
-(
-	.clock(clock),
-	.address_a(address_a),
-	.data_a(data_a[15:8]),
-	.wren_a(byteena_a[1] & wren_a),
-	.q_a(q_a[15:8]),
-	.address_b(address_b),
-	.data_b(data_b[15:8]),
-	.wren_b(byteena_b[1] & wren_b),
-	.q_b(q_b[15:8])
 );
 
 endmodule

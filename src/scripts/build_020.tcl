@@ -10,13 +10,14 @@ add_file minimig-aga/amiga_clk.v
 add_file minimig-aga/cpu_wrapper.v
 add_file minimig-aga/cpu_cache_new.v
 add_file minimig-aga/dpram.v
-add_file minimig-aga/minimig.v 
+add_file minimig-aga/dpram_be_1024x16.v
+add_file minimig-aga/minimig.v
 add_file minimig-aga/ciaa.v
 add_file minimig-aga/ciab.v
 add_file minimig-aga/cia_int.v
 add_file minimig-aga/cia_timera.v
 add_file minimig-aga/cia_timerb.v
-add_file minimig-aga/cia_timerd.v 
+add_file minimig-aga/cia_timerd.v
 add_file minimig-aga/paula.v
 add_file minimig-aga/paula_uart.v
 add_file minimig-aga/paula_audio_channel.v

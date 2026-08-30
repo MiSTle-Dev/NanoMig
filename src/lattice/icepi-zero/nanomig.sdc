@@ -16,6 +16,7 @@ set_false_path -from [get_cells {sysctrl.system_video*}]
 set_false_path -from [get_cells {sysctrl.system_chipmem*}]
 set_false_path -from [get_cells {sysctrl.system_slowmem*}]
 set_false_path -from [get_cells {sysctrl.system_fastmem*}]
+set_false_path -from [get_cells {sysctrl.system_turbo*}]
 set_false_path -from [get_cells {sysctrl.system_volume*}]
 
 set_false_path -from [get_cells {*packet_picker/audio_sample_word_transfer*}]

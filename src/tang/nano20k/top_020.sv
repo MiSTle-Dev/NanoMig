@@ -13,11 +13,10 @@
 `define ENABLE_AGA   // offer the AGA chipset in the menu
 `define CPU_SLOW14   // run TG68K at 14MHz effective (A1200 speed) for timing closure
 `define ENABLE_CACHE // MiSTer cpu cache between the cpu and the sdram (cached kickstart + fast ram)
-// `define TURBO_KICK   // bisect build: turbo kick via the plain fast path, no cache
+`define CHIPRAM_CACHE
 // `define DISABLE_IDE  // v32 experiment: cache + ide together
 `define NO_WS2812   // drop the rgb status led to make room for cache + ide
 `define DENISE_EBR   // block ram based bitplane and sprite buffers, saves logic
-`define CHIPRAM_CACHE // cache chip ram instruction fetches too (a1200 68ec020 style) with chip bus snooping
 
 module top(
   input			clk,
@@ -165,6 +164,7 @@ wire       osd_video_mode;      // PAL (0=PAL, 1=NTSC)
 wire [1:0] osd_video_screen;    // 0=standard, 1=overscan, 2=wide screen (jailbars)
 wire [1:0] osd_video_filter;
 wire [1:0] osd_video_scanlines;
+wire [2:0] osd_turbo;           // 001=turbochip, 010=turbokick, 100=chipcache
 wire       osd_joy_swap;        // 0=off, 1=on
 wire [2:0] osd_volume;          // Mute=0, 1=25%, 2=50%, 3=75%, 4=100%
 wire       osd_stereo_mix;      // 0=off, 1=on
@@ -487,24 +487,25 @@ sysctrl #(
         .data_out(sys_data_out),
 
         // values controlled by the OSD
-		.system_reset(osd_reset),
-		.system_floppy_drives(osd_floppy_drives),
-		.system_floppy_turbo(osd_floppy_turbo),
-		.system_floppy_wrprot(osd_floppy_wrprot),
-		.system_ide_enable(osd_ide_enable),
-		.system_chipset(osd_chipset),
-		.system_cpu(osd_cpu),
-		.system_video_mode(osd_video_mode),
-		.system_video_screen(osd_video_screen),
-		.system_video_filter(osd_video_filter),
-		.system_video_scanlines(osd_video_scanlines),
-		.system_chipmem(osd_chipmem),
-		.system_slowmem(osd_slowmem),
-		.system_fastmem(osd_fastmem),
-        .system_joy_swap(osd_joy_swap),
-    	.system_volume(osd_volume),
-		.system_stereo_mix(osd_stereo_mix),
-				 
+	.system_reset(osd_reset),
+	.system_floppy_drives(osd_floppy_drives),
+	.system_floppy_turbo(osd_floppy_turbo),
+	.system_floppy_wrprot(osd_floppy_wrprot),
+	.system_ide_enable(osd_ide_enable),
+	.system_chipset(osd_chipset),
+	.system_cpu(osd_cpu),
+	.system_video_mode(osd_video_mode),
+	.system_video_screen(osd_video_screen),
+	.system_video_filter(osd_video_filter),
+	.system_video_scanlines(osd_video_scanlines),
+	.system_chipmem(osd_chipmem),
+	.system_slowmem(osd_slowmem),
+	.system_fastmem(osd_fastmem),
+	.system_turbo(osd_turbo),
+	.system_joy_swap(osd_joy_swap),
+	.system_volume(osd_volume),
+	.system_stereo_mix(osd_stereo_mix),
+
         .int_out_n(spi_intn),
         .int_in( { 4'b0000, sdc_int, 1'b0, hid_int, 1'b0 }),
         .int_ack( int_ack ),
@@ -610,8 +611,8 @@ wire fastram_wr;
 wire fastram_ready;
    
 wire [15:0] sdram_dout;
-wire [47:0] chip48;   // upper 48 bits of 64 bit aligned chipram reads (AGA fmode>0)
-wire [47:0] fastram_chip48; // wide read data of the cpu cache port
+wire [47:0] chip48;         // upper 48 bits of 64 bit aligned chipram reads (AGA fmode>0)
+wire [47:0] fastram_dout48; // wide read data of the cpu cache port
 
 assign ram_din = sdram_dout;
 
@@ -620,6 +621,7 @@ wire [5:0] chipset_config = { 1'b0,osd_chipset,osd_video_mode,1'b0 };
 wire [1:0] cpu_config = { osd_cpu };
 wire [7:0] memory_config = { 4'b0_000, osd_slowmem, osd_chipmem };   
 wire [2:0] fastram_config = { 1'b0, osd_fastmem };   
+wire [2:0] turbo_config = { osd_turbo };
 wire [3:0] floppy_config = { osd_floppy_drives, osd_floppy_wrprot, osd_floppy_turbo };
 wire [3:0] video_config = { osd_video_filter, osd_video_scanlines };   
 // FIXME - setting ide_config[5] prevents minimig from using
@@ -649,6 +651,7 @@ nanomig nanomig
  .chipset_config(chipset_config),
  .floppy_config(floppy_config),
  .video_config(video_config),
+ .turbo_config(turbo_config),
 `ifndef DISABLE_IDE
  .ide_config(ide_config),
 `endif
@@ -696,7 +699,11 @@ nanomig nanomig
  ._ram_ble(ram_be[0]),      // sram lower byte select
  ._ram_we(ram_we_n),        // sram write enable
  ._ram_oe(ram_oe_n),        // sram output enable
+`ifdef ENABLE_AGA
  .chip48(chip48),
+`else
+ .chip48(48'b0),
+`endif
  .refresh(ram_refresh),
  
  .fastram_sel(fastram_sel),
@@ -704,8 +711,10 @@ nanomig nanomig
  .fastram_lds(fastram_lds),
  .fastram_uds(fastram_uds),
  .fastram_dout(fastram_dout),
- .fastram_chip48(fastram_chip48),
 `ifdef ENABLE_CACHE
+ .fastram_dout48(fastram_dout48),
+`else
+ .fastram_dout48(48'b0),
 `endif
  .fastram_din(fastram_din),
  .fastram_wr(fastram_wr),
@@ -859,9 +868,21 @@ wire [21:0] sdram_addr    =
 
 assign O_sdram_clk = clk_85m_shifted;
 
-sdram #(.DATA_WIDTH(32), .RAS_WIDTH(11), .CAS_WIDTH(8),
-        .CHIP48_BURST(1)   // the wide 64 bit fetch AGA needs
-        ) sdram (
+localparam CHIP48_BURST = 0
+`ifdef ENABLE_AGA
+    | 1
+`endif
+`ifdef ENABLE_CACHE
+    | 1
+`endif
+;
+
+sdram #(
+    .DATA_WIDTH(32),
+    .RAS_WIDTH(11),
+    .CAS_WIDTH(8),
+    .CHIP48_BURST(CHIP48_BURST)   // the wide 64 bit fetch AGA or cache needs
+) sdram (
 	.sd_data    ( IO_sdram_dq   ), // 32 bit bidirectional data bus
 	.sd_addr    ( O_sdram_addr  ), // 11 bit multiplexed address bus
 	.sd_dqm     ( O_sdram_dqm   ), // two byte masks
@@ -890,7 +911,7 @@ sdram #(.DATA_WIDTH(32), .RAS_WIDTH(11), .CAS_WIDTH(8),
 
 	.p2_din        ( fastram_din     ), // data input from chipset/cpu
 	.p2_dout       ( fastram_dout    ),
-	.p2_dout48     ( fastram_chip48  ), // wide read data for the cache line fills
+	.p2_dout48     ( fastram_dout48  ), // wide read data for the cache line fills
 	.p2_addr       ( fastram_addr    ), // 22 bit word address
 	.p2_ds         ( fastram_be      ), // upper/lower data strobe
 	.p2_cs         ( fastram_sel     ), // cpu/chipset requests read/wrie
@@ -960,7 +981,7 @@ always @(posedge clk_pixel) begin
         // --- Stereo Mix (75/25)-------------------------------------------
         // 16-bit signed wires prevent any overflow; the result
         // always fits in 15 bit and is truncated safely on assignment. 
-	    case (osd_stereo_mix)
+        case (osd_stereo_mix)
             1'b0: begin   // no mix
                 mixed_audio_left  <= audio_left;
                 mixed_audio_right <= audio_right;
@@ -973,7 +994,7 @@ always @(posedge clk_pixel) begin
             end
         endcase
 
-    // --- Volume scaling ----------------------------------------
+        // --- Volume scaling ----------------------------------------
         // mixed_audio_* are reg signed [14:0], so >>> is always
         // arithmetic â€“ no $signed() wrapper required.
         case (osd_volume) 
@@ -1009,7 +1030,6 @@ always @(posedge clk_pixel) begin
         // Explicit per-element assignment avoids unpacked-array ambiguity.
         audio_reg[0] <= {scaled_audio_left[14],  scaled_audio_left[14:0]};
         audio_reg[1] <= {scaled_audio_right[14], scaled_audio_right[14:0]};	
-
     end
 end
    

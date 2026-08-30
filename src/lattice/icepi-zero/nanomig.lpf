@@ -264,6 +264,7 @@ BLOCK PATH FROM CELL "sysctrl/system_video*" ;
 BLOCK PATH FROM CELL "sysctrl/system_chipmem*" ;
 BLOCK PATH FROM CELL "sysctrl/system_slowmem*" ;
 BLOCK PATH FROM CELL "sysctrl/system_fastmem*" ;
+BLOCK PATH FROM CELL "sysctrl/system_turbo*" ;
 BLOCK PATH FROM CELL "sysctrl/system_volume*" ;
 
 BLOCK PATH FROM CELL "*packet_picker/audio_sample_word_transfer*" ;
