@@ -52,7 +52,9 @@ module cpu_wrapper
 
 	input [1:0]	  cpucfg,
 	input [2:0]	  fastramcfg,
-	input [2:0]	  cachecfg,
+	input [1:0]	  chipramcfg,
+	input [1:0]	  slowramcfg,
+	input [2:0]	  turbocfg,
 	input		  bootrom,
 
 	output reg [23:1] chip_addr,
@@ -65,7 +67,7 @@ module cpu_wrapper
 	input		  chip_dtack,
 	input [2:0]	  chip_ipl,
 
- `ifdef FASTCHIP_DEPRECATED
+`ifdef FASTCHIP_DEPRECATED
 	input [15:0]	  fastchip_dout,
 	output reg	  fastchip_sel,
 	output		  fastchip_lds,
@@ -75,7 +77,7 @@ module cpu_wrapper
 	input		  fastchip_selack,
 	input		  fastchip_ready,
 `endif
- 
+
 	output		  ramreq,
 	output [28:1]	  ramaddr,
 	output [15:0]	  ramdin,
@@ -89,25 +91,14 @@ module cpu_wrapper
 	output reg	  toccata_ena,
 	output reg [7:0]  toccata_base,
 `endif
- 
+
 	output reg [1:0]  cpustate,
 	output reg [3:0]  cacr,
 	output reg [31:0] nmi_addr,
 	output		  cpu_clkena  // the tg68k advances on this enable (bus handshake consumption)
 );
 
-wire cpu_req = cpustate != 1 && !skip_fetch;
-
-wire sel_nmi_vector;
-
-reg    ram_dtack    = 1'b1;
-wire   ramsel       = cpu_req & ~sel_nmi_vector & (sel_zram | sel_chipram | sel_kickram | sel_dd | sel_rtg);
-assign ramreq       = ramsel & ram_dtack;
-assign ramshared    = sel_dd;
-
-// NMI
-reg  [31:0] vbr;
-always @(posedge clk) nmi_addr <= vbr + 32'h7c;
+wire cpu_req = cpustate != 2'b01 && !skip_fetch;
 
 reg  [31:0] cpu_addr;
 reg  [15:0] cpu_dout;
@@ -123,26 +114,71 @@ reg       z3ram_ena1;
 
 wire sel_z3ram0 = (cpu_addr[31:27] == z3ram_base0) && z3ram_ena0;
 wire sel_z3ram1 = (cpu_addr[31:28] == z3ram_base1) && z3ram_ena1;
-wire sel_z2ram  = !cpu_addr[31:24] && (cpu_addr[23] ^ |cpu_addr[22:21]) && z2ram_ena; // addr[23:21] = 1..4
+wire sel_z2ram  = (cpu_addr[31:24] == 8'h00) && (cpu_addr[23] ^ |cpu_addr[22:21]) && z2ram_ena; // addr[23:21] = 1..4
 wire sel_zram   = sel_z3ram0 | sel_z3ram1 | sel_z2ram;
-wire sel_dd     = (cpu_addr[31:16] == 16'h00DD) && (cpu_addr[15:13] == 'b010);
-wire sel_rtg    = (cpu_addr[31:24] == 8'h02);
+
+`ifdef MISTER_DEPRECATED
+wire sel_dd  = (cpu_addr[31:16] == 16'h00DD) && (cpu_addr[15:13] == 'b010);
+wire sel_rtg = (cpu_addr[31:24] == 8'h02);
+`else
+wire sel_dd  = 1'b0;
+wire sel_rtg = 1'b0;
+`endif
 
 // don't sel_kickram when writing
-wire	cchip;   
-wire	ckick;   
+wire cchip;
+wire ckick;
+wire cslow;
+
+reg [2:0] fastramcfg_d;
+reg [1:0] chipramcfg_d;
+reg [1:0] slowramcfg_d;
+
+always @(posedge clk) begin
+    if (~reset | ~reset_out) begin
+        fastramcfg_d <= fastramcfg;
+        chipramcfg_d <= chipramcfg;
+        slowramcfg_d <= slowramcfg;
+    end
+end
+
 // NanoMig: only the real $f8xxxx kickstart range is served from sdram in
 // turbo kick mode. The $e0xxxx extended rom area of the MiSTer mapping is
 // NOT initialized in sdram here, so those reads must keep going to the
 // chip bus (which returns zeros = no extension rom) instead of reading
 // random uninitialized sdram content.
-wire sel_kickram   = !cpu_addr[31:24] && (&cpu_addr[23:19]) && ckick && wr;	// $f8xxxx
-wire sel_kicklower = !cpu_addr[31:24] && (cpu_addr[23:18] == 6'b111110);
-wire sel_chipram   = !cpu_addr[31:21] && cchip; 		             //$000000 - $1FFFFF
+wire sel_kick    = cpu_addr[31:24] == 8'h00 && (&cpu_addr[23:19]);  // $F8xxxx
+wire sel_kickram = sel_kick && ckick && wr;
 
+wire sel_chip    = cpu_addr[31:24] == 8'h00 && (cpu_addr[23:21] == 3'b000) &&
+                   ((chipramcfg_d != 2'b00) || (cpu_addr[20:19] == 2'b00)) &&
+                   ((chipramcfg_d != 2'b01) || (cpu_addr[20] == 1'b0)) &&
+                   ((chipramcfg_d != 2'b10) || (cpu_addr[20:19] != 2'b11));  // $000000 - $1FFFFF
+wire sel_chipram = sel_chip && cchip;
+
+wire sel_slow    = cpu_addr[31:24] == 8'h00 &&
+                   ((cpu_addr[23:20] == 4'b1100 && ((cpu_addr[19] == 1'b0 && slowramcfg_d != 2'b00) || (cpu_addr[19] == 1'b1 && slowramcfg_d[1] == 1'b1))) ||
+                    (cpu_addr[23:19] == 4'b1101 &&  (cpu_addr[19] == 1'b0 && slowramcfg_d == 2'b11)));  // $C00000 - $D7FFFF
+wire sel_slowram = sel_slow && cslow;
+
+wire sel_nmi_vector;
+
+reg    ram_dtack = 1'b1;
+wire   ramsel    = cpu_req & ~sel_nmi_vector & (sel_zram | sel_chipram | sel_kickram | sel_slowram | sel_dd | sel_rtg);
+assign ramreq    = ramsel & ram_dtack;
+assign ramshared = sel_dd;
+
+// NMI
+reg  [31:0] vbr;
+always @(posedge clk) nmi_addr <= vbr + 32'h7c;
+
+`ifdef ENABLE_CART
 // we route everything hrtmon related through cart.v (needs a couple of signals to
 // decide what to do, would not be good style to replicate that here).
-assign sel_nmi_vector = (cpu_addr[31:2] == nmi_addr[31:2]) && (cpustate == 2);
+assign sel_nmi_vector = (cpu_addr[31:2] == nmi_addr[31:2]) && (cpustate == 2'b10);
+`else
+assign sel_nmi_vector = 1'b0;
+`endif;
 
 wire [15:0] ramdat;
 
@@ -171,10 +207,15 @@ assign ramdat = sel_rtg ? {ramdout[7:0], ramdout[15:8]}  : ramdout;
 
 assign ramaddr[28:24] = 5'b0;
 
-assign ramaddr[23:21] = (fastramcfg == 1 || fastramcfg == 2) ? {1'b0, cpu_addr[22], cpu_addr[21] | cpu_addr[23]} :	// 2MiB or 4MiB
-				(cpu_addr[23:21] == 3'b011) ? 3'b100 :	// $600000-$7FFFFF -> $800000-$9FFFFF
-				(cpu_addr[23:21] == 3'b100) ? 3'b101 :	// $800000-$9FFFFF -> $A00000-$BFFFFF
-				{1'b0, cpu_addr[22:21]};		// $200000-$5FFFFF -> $200000-$5FFFFF
+`ifdef ENABLE_RAM32
+assign ramaddr[23:21] = (fastramcfg_d != 3'b11) ? {1'b0, cpu_addr[22], cpu_addr[21] | cpu_addr[23]} :	// 2MiB or 4MiB
+				        (cpu_addr[23:21] == 3'b011) ? 3'b100 :				// $600000-$7FFFFF -> $800000-$9FFFFF
+				        (cpu_addr[23:21] == 3'b100) ? 3'b101 :				// $800000-$9FFFFF -> $A00000-$BFFFFF
+				        {1'b0, cpu_addr[22], cpu_addr[21] | cpu_addr[23]};		// $000000-$FFFFFF -> $000000-$7FFFFF
+`else
+// save logic for devices without 32MiB RAM
+assign ramaddr[23:21] = {1'b0, cpu_addr[22], cpu_addr[21] | cpu_addr[23]};
+`endif
 
 assign ramaddr[20:1] = cpu_addr[20:1];
 
@@ -183,7 +224,7 @@ assign fastchip_lds = lds_in;
 assign fastchip_uds = uds_in;
 assign fastchip_rnw = wr;
 `endif
-   
+
 wire	  sel_autoconfig;
 reg [1:0] autocfg_card;
 reg [3:0] autocfg_data;
@@ -193,6 +234,7 @@ wire [15:0] cpu_din = ramsel ? ramdat :
 	    fastchip_selack ? fastchip_dout :
 `endif
 	    {sel_autoconfig ? autocfg_data : chip_data[15:12], chip_data[11:0]};
+
 reg         skip_fetch;
 wire        skip_fetch_i;
 reg  [15:0] chip_data;
@@ -214,6 +256,12 @@ always @* begin
 		cpu_dout     = cpu_dout_p;
 		cpustate     = cpustate_p;
 		cacr         = cacr_p;
+`ifdef ENABLE_ENABLE
+`ifndef CHIPRAM_CACHE
+		// prevent chipram access through cache
+		cacr[0]      |= sel_chipram;
+`endif
+`endif
 		vbr          = vbr_p;
 		wr           = wr_p;
 		uds_in       = uds_p;
@@ -247,8 +295,13 @@ always @* begin
 `endif
  `ifdef ENABLE_FX68K
 		cpu_dout     = cpu_dout_o;
-		cpu_addr     = {cpu_addr_o,1'b0};
-		cpustate     = as_o ? 2'b01 : ~{wr_o,wr_o};
+		cpu_addr     = {cpu_addr_o, 1'b0};
+		casez ({as_o, fc_o[1], fc_o[0], wr_o})
+			4'b0101: cpustate = 2'b00;  // fetch
+			4'b0011: cpustate = 2'b10;  // data read
+			4'b0zz0: cpustate = 2'b11;  // write
+			default: cpustate = 2'b01;  // internal
+		endcase
 		cacr         = 1;
 		vbr          = 0;
 		wr           = wr_o;
@@ -457,29 +510,34 @@ fx68k cpu_inst_o
 
 reg turbochip_d;
 reg turbokick_d;
-reg dcache_d;
+reg turbodata_d;
 
-assign cchip = turbochip_d & (!cpustate | dcache_d);
-assign ckick = turbokick_d & (!cpustate | dcache_d);
+assign cchip = turbochip_d && (turbodata_d || cpustate == 2'b00);
+assign ckick = turbokick_d && (turbodata_d || cpustate == 2'b00);
+
+// enable turboslow either when
+// 1) turbochip is enabled
+// 2) turbodata is enabled
+assign cslow = turbochip_d | turbodata_d;
 
 always @(posedge clk) begin
 	if (~reset | ~reset_out) begin
 		turbochip_d <= 0;
 		turbokick_d <= 0;
-		dcache_d    <= 0;
+		turbodata_d <= 0;
 	end
 	else if (~cpu_req) begin	// No mem access, so safe to switch chipram access mode
-		turbochip_d <= cachecfg[0] & cpucfg[1]; // turbo chip for 020+
-		turbokick_d <= cachecfg[1] & cpucfg[1]; //     - kick -
-		dcache_d    <= cachecfg[2];
+		turbochip_d <= turbocfg[0];
+		turbokick_d <= turbocfg[1];
+		turbodata_d <= turbocfg[2];
 	end
 end
 
-wire cfg_z3 = fastramcfg[2] & cpucfg[1];
+wire cfg_z3 = fastramcfg_d[2] & cpucfg[1];
 `ifdef ENABLE_TOCCATA
 reg       ac_toccata;
 `endif
-   
+
 always @(*) begin
 	autocfg_data = 4'b1111;
 
@@ -505,10 +563,14 @@ always @(*) begin
 			case (chip_addr[6:1])
 				6'b000000: autocfg_data = 4'b1110;	// Zorro-II card, add mem, no ROM
 				6'b000001:
-					case (fastramcfg)
+					case (fastramcfg_d)
 							   1: autocfg_data = 4'b0110; // 2MB
 							   2: autocfg_data = 4'b0111; // 4MB
+`ifdef ENABLE_RAM32
 						default: autocfg_data = 4'b0000; // 8MB
+`else
+						default: autocfg_data = 4'b0111; // 4MB
+`endif
 					endcase
 				6'b001000: autocfg_data = 4'b1110;	// Manufacturer ID: 0x139c
 				6'b001001: autocfg_data = 4'b1100;
@@ -537,7 +599,7 @@ always @(*) begin
 	end
 end
 
-assign sel_autoconfig = fastramcfg && chip_addr[23:16] == 8'b11101000 && autocfg_card; //$E80000 - $E8FFFF
+assign sel_autoconfig = fastramcfg_d && chip_addr[23:16] == 8'b11101000 && autocfg_card; //$E80000 - $E8FFFF
 
 always @(posedge clk) begin
 	reg old_uds;
@@ -574,7 +636,7 @@ always @(posedge clk) begin
 			if (autocfg_card == 1) begin
 				z3ram_base1 <= cpu_dout[15:12];
 				z3ram_ena1 <= 1;
-				autocfg_card <= {fastramcfg[0], 1'b0};
+				autocfg_card <= {fastramcfg_d[0], 1'b0};
 			end
 			else begin
 				z3ram_base0 <= cpu_dout[15:11];
@@ -590,7 +652,7 @@ wire chipreq = cpu_req & ~ramsel
      & ~fastchip_selack
 `endif
 ;
-   
+
 reg [15:0] chipdout_i;
 reg        c_as,c_rw,c_uds,c_lds;
 
