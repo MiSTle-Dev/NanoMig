@@ -158,7 +158,7 @@ wire sel_chipram = sel_chip && cchip;
 
 wire sel_slow    = cpu_addr[31:24] == 8'h00 &&
                    ((cpu_addr[23:20] == 4'b1100 && ((cpu_addr[19] == 1'b0 && slowramcfg_d != 2'b00) || (cpu_addr[19] == 1'b1 && slowramcfg_d[1] == 1'b1))) ||
-                    (cpu_addr[23:19] == 4'b1101 &&  (cpu_addr[19] == 1'b0 && slowramcfg_d == 2'b11)));  // $C00000 - $D7FFFF
+                    (cpu_addr[23:20] == 4'b1101 &&  (cpu_addr[19] == 1'b0 && slowramcfg_d == 2'b11)));  // $C00000 - $D7FFFF
 wire sel_slowram = sel_slow && cslow;
 
 wire sel_nmi_vector;
@@ -201,17 +201,16 @@ assign ramdat = sel_rtg ? {ramdout[7:0], ramdout[15:8]}  : ramdout;
 // 4MiB Fast RAM, 20-5f => 20-5f;
 // Slow RAM,      c0-d7 => 60-77;
 // Kick ROM,      f8-ff => 78-7f;
-// 2MiB Fast RAM  60-7f => 80-9f;
-// 2MiB Fast RAM  89-9f => a0-bf;
+// 2MiB Fast RAM  60-7f => a0-bf;
+// 2MiB Fast RAM  80-9f => 80-9f;
 // All other bits passed through unmodified.
 
 assign ramaddr[28:24] = 5'b0;
 
 `ifdef ENABLE_RAM32
-assign ramaddr[23:21] = (fastramcfg_d != 3'b11) ? {1'b0, cpu_addr[22], cpu_addr[21] | cpu_addr[23]} :	// 2MiB or 4MiB
-				        (cpu_addr[23:21] == 3'b011) ? 3'b100 :				// $600000-$7FFFFF -> $800000-$9FFFFF
-				        (cpu_addr[23:21] == 3'b100) ? 3'b101 :				// $800000-$9FFFFF -> $A00000-$BFFFFF
-				        {1'b0, cpu_addr[22], cpu_addr[21] | cpu_addr[23]};		// $000000-$FFFFFF -> $000000-$7FFFFF
+assign ramaddr[23:21] = (cpu_addr[23:21] == 3'b011) ? 3'b101 :	// $600000-$7FFFFF -> $A00000-$BFFFFF
+			(cpu_addr[23:21] == 3'b100) ? 3'b100 :	// $800000-$9FFFFF -> $800000-$9FFFFF
+			{1'b0, cpu_addr[22], cpu_addr[21] | cpu_addr[23]};	// $000000-$FFFFFF -> $000000-$7FFFFF
 `else
 // save logic for devices without 32MiB RAM
 assign ramaddr[23:21] = {1'b0, cpu_addr[22], cpu_addr[21] | cpu_addr[23]};
@@ -295,7 +294,7 @@ always @* begin
 `endif
  `ifdef ENABLE_FX68K
 		cpu_dout     = cpu_dout_o;
-		cpu_addr     = {cpu_addr_o, 1'b0};
+		cpu_addr     = {8'b0, cpu_addr_o, 1'b0};
 		casez ({as_o, fc_o[1], fc_o[0], wr_o})
 			4'b0101: cpustate = 2'b00;  // fetch
 			4'b0011: cpustate = 2'b10;  // data read
