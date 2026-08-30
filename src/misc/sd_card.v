@@ -187,8 +187,31 @@ wire [2:0] drive =
 // start sector has to be known and the core will read and
 // write from and to the sd card without and further interaction
 // with the Companion.
-reg [31:0] direct_start [8];   
-wire	   direct_enable = direct_start[drive] != 32'd0;   
+//
+// This 8-entry x 32-bit table is written by the MCU (indexed by
+// image_target) and read by the core request logic (indexed by
+// drive). Neither address is ever a function of the other, so a
+// single synchronous write port plus a single asynchronous read
+// port (dual-port pseudo RAM) is enough -- no address muxing
+// between sources is needed. This shape lets ECP5 synthesis infer
+// LUTRAM instead of a bank of muxed flip-flops.
+reg [31:0] direct_start [8];
+
+wire  [2:0] direct_start_waddr = image_target[2:0];
+reg         direct_start_we;
+reg  [31:0] direct_start_wdata;
+
+wire  [2:0] direct_start_raddr = drive;
+wire [31:0] direct_start_rdata = direct_start[direct_start_raddr];
+
+// Asynchronous read
+wire direct_enable = direct_start_rdata != 32'd0;
+
+// Synchronous write
+always @(posedge clk) begin
+	if(direct_start_we)
+		direct_start[direct_start_waddr] <= direct_start_wdata;
+end
 `endif
    
 wire [7:0] doutb;
@@ -241,7 +264,7 @@ sector_dpram buffer(
 reg	      rom_image_trigger_irq;   
 `endif
    
-always @(posedge clk) begin
+always @(posedge clk, negedge rstn) begin
    reg	  startD;   
    
    if(!rstn) begin
@@ -307,21 +330,23 @@ reg reset_D;
 `endif   
 `endif   
 
+reg [15:0] fifo_available;
 
 // register the rising edge of rstart and clear it once
 // it has been reported to the MCU
-always @(posedge clk) begin
+always @(posedge clk, negedge rstn) begin
    if(!rstn) begin
-	  byte_cnt <= 4'd15;
+      byte_cnt <= 4'd15;
       command <= 8'hff;
       rstart_int <= 1'b0;
       wstart_int <= 1'b0;
       image_size <= 64'd0;
       image_mounted <= 8'b00000000;
-	  dinb_we <=1'b0;
+      direct_start_we <= 1'b0;
+      dinb_we <=1'b0;
 `ifdef NO_COMPANION
 `ifdef IMAGE_SIZE
-	  reset_D <= 1'b1;   
+      reset_D <= 1'b1;
       image_size <= `IMAGE_SIZE;
 `endif
 `endif
@@ -344,6 +369,7 @@ always @(posedge clk) begin
 	  core_request <= CORE_REQ_IDLE;	  
    end else begin
       image_mounted <= 8'b00000000;
+      direct_start_we <= 1'b0;
 
 `ifdef NO_COMPANION
 `ifdef IMAGE_SIZE
@@ -485,7 +511,7 @@ always @(posedge clk) begin
 		 if(start_any && direct_enable && core_request == CORE_REQ_IDLE) begin
 			$display("sd_card.v: Direct request for drive %0d, sector %0d", drive, rsector);
 			
-			core_sector <= direct_start[drive] + rsector;
+			core_sector <= direct_start_rdata + rsector;
 			if(rstart_any) core_request <= CORE_REQ_READ;
 			if(wstart_any) core_request <= CORE_REQ_WRITE;
 		 end
@@ -594,11 +620,10 @@ always @(posedge clk) begin
 			   if(byte_cnt == 4'd3) image_size[15:8]  <= data_in;
 			   if(byte_cnt == 4'd4) begin 
 				  image_size[7:0] <= data_in;
-				  if(image_target <= 8'd7) begin  // images 0..7 are supported
-					 $display("sd_card.v: MCU inserted image %0d with %0d bytes", image_target, { image_size[63:8], data_in } );
-					 direct_start[image_target] <= 32'd0;
-					 image_mounted[image_target] <= 1'b1;
-				  end
+				  image_mounted[image_target] <= 1'b1;
+				  direct_start_wdata <= 32'b0;
+				  direct_start_we <= 1'b1;
+				  $display("sd_card.v: MCU inserted image %0d with %0d bytes", image_target, { image_size[63:8], data_in } );
 			   end
 			end
 			
@@ -629,17 +654,16 @@ always @(posedge clk) begin
 			
 			// SDC CMD 6: ENABLE DIRECT ACCESS
 			if(command == 8'd6) begin
-			   reg [23:0] ds;
-			   
 			   // MCU reports that the core may access the image
 			   // directy without sector translation
 			   if(byte_cnt == 4'd0) image_target <= data_in;
-               if(byte_cnt == 4'd1) ds[23:16] <= data_in;
-               if(byte_cnt == 4'd2) ds[15: 8] <= data_in;
-               if(byte_cnt == 4'd3) ds[ 7: 0] <= data_in;
-               if(byte_cnt == 4'd4) begin
-				  direct_start[image_target] <= { ds, data_in };
-				  $display("sd_card.v: MCU direct start %0d with offset %0d(%8x)", image_target, { ds, data_in }, { ds, data_in });
+			   if(byte_cnt == 4'd1) direct_start_wdata[31:24] <= data_in;
+			   if(byte_cnt == 4'd2) direct_start_wdata[23:16] <= data_in;
+			   if(byte_cnt == 4'd3) direct_start_wdata[15: 8] <= data_in;
+			   if(byte_cnt == 4'd4) begin
+				   direct_start_wdata[ 7: 0] <= data_in;
+				   direct_start_we <= 1'b1;
+				   $display("sd_card.v: MCU direct start %0d with offset %0d(%8x)", image_target, { direct_start_wdata[31:8], data_in }, { direct_start_wdata[31:8], data_in });
 			   end
 			end
 
@@ -647,20 +671,20 @@ always @(posedge clk) begin
             if(command == 8'd7) begin
                // MCU reports that some large image has been inserted.
                if(byte_cnt == 4'd0) image_target <= data_in;
-               if(byte_cnt == 4'd1) image_size[63:56] <= data_in;
-               if(byte_cnt == 4'd2) image_size[55:48] <= data_in;
-               if(byte_cnt == 4'd3) image_size[47:40] <= data_in;
+               // it should be ok to limit image size to 1TiB
+               if(byte_cnt == 4'd1) image_size[63:56] <= 8'h00;
+               if(byte_cnt == 4'd2) image_size[55:48] <= 8'h00;
+               if(byte_cnt == 4'd3) image_size[47:40] <= 8'h00;
                if(byte_cnt == 4'd4) image_size[39:32] <= data_in;
                if(byte_cnt == 4'd5) image_size[31:24] <= data_in;
                if(byte_cnt == 4'd6) image_size[23:16] <= data_in;
                if(byte_cnt == 4'd7) image_size[15:8]  <= data_in;
-               if(byte_cnt == 4'd8) begin 
-                  image_size[7:0]   <= data_in;
-                  if(image_target <= 8'd7) begin // images 0..7 are supported
-					 $display("sd_card.v: MCU inserted large image %0d with %0d bytes", image_target, { image_size[63:8], data_in } );
-					 direct_start[image_target] <= 32'd0;
-                     image_mounted[image_target] <= 1'b1;
-				  end
+               if(byte_cnt == 4'd8) begin
+                  image_size[7:0] <= data_in;
+                  image_mounted[image_target] <= 1'b1;
+                  direct_start_wdata <= 32'b0;
+                  direct_start_we <= 1'b1;
+                  $display("sd_card.v: MCU inserted large image %0d with %0d bytes", image_target, { image_size[63:8], data_in } );
                end
             end
 
@@ -680,7 +704,6 @@ always @(posedge clk) begin
 					   // TODO: Is this latch really needed? It's meant to prevent inconsitant
 					   // values to be returned to the core if the fifo changes between the
 					   // transfer of the different reply bytes
-					   reg [15:0] fifo_available;					   
 					   
 					   // send number of bytes free in the fifo
 					   if(byte_cnt == 4'd1) begin

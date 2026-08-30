@@ -153,6 +153,12 @@
         <Source name="../../minimig-aga/cpu_wrapper.v" type="Verilog" type_short="Verilog">
             <Options/>
         </Source>
+        <Source name="../../minimig-aga/cpu_cache_new.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../minimig-aga/dpram.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
         <Source name="../../minimig-aga/denise_collision.v" type="Verilog" type_short="Verilog">
             <Options/>
         </Source>

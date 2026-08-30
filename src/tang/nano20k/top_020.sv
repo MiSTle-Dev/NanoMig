@@ -171,18 +171,15 @@ wire       osd_stereo_mix;      // 0=off, 1=on
 
 wire	   rom_download_in_progress;
 
-// generate a reset for some time after rom has been initialized
-reg [15:0] reset_cnt = 16'hffff;
+// this is the reset that goes into the nanomig itself
+reg nanomig_reset = 1;
 
 always @(posedge clk_28m, posedge rst_28m) begin
-    if(rst_28m || !rom_done || reset || osd_reset || kbd_reset || rom_download_in_progress)
-        reset_cnt <= 16'hffff;
-    else if(reset_cnt != 0)
-        reset_cnt <= reset_cnt - 16'd1;
+    if (rst_28m)
+        nanomig_reset <= 1'b1;
+    else
+        nanomig_reset <= !rom_done || reset || osd_reset || kbd_reset || rom_download_in_progress;
 end
-
-// this is the reset that goes into the nanomig itself
-wire cpu_reset = |reset_cnt;
 
 // -------------------------- M0S MCU interface -----------------------
 // intn and dout are outputs driven by the FPGA to the MCU
@@ -634,7 +631,7 @@ wire [5:0] ide_config = { 5'b10000, osd_ide_enable };
 nanomig nanomig
 (
  .clk_sys(clk_28m),
- .reset(cpu_reset),
+ .reset(nanomig_reset),
  .por(rst_28m),
 
  .clk7_en(clk7_en),
@@ -940,15 +937,19 @@ reg signed [14:0] scaled_audio_right;
 // An integer divider cannot hit 48kHz: 28500000 / 48000 / 2 = 296.88, and the
 // truncation leaves the stream running fast, which makes sinks drop a chunk of
 // audio every few seconds. A phase accumulator keeps the fractional part.
-localparam [31:0] AUDIO_INC = (64'd48000 <<< 32) / `PIXEL_CLOCK;
-reg [31:0] aclk_acc;
-reg        clk_audio;
-reg        aclk_tick;
+localparam integer AUDIO_RATE = 48000;
+localparam integer AUDIO_ACC_WIDTH = $clog2(`PIXEL_CLOCK + AUDIO_RATE);
+
+localparam [AUDIO_ACC_WIDTH-1:0] AUDIO_INC = ((AUDIO_ACC_WIDTH*2)'(AUDIO_RATE) <<< AUDIO_ACC_WIDTH) / `PIXEL_CLOCK;
+
+reg [AUDIO_ACC_WIDTH-1:0] aclk_acc;
+reg                       clk_audio;
+reg                       aclk_tick;
 
 always @(posedge clk_pixel) begin
     aclk_acc  <= aclk_acc + AUDIO_INC;
-    clk_audio <= aclk_acc[31];                 // msb of the accumulator = 48kHz
-    aclk_tick <= (clk_audio != aclk_acc[31]);  // high the cycle after each edge
+    clk_audio <= aclk_acc[AUDIO_ACC_WIDTH-1];                 // msb of the accumulator = 48kHz
+    aclk_tick <= (clk_audio != aclk_acc[AUDIO_ACC_WIDTH-1]);  // high the cycle after each edge
 
     // The sample word must not change on the same clk_pixel edge that toggles
     // clk_audio: the hdmi module latches it on that very edge, so data and
@@ -1029,7 +1030,8 @@ video_analyzer video_analyzer (
 );
 
 hdmi #(
-    .AUDIO_RATE(48000), .AUDIO_BIT_WIDTH(16),
+    .AUDIO_RATE(AUDIO_RATE),
+    .AUDIO_BIT_WIDTH(16),
     .VENDOR_NAME( { "MiSTle", 16'd0} ),
     .PRODUCT_DESCRIPTION( {"Nanomig", 72'd0} )
 ) hdmi(

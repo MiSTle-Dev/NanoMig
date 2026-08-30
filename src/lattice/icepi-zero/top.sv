@@ -12,7 +12,11 @@
 // `define INFER_DPRAM
 `define ENABLE_TG68K
 `define ENABLE_AGA
+`define NO_WS2812    // drop the rgb status led to make room for cache + ide
 `define DENISE_EBR   // use the block ram based bitplane and sprite buffers
+`define ENABLE_CACHE
+`define CHIPRAM_CACHE
+// `define CPU_SLOW14   // run TG68K at 14MHz effective (A1200 speed) for timing closure
 // `define DISABLE_IDE       // when using inferred ram, this exceeds the chip
 // `define HDMI_TEST_PATTERN  // display static test pattern on HDMI instead of amiga video
 // `define ENABLE_INT_ROM     // enable 2k internal test rom in nanomig.v
@@ -170,27 +174,28 @@ wire       osd_stereo_mix;      // 0=off, 1=on
 
 wire	   rom_download_in_progress;
 
-// generate a reset for some time after rom has been initialized
-reg [15:0] reset_cnt = 16'hffff;
+// this is the reset that goes into the nanomig itself
+reg nanomig_reset = 1;
 
 always @(posedge clk_28m, posedge rst_28m) begin
-    if(rst_28m || !rom_done || !reset_n || osd_reset || kbd_reset || rom_download_in_progress)
-        reset_cnt <= 16'hffff;
-    else if(reset_cnt != 0)
-        reset_cnt <= reset_cnt - 16'd1;
+    if (rst_28m)
+        nanomig_reset <= 1'b1;
+    else
+        nanomig_reset <= !rom_done || !reset_n || osd_reset || kbd_reset || rom_download_in_progress;
 end
-
-// this is the reset that goes into the nanomig itself
-wire cpu_reset = reset_cnt != 0;
 
 // connect to ws2812 led
 wire [23:0] ws2812_color;
+`ifdef NO_WS2812
+assign ws2812 = 1'b0;
+`else
 ws2812 #(.CLK_FRE(`PIXEL_CLOCK)) ws2812_inst (
     .clk(clk_28m),
     .reset(rst_28m),
     .color(ws2812_color),
     .data(ws2812)
 );
+`endif
 
 // -------------------------- M0S MCU interface -----------------------
 // intn and dout are outputs driven by the FPGA to the MCU
@@ -491,7 +496,11 @@ sysctrl #(
 
         .buttons( {!user_n, !reset_n} ),
         .leds(),
+`ifdef NO_WS2812
+        .color()
+`else
         .color(ws2812_color)
+`endif
 );
 
 // digital 12 bit video
@@ -588,6 +597,7 @@ wire fastram_ready;
 
 wire [15:0] sdram_dout;
 wire [47:0] sdram_dout48;
+wire [47:0] fastram_chip48;
 
 assign ram_din = sdram_dout;
 assign chip48_din = sdram_dout48;
@@ -610,7 +620,7 @@ wire [5:0] ide_config = { 5'b10000, osd_ide_enable };
 nanomig nanomig
 (
  .clk_sys(clk_28m),
- .reset(cpu_reset),
+ .reset(nanomig_reset),
  .por(rst_28m),
 
  .clk7_en(clk7_en),
@@ -683,6 +693,7 @@ nanomig nanomig
  .fastram_lds(fastram_lds),
  .fastram_uds(fastram_uds),
  .fastram_dout(fastram_dout),
+ .fastram_chip48(fastram_chip48),
  .fastram_din(fastram_din),
  .fastram_wr(fastram_wr),
  .fastram_ready(fastram_ready)
@@ -871,6 +882,7 @@ sdram #(
 
 	.p2_din        ( fastram_din     ), // data input from cpu
 	.p2_dout       ( fastram_dout    ),
+	.p2_dout48     ( fastram_chip48  ), // wide read data for the cache line fills
 	.p2_addr       ( fastram_addr    ), // 22 bit word address
 	.p2_ds         ( fastram_be      ), // upper/lower data strobe
 	.p2_cs         ( fastram_sel     ), // cpu requests read/wrie
@@ -920,18 +932,22 @@ reg signed [14:0] scaled_audio_left;
 reg signed [14:0] scaled_audio_right;
 
 // generate 48khz audio clock
-// An integer divider cannot land on 48kHz, and the truncation leaves the
-// stream running fast, so sinks drop a chunk of audio every few seconds. A
-// phase accumulator keeps the fractional part.
-localparam [31:0] AUDIO_INC = (64'd48000 <<< 32) / `PIXEL_CLOCK;
-reg [31:0] aclk_acc;
-reg        clk_audio;
-reg        aclk_tick;
+// An integer divider cannot hit 48kHz: 28500000 / 48000 / 2 = 296.88, and the
+// truncation leaves the stream running fast, which makes sinks drop a chunk of
+// audio every few seconds. A phase accumulator keeps the fractional part.
+localparam integer AUDIO_RATE = 48000;
+localparam integer AUDIO_ACC_WIDTH = $clog2(`PIXEL_CLOCK + AUDIO_RATE);
+
+localparam [AUDIO_ACC_WIDTH-1:0] AUDIO_INC = ((AUDIO_ACC_WIDTH*2)'(AUDIO_RATE) <<< AUDIO_ACC_WIDTH) / `PIXEL_CLOCK;
+
+reg [AUDIO_ACC_WIDTH-1:0] aclk_acc;
+reg                       clk_audio;
+reg                       aclk_tick;
 
 always @(posedge clk_pixel) begin
     aclk_acc  <= aclk_acc + AUDIO_INC;
-    clk_audio <= aclk_acc[31];                 // msb of the accumulator = 48kHz
-    aclk_tick <= (clk_audio != aclk_acc[31]);  // high the cycle after each edge
+    clk_audio <= aclk_acc[AUDIO_ACC_WIDTH-1];                 // msb of the accumulator = 48kHz
+    aclk_tick <= (clk_audio != aclk_acc[AUDIO_ACC_WIDTH-1]);  // high the cycle after each edge
 
     // The sample word must not change on the same clk_pixel edge that toggles
     // clk_audio: the hdmi module latches it on that very edge, so data and
@@ -990,6 +1006,8 @@ always @(posedge clk_pixel) begin
         // Convert signed two's complement → offset binary:
         // flip sign bit (bit 14).  Bit 15 = 0 (15-bit audio in 16-bit slot).
         // Explicit per-element assignment avoids unpacked-array ambiguity.
+        // audio_reg[0] <= {audio_left[14], audio_left};
+        // audio_reg[1] <= {audio_right[14], audio_right};
         audio_reg[0] <= {scaled_audio_left[14], scaled_audio_left[14:0]};
         audio_reg[1] <= {scaled_audio_right[14], scaled_audio_right[14:0]};
 
@@ -1009,7 +1027,8 @@ video_analyzer video_analyzer (
 );
 
 hdmi #(
-    .AUDIO_RATE(48000), .AUDIO_BIT_WIDTH(16),
+    .AUDIO_RATE(AUDIO_RATE),
+    .AUDIO_BIT_WIDTH(16),
     .VENDOR_NAME( { "MiSTle", 16'd0} ),
     .PRODUCT_DESCRIPTION( {"Nanomig", 72'd0} )
 ) hdmi(
