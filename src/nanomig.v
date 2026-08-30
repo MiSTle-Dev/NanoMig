@@ -7,7 +7,6 @@
 // -> run cpu on unused hpos[0] == 1 for turbo
 // TODO:
 // - check IDE head adressing heads[0] vs heads[drive]
-
 module nanomig (
    input	 clk_sys,
    input	 reset,
@@ -390,7 +389,7 @@ always @(posedge clk_sys) begin
 end
 
 `else
-wire        snoop_act = 1'b0;   // nothing cached that the chip bus can modify
+wire        snoop_act   = 1'b0;   // nothing cached that the chip bus can modify
 wire [22:1] snoop_adr_r = 22'd0;
 wire [15:0] snoop_dat_r = 16'd0;
 wire [1:0]  snoop_bs_r  = 2'd0;
@@ -409,13 +408,23 @@ wire        cache_cs = ram_sel & ~ram_ready;
 reg         cache_fill_ack;
 reg  [15:0] cache_fill_dat;
 
-cpu_cache_new cpu_cache (
+`ifdef ENABLE_RAM32
+// We need to extend address width for devices with more than
+// 8MiB SDRAM to make 8MiB FastRAM work properly
+localparam CACHE_ADDR_WIDTH = 24;
+`else
+localparam CACHE_ADDR_WIDTH = 23;
+`endif
+
+cpu_cache_new #(
+  .ADDR_WIDTH(CACHE_ADDR_WIDTH)
+) cpu_cache (
   .clk            (clk_sys),
   .rst            (!cpu_rst),
   .cpu_cache_ctrl (cpu_cacr),
   .cache_inhibit  (1'b0),
   .cpu_cs         (cache_cs),
-  .cpu_adr        ({6'b000000, ram_addr[22:1]}),
+  .cpu_adr        (ram_addr[CACHE_ADDR_WIDTH-1:1]),
   .cpu_bs         ({~ram_uds, ~ram_lds}),
   .cpu_we         (cpu_state == 2'd3),
   .cpu_ir         (cpu_state == 2'd0),
@@ -427,12 +436,8 @@ cpu_cache_new cpu_cache (
   .sdr_dat_r      (cache_fill_dat),
   .sdr_read_req   (cache_req),
   .sdr_read_ack   (cache_fill_ack),
-  // Snooping is not needed in this configuration: chip ram is not cached
-  // (turbo chip off), kickstart is read only and fast ram is only written
-  // through the cache itself. Disabling it avoids undefined cross port
-  // read-during-write behaviour of the tag block rams on real hardware.
   .snoop_act      (snoop_act),
-  .snoop_adr      ({6'b000000, snoop_adr_r}),
+  .snoop_adr      ({{(CACHE_ADDR_WIDTH-23){1'b0}}, snoop_adr_r}),
   .snoop_dat_w    (snoop_dat_r),
   .snoop_bs       (snoop_bs_r)
 );
@@ -444,14 +449,14 @@ reg  [1:0]  fill_idx;       // requested (critical) word index
 reg  [1:0]  fill_cnt;
 reg         wbuf_pending;   // a write is in flight on the sdram port
 reg         write_acked;
-reg         wb_req;    // latched pending cache write
-reg         wb_en_d;   // wb_en edge detect
-reg         wr_lock;   // ack delivered, waiting for the cpu to consume it    // current cpu write has been acknowledged
+reg         wb_req;         // latched pending cache write
+reg         wb_en_d;        // wb_en edge detect
+reg         wr_lock;        // ack delivered, waiting for the cpu to consume it    // current cpu write has been acknowledged
 reg         cache_ack_d;
 reg         fastram_done_d;
 reg         fastram_sel_r;
 reg         fastram_wr_r;
-reg  [22:1] fastram_addr_r;
+reg  [CACHE_ADDR_WIDTH-1:1] fastram_addr_r;
 reg  [15:0] fastram_din_r;
 reg         fastram_lds_r;
 reg         fastram_uds_r;
@@ -492,7 +497,7 @@ always @(posedge clk_sys) begin
     case(fill_state)
       2'd0: if(cache_req && !wbuf_pending && !fastram_sel_r) begin
               // fetch the aligned 64 bit line containing the requested word
-              fastram_addr_r <= { ram_addr[22:3], 2'b00 };
+              fastram_addr_r <= { ram_addr[CACHE_ADDR_WIDTH-1:3], 2'b00 };
               fill_idx       <= ram_addr[2:1];
               fastram_wr_r   <= 1'b0;
               fastram_lds_r  <= 1'b0;
@@ -532,7 +537,7 @@ always @(posedge clk_sys) begin
     if(cache_wb_en && !wb_en_d && !wr_lock) wb_req <= 1'b1;
     if((wb_req || (cache_wb_en && !wb_en_d)) && (cpu_state == 2'd3) && !wr_lock &&
        !wbuf_pending && !fastram_sel_r && (fill_state == 2'd0)) begin
-      fastram_addr_r <= ram_addr[22:1];
+      fastram_addr_r <= ram_addr[CACHE_ADDR_WIDTH-1:1];
       fastram_din_r  <= ram_din;
       fastram_lds_r  <= ram_lds;
       fastram_uds_r  <= ram_uds;
@@ -547,17 +552,15 @@ always @(posedge clk_sys) begin
   end
 end
 
-
-
-assign fastram_sel = fastram_sel_r;
-assign fastram_addr = fastram_addr_r;
+assign fastram_sel  = fastram_sel_r;
+assign fastram_addr = {{(24-CACHE_ADDR_WIDTH){1'b0}}, fastram_addr_r};
 assign fastram_lds  = fastram_lds_r;
 assign fastram_uds  = fastram_uds_r;
 assign fastram_din  = fastram_din_r;
 assign fastram_wr   = fastram_wr_r;
 assign ram_dout     = cache_dat_r;
 `else
-assign fastram_addr = ram_addr;
+assign fastram_addr = ram_addr[23:1];
 assign fastram_lds  = ram_lds;
 assign fastram_uds  = ram_uds;
 assign ram_dout     = fastram_dout;
