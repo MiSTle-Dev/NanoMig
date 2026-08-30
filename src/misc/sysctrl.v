@@ -49,6 +49,7 @@ module sysctrl #(
   output reg [1:0]  system_chipmem,
   output reg [1:0]  system_slowmem,
   output reg [1:0]  system_fastmem,
+  output reg [2:0]  system_turbo,
   output reg	    system_joy_swap,
   output reg [2:0]  system_volume,
   output reg	    system_stereo_mix,
@@ -128,6 +129,7 @@ always @(posedge clk) begin
       system_chipmem <= AGA ? 2'd2 : 2'd0;
       system_slowmem <= 2'd1;
       system_fastmem <= 2'd0;
+      system_turbo <= 3'b011;
       system_ide_enable <= 1'b0;
       system_joy_swap <= 1'b1;
       system_volume <= 3'b010;
@@ -239,8 +241,12 @@ always @(posedge clk) begin
 		   if(id == "Y") system_chipmem <= data_in[1:0];
 		   // Value "X": Slowmem none(0), 512k(1), 1M(2) or 1.5M(3)
 		   if(id == "X") system_slowmem <= data_in[1:0];
-		   // Value "Q": Fastmem none(0), 2M(1) or 4M(2)
+		   // Value "Q": Fastmem none(0), 2M(1), 4M(2) or 8M(3)
 		   if(id == "Q") system_fastmem <= data_in[1:0];
+		   // Value "Z": Turbo mode none(0), chip(1), turbo(2), both(3)
+		   if(id == "Z") system_turbo[1:0] <= data_in[1:0];
+		   // Value "U": Turbo data off(0), on(1)
+		   if(id == "U") system_turbo[2] <= data_in[0];
 		   // Value "I": IDE disabled(0) or enabled(1)
 		   if(id == "I") system_ide_enable <= data_in[0];
 		   // value "J": Swap Joyst off(0) on(1)
