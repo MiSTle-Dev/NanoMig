@@ -9,7 +9,8 @@ add_file nanomig.v
 add_file minimig-aga/amiga_clk.v
 add_file minimig-aga/cpu_wrapper.v
 add_file minimig-aga/cpu_cache_new.v
-add_file minimig-aga/dpram.v
+add_file minimig-aga/dpram.v	
+add_file minimig-aga/dpram_be_1024x16.v
 add_file minimig-aga/minimig.v
 add_file minimig-aga/ciaa.v
 add_file minimig-aga/ciab.v
