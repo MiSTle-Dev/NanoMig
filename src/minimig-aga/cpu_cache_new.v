@@ -14,8 +14,9 @@
 //
 //
 
-module cpu_cache_new
-(
+module cpu_cache_new #(
+  parameter ADDR_WIDTH = 24
+) (
   // system
   input             clk,            // clock
   input             rst,            // cache reset
@@ -24,7 +25,7 @@ module cpu_cache_new
 
   // cpu
   input             cpu_cs,         // cpu activity
-  input      [28:1] cpu_adr,        // cpu address
+  input      [ADDR_WIDTH-1:1] cpu_adr,        // cpu address
   input       [1:0] cpu_bs,         // cpu byte selects
   input             cpu_we,         // cpu write
   input             cpu_ir,         // cpu instruction read
@@ -43,11 +44,19 @@ module cpu_cache_new
 
   // snoop
   input             snoop_act,      // snoop act (write only - just update existing data in cache)
-  input      [28:1] snoop_adr,      // chip address
+  input      [ADDR_WIDTH-1:1] snoop_adr,      // chip address
   input      [15:0] snoop_dat_w,    // snoop write data
   input       [1:0] snoop_bs
 );
 
+// maximum address width
+localparam MAX_ADDR_WIDTH = 29;
+
+// maximum tag width
+localparam TAG_WIDTH = 18;
+
+// effective tag length (reduced)
+localparam TAG_LENGTH = (18 - (MAX_ADDR_WIDTH - ADDR_WIDTH));
 
 //// internal signals ////
 
@@ -93,7 +102,7 @@ reg         cc_clr;
 // cpu address
 wire  [1:0] cpu_adr_blk;
 wire  [7:0] cpu_adr_idx;
-wire [17:0] cpu_adr_tag;
+wire [TAG_WIDTH-1:0] cpu_adr_tag;
 // idram0
 wire  [9:0] idram0_cpu_adr;
 wire  [1:0] idram0_cpu_bs;
@@ -232,7 +241,7 @@ end
 // slice up cpu address
 assign cpu_adr_blk = cpu_adr[2:1];    // cache block address (inside cache row), 2 bits for 4x16 rows
 assign cpu_adr_idx = cpu_adr[10:3];   // cache row address, 8 bits
-assign cpu_adr_tag = cpu_adr[28:11];  // tag, 18 bits
+assign cpu_adr_tag = {{(MAX_ADDR_WIDTH-ADDR_WIDTH){1'b0}}, cpu_adr[ADDR_WIDTH-1:11]};  // tag, 18 bits
 
 // cpu side state machine
 always @ (posedge clk) begin
@@ -516,16 +525,16 @@ end
 assign itram_cpu_adr    = cpu_adr_idx;
 assign itram_cpu_we     = cpu_sm_itag_we;
 assign itram_cpu_dat_w  = cpu_sm_tag_dat_w;
-assign itag0_match      = (cpu_adr_tag == itram_cpu_dat_r[17:0]);
-assign itag1_match      = (cpu_adr_tag == itram_cpu_dat_r[35:18]);
+assign itag0_match      = (cpu_adr_tag[TAG_LENGTH-1:0] == itram_cpu_dat_r[0 +: TAG_LENGTH]);
+assign itag1_match      = (cpu_adr_tag[TAG_LENGTH-1:0] == itram_cpu_dat_r[18 +: TAG_LENGTH]);
 assign itag_lru         = itram_cpu_dat_r[39];
 assign itag0_valid      = itram_cpu_dat_r[38];
 assign itag1_valid      = itram_cpu_dat_r[37];
 assign itram_sdr_adr    = sdr_sm_adr[9:2];
 assign itram_sdr_we     = sdr_sm_itag_we;
 assign itram_sdr_dat_w  = sdr_sm_tag_dat_w;
-assign sdr_itag0_match  = (snoop_adr[28:11] == itram_sdr_dat_r[17:0]);
-assign sdr_itag1_match  = (snoop_adr[28:11] == itram_sdr_dat_r[35:18]);
+assign sdr_itag0_match  = (snoop_adr[ADDR_WIDTH-1:11] == itram_sdr_dat_r[0 +: TAG_LENGTH]);
+assign sdr_itag1_match  = (snoop_adr[ADDR_WIDTH-1:11] == itram_sdr_dat_r[18 +: TAG_LENGTH]);
 assign sdr_itag0_valid  = itram_sdr_dat_r[38];
 assign sdr_itag1_valid  = itram_sdr_dat_r[37];
 
@@ -596,16 +605,16 @@ dpram_be_1024x16 idram1 (
 assign dtram_cpu_adr    = cpu_adr_idx;
 assign dtram_cpu_we     = cpu_sm_dtag_we;
 assign dtram_cpu_dat_w  = cpu_sm_tag_dat_w;
-assign dtag0_match      = (cpu_adr_tag == dtram_cpu_dat_r[17:0]);
-assign dtag1_match      = (cpu_adr_tag == dtram_cpu_dat_r[35:18]);
+assign dtag0_match      = (cpu_adr_tag[TAG_LENGTH-1:0] == dtram_cpu_dat_r[0 +: TAG_LENGTH]);
+assign dtag1_match      = (cpu_adr_tag[TAG_LENGTH-1:0] == dtram_cpu_dat_r[18 +: TAG_LENGTH]);
 assign dtag_lru         = dtram_cpu_dat_r[39];
 assign dtag0_valid      = dtram_cpu_dat_r[38];
 assign dtag1_valid      = dtram_cpu_dat_r[37];
 assign dtram_sdr_adr    = sdr_sm_adr[9:2];
 assign dtram_sdr_we     = sdr_sm_dtag_we;
 assign dtram_sdr_dat_w  = sdr_sm_tag_dat_w;
-assign sdr_dtag0_match  = (snoop_adr[28:11] == dtram_sdr_dat_r[17:0]);
-assign sdr_dtag1_match  = (snoop_adr[28:11] == dtram_sdr_dat_r[35:18]);
+assign sdr_dtag0_match  = (snoop_adr[ADDR_WIDTH-1:11] == dtram_sdr_dat_r[0 +: TAG_LENGTH]);
+assign sdr_dtag1_match  = (snoop_adr[ADDR_WIDTH-1:11] == dtram_sdr_dat_r[18 +: TAG_LENGTH]);
 assign sdr_dtag0_valid  = dtram_sdr_dat_r[38];
 assign sdr_dtag1_valid  = dtram_sdr_dat_r[37];
 
