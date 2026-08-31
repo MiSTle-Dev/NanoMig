@@ -11,11 +11,12 @@ This is still a work in progress. The current version is based on the [MiSTer Mi
 Current state:
 
   * Minimig based on [MiSTer Minimig AGA](https://github.com/MiSTer-devel/Minimig-AGA_MiSTer)
-  * Amiga 500 and Amiga 1000 modes
+  * Amiga 500, 1000 and Amiga 1200 modes
   * Kick ROM stored in flash ROM
-  * Up to 2MB chip, 4MB fast and 1.5MB slow RAM
-  * Accelerated 68020 support (in the works)
-  * OCS and ECS chipset (no AGA on TN20K!)
+  * 2MB chip, 4MB fast and 1.5MB slow RAM on Tang Nano
+  * 2MB chip, 28MB fast and 1.5MB slow RAM on ICEPI-ZERO
+  * Accelerated 68020 support + CPU cache
+  * OCS, ECS, AGA chipset 
   * ROM loader (Kickstart 1.3 / 3.1 / 3.2 / DiagRom)
   * Up to four virtual floppy drives
   * Floppy disk write support
@@ -23,19 +24,15 @@ Current state:
   * Keyboard and mouse via USB
   * Joysticks via USB or DB9 ports 
   * Up to two virtual IDE hard disks, read and write support
-  * Runs on [Tang Nano 20k](https://wiki.sipeed.com/hardware/en/tang/tang-nano-20k/nano-20k.html), [Primer 25K](https://wiki.sipeed.com/hardware/en/tang/tang-primer-25k/primer-25k.html), [Mega 138K Pro](https://wiki.sipeed.com/hardware/en/tang/tang-mega-138k/mega-138k-pro.html) and [Tang Console with Mega 60k / 138k module](https://wiki.sipeed.com/hardware/en/tang/tang-console/mega-console.html)
+  * Runs on [Tang Nano 20k](https://wiki.sipeed.com/hardware/en/tang/tang-nano-20k/nano-20k.html), [Primer 25K](https://wiki.sipeed.com/hardware/en/tang/tang-primer-25k/primer-25k.html), [Mega 138K Pro](https://wiki.sipeed.com/hardware/en/tang/tang-mega-138k/mega-138k-pro.html) and [Tang Console with Mega 60k / 138k module],(https://wiki.sipeed.com/hardware/en/tang/tang-console/mega-console.html), ICEPI-ZERO (25K) and ICEPI-ZERO XL (45K)
   * [Fully simulated](sim)
 
 Planned features:
 
-  * AGA support (is planned for the Arora III FPGA series e.g. GW3A-20)
   * Drive Sounds for FDD & HDD (hardware addon / buzzer)
-
-Outlook:
-
-  * RTG implementation
+  * RTG - Retargetable Graphics
+  * Toccata - Sound Card
   * WIFI support
-  * Flickerfixer
 
 ## Videos
 
@@ -89,9 +86,9 @@ The necessary binaries can be found in the [project releases](https://github.com
 Please make sure to use RDB (Rigid Disk Block) images with a **Start Offset 0**.  
 If unallocated space is present before the RDB, the HDF image won't be recognized.
 
-
 ## Credits
-Many thanks to **Alastair M. Robinson** ([robinsonb5](https://github.com/robinsonb5)) for his contributions to the **NanoMig**, in particular **Fastram** and **68020** cpu! 
+Many thanks to **Alastair M. Robinson** ([robinsonb5](https://github.com/robinsonb5)) for his contributions to the **NanoMig**, in particular **Fastram** and **68020** cpu!
+Many thanks to **m1nl** and **djnice** for the space saving implementation of the **AGA chipset** with Embedded Block Ram and many more contributions!
 
 ## Build setting (Tang Nano 20K only!)
 The core needs to be able to react on bl616 jtagsel Signal (all boards except tn20k).  
@@ -108,7 +105,7 @@ Only for the TN20K: **Use JTAG as regular IO** must be unselected in Gowin EDA C
 | 0 | POWER         | x     | x     | x   |x         |x|
 | 1 | F.DISK        | x     | x     | x   |x         |x|
 | 2 | H.DISK        | x     | -     |   - |x         |-|
-| 3 | ???           | x     | -     |   - |x         |-|
+| 3 | KICK READY    | x     | -     |   - |x         |-|
 | 4 | SD-READ       | x     | -     |   - |x         |-|
 | 5 | SD-WRITE      | x     | -     |   - |x         |-|
 
