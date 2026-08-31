@@ -8,7 +8,11 @@ OBJ_DIR=obj_dir
 
 # generic config defines
 DEFINES = -DINFER_DPRAM
-#DEFINES += -DENABLE_TG68K
+DEFINES += -DENABLE_TG68K
+DEFINES += -DENABLE_CACHE
+DEFINES += -DCHIPRAM_CACHE
+DEFINES += -DCPU_SLOW14
+DEFINES += -DDENISE_EBR
 #DEFINES += -DNO_COMPANION -DIMAGE_SIZE=1048576 -DIMAGE_INDEX=0
 
 # the original fx68k won't simulate. Thus we use this special version for simulation
@@ -22,7 +26,7 @@ TG68K_FILES=TG68KdotC_Kernel.v
 
 # Minimig-AGA
 MINIMIG_DIR=../src/minimig-aga
-MINIMIG_FILES=../nanomig.v amiga_clk.v cpu_wrapper.v cpu_cache_new.v dpram.v minimig.v 
+MINIMIG_FILES=../nanomig.v amiga_clk.v cpu_wrapper.v cpu_cache_new.v dpram.v dpram_be_1024x16.v minimig.v 
 MINIMIG_FILES+=bitplane_ram.v sprite_ram.v
 MINIMIG_FILES+=ciaa.v ciab.v cia_int.v cia_timera.v cia_timerb.v cia_timerd.v 
 MINIMIG_FILES+=paula.v paula_uart.v paula_audio_channel.v paula_audio_mixer.v paula_audio.v paula_audio_volume.v paula_floppy_fifo.v paula_floppy.v paula_intcontroller.v

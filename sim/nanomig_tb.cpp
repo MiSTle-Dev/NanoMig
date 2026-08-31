@@ -511,7 +511,15 @@ void tick(int c) {
   static int sector_tx_cnt = 512;
   static int sector_rx_cnt = 512;  
   
+  // Let the 28MHz edge settle before the 85MHz edges of this half period.
+  // On the board clk_28m is a CLKDIV output of clk_85m, so the 85MHz domain
+  // sees the new clk7_en right away. Evaluating both edges in one eval()
+  // started the sdram one 85MHz clock late, which was harmless with the old
+  // controller but makes the read data of the current controller miss the
+  // m68k bridge latch window - every chip bus read then returned the
+  // previous word and the cpu took a garbage reset vector.
   tb->clk = c;
+  tb->eval();
 
   if(c) {
 
@@ -769,7 +777,17 @@ int main(int argc, char **argv) {
   int chipset_aga = getenv("CHIPSET") ? atoi(getenv("CHIPSET")) : aga_mode;
   int cpu_sel     = getenv("CPU")     ? atoi(getenv("CPU"))     : (aga_mode ? 2 : 0);
   tb->chipset_config = chipset_aga ? 0x18 : 0x00;  // bits 4:3 = 11 -> AGA
-  tb->cpu_config = cpu_sel;                        // 2 = 68020
+  // sysctrl.v maps the menu value 2 to 2'b11 before it reaches cpu_config;
+  // nanomig.v documents the encoding as 00=68000, 01=68010, 11=68020.
+  // Driving a raw 2'b10 half configures TG68K: 32 bit mul/div on, but
+  // 68000 style stack frames, so RTE pops 6 bytes where exec pushed 8.
+  tb->cpu_config = (cpu_sel == 2) ? 3 : cpu_sel;
+  // 001 = turbo chip, 010 = turbo kick, 100 = data cache. 3 is the power on
+  // default of sysctrl.v (Turbo: both, Turbo data: off). Leaving this input
+  // unconnected made verilator tie it low and ran every simulation with turbo
+  // switched off entirely, which the kickstart takes many seconds to survive.
+  tb->turbo_config = getenv("TURBO") ? atoi(getenv("TURBO")) : 3;
+  printf("turbo_config = %d\n", tb->turbo_config);
   printf("config: chipset=%s cpu=%s\n", chipset_aga?"AGA":"OCS", cpu_sel==2?"68020":"68000");
 
   /* run for a while */
