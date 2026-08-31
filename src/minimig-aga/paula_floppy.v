@@ -205,13 +205,17 @@ reg [3:0] fifo_sector_counter;   // sector being written into fifo
 reg [9:0] fifo_word_counter;     // sector word being written into fifo
 reg 	  fifo_reading_sector;      
 reg 	  fifo_is_writing;
+
+// fifo read pointer. This has to be recomputed on every write, so it is a
+// continuous assignment: as a declaration initialiser inside the always block
+// it is evaluated once at time zero and the pointer stays frozen in
+// simulation, which stops the floppy from ever delivering data.
+wire [7:0] fd_dma_rd_ptr = fifo_word_counter - 10'd31;
    
 // read data from fifo
 always @(posedge clk) begin
    if(!fd_dma_is_writing) begin
       if(clk7_en && fifo_wr) begin
-	 static logic [7:0] fd_dma_rd_ptr = fifo_word_counter - 10'd31;  
-
 	 // permanently read 16 bits from the sector buffer
 	 // to be written to the FIFO
 	 fd_dma_buf_out <= { fd_dma_buf_even[fd_dma_rd_ptr],
