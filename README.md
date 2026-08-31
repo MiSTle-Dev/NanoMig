@@ -88,7 +88,7 @@ If unallocated space is present before the RDB, the HDF image won't be recognize
 
 ## Credits
 Many thanks to **Alastair M. Robinson** ([robinsonb5](https://github.com/robinsonb5)) for his contributions to the **NanoMig**, in particular **Fastram** and **68020** cpu!
-Many thanks to Mateusz Nalewajski ([m1nl](https://github.com/m1nl)) and **djnice** for the space saving implementation of the **AGA chipset** with Embedded Block Ram and many more contributions!
+Many thanks to **Mateusz Nalewajsk**i ([m1nl](https://github.com/m1nl)) and **djnice** ([djnice](https://github.com/djnice)) for the implementation of the **AGA chipset** with Embedded Block Ram and many more contributions!
 
 ## Build setting (Tang Nano 20K only!)
 The core needs to be able to react on bl616 jtagsel Signal (all boards except tn20k).  
