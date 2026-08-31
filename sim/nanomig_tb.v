@@ -33,6 +33,7 @@ module nanomig_tb
    input [5:0]	 ide_config,
    input [5:0]	 chipset_config, // bit 4:3 = 11 -> AGA
    input [1:0]	 cpu_config,     // 0=68000, 2=68020
+   input [2:0]	 turbo_config,   // 001=turbo chip, 010=turbo kick, 100=data cache
    
    output	 sdclk,
    output	 sdcmd,
@@ -277,6 +278,7 @@ nanomig nanomig (
 `endif
 		 .chipset_config(chipset_config),
 		 .cpu_config(cpu_config),
+		 .turbo_config(turbo_config),
 		 
 		 .hs(hs_n),
 		 .vs(vs_n),
@@ -342,14 +344,12 @@ wire        ram_refresh;
 wire [15:0] sdram_dout;
 wire [47:0] chip48_sdram;
 
-// run a counter at 28Mhz synchronous to the 7Mhz bus cycle (like top_020.sv)
-reg  [1:0]  cyc;
-always @(posedge clk)
-  if(clk7_en) cyc <= 2'd0;
-  else        cyc <= cyc + 2'd1;
-
 wire        sdram_access = (!_ram_oe || !_ram_we);
-wire        sdram_sync   = !cyc;
+
+// the memory cycle starts on the same edge as on the board, where top_020.sv
+// drives sync from clk7_en directly. A delayed sync shifts the whole sdram
+// state machine against the chipset bus and the read data arrives too late.
+wire        sdram_sync   = clk7_en;
 
 wire [31:0] sd_dq;
 wire [10:0] sd_addr;
