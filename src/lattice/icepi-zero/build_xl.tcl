@@ -11,4 +11,4 @@ puts "=== Saving and closing ==="
 prj_project close
 
 puts "=== Done ==="
-puts "You can now e.g. run 'openFPGALoader -cft231X --pins=7:3:5:6 impl/nanomig_xl_impl.bit'"
+puts "You can now e.g. run 'openFPGALoader -cft231X --pins=7:3:5:6 impl_xl/nanomig_xl_impl.bit'"
