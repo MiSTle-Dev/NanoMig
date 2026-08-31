@@ -319,7 +319,7 @@ nanomig nanomig (
 		 .fastram_lds(fastram_lds),
 		 .fastram_uds(fastram_uds),
 		 .fastram_dout(fastram_dout),
-		 .fastram_chip48(fastram_chip48),
+		 .fastram_dout48(fastram_chip48),
 		 .fastram_din(fastram_din),
 		 .fastram_wr(fastram_wr),
 		 .fastram_ready(fastram_ready)
@@ -329,7 +329,7 @@ wire        fastram_sel;
 wire [22:1] fastram_addr;
 wire        fastram_lds, fastram_uds, fastram_wr, fastram_ready;
 wire [15:0] fastram_dout, fastram_din;
-wire [47:0] fastram_chip48;
+wire [47:0] fastram_dout48;
 
 // ---------------------------------------------------------------------------
 // ------ the real sdram controller of the tang nano 20k + a chip model ------
@@ -384,7 +384,7 @@ sdram #(.DATA_WIDTH(32), .RAS_WIDTH(11), .CAS_WIDTH(8), .CHIP48_BURST(1) ) sdram
 
 	.p2_din     ( fastram_din    ),
 	.p2_dout    ( fastram_dout   ),
-	.p2_dout48  ( fastram_chip48 ),
+	.p2_dout48  ( fastram_dout48 ),
 	.p2_addr    ( fastram_addr   ),
 	.p2_ds      ( { fastram_uds, fastram_lds } ),
 	.p2_cs      ( fastram_sel    ),
