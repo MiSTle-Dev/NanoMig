@@ -319,7 +319,7 @@ nanomig nanomig (
 		 .fastram_lds(fastram_lds),
 		 .fastram_uds(fastram_uds),
 		 .fastram_dout(fastram_dout),
-		 .fastram_dout48(fastram_chip48),
+		 .fastram_dout48(fastram_dout48),
 		 .fastram_din(fastram_din),
 		 .fastram_wr(fastram_wr),
 		 .fastram_ready(fastram_ready)
