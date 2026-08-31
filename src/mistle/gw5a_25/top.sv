@@ -740,7 +740,7 @@ sdram #(
     .p2_din     ( fastram_din   ), // data input from cpu
     .p2_dout    ( fastram_dout  ),
 	.p2_dout48  ( fastram_dout48), // wide read data for the cache line fills
-    .p2_addr    ( fastram_addr  ), // 22 bit word address
+    .p2_addr    ( fastram_addr  ), // 23 bit word address
     .p2_ds      ( fastram_be    ), // upper/lower data strobe
     .p2_cs      ( fastram_sel   ), // cpu requests read/wrie
     .p2_we      ( fastram_wr    ), // cpu requests write
