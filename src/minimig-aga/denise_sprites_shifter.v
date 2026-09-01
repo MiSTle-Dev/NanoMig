@@ -176,16 +176,27 @@ assign bankwr_idx = spr_bankwr_idx;
 
 // translate data registers write
 always @(posedge clk) begin
+  // initially I wanted to keep sprites double-buffered
+  // but then I realized that with AGA, there is no way
+  // to update sprite data without DMA, which happens once
+  // per scanline; with 32-bit or 64-bit fetch mode,
+  // updating sprite data with CPU or Copper write will
+  // fill the remaining 16-/48 bits of the buffer with
+  // random data; after debugging some games and demos,
+  // I decided to disable this feature as I cannot find
+  // any way to make a sensible use for it; also it breaks
+  // a few games and demos I tested
+  bankwr_buf <= 1'b0;
+
   if (clk7_en) begin
     // finish writing when we get a full 7MHz cycle
     ram_wea <= 0;
 
     if (aen) begin
-      // initiate data transfer and continue for the next 4 cycles
-      // also ensure we won't overwrite currently read data
+      // initiate data transfer and continue for the next 4 cycles;
       case (address)
-        DATA: begin ram_wea <= 1; bankwr_reg <= 0; bankwr_buf <= ~bankrd_buf; end
-        DATB: begin ram_wea <= 1; bankwr_reg <= 1; bankwr_buf <= ~bankrd_buf; end
+        DATA: begin ram_wea <= 1; bankwr_reg <= 0; end
+        DATB: begin ram_wea <= 1; bankwr_reg <= 1; /* bankwr_buf <= ~bankrd_buf; */ end
         default: ;
       endcase
     end
@@ -195,9 +206,10 @@ end
 //--------------------------------------------------------------------------------------
 
 // shared control decodes (used by both the bank-index and the shift register)
-wire spr_hit  = armed & (hpos[7:0] == hstart[7:0]) & (fmode[15] | (hpos[8] == hstart[8]));
-wire idx_last = &shiftidx;                                         // shift registers drained
-wire reload   = shift & idx_last & (bankrd_idx != spr_bankrd_num); // fetch next bank
+wire spr_hit   = armed & (hpos[7:0] == hstart[7:0]) & (fmode[15] | (hpos[8] == hstart[8]));
+wire idx_last  = &shiftidx;                     // shift registers drained
+wire load_done = bankrd_idx == spr_bankrd_num;  // loading shift register done
+wire reload    = shift & idx_last & !load_done; // fetch next bank
 
 // generate load signal and advance the BRAM read-bank pointer
 always @(posedge clk) begin
