@@ -85,7 +85,7 @@ The necessary binaries can be found in the [project releases](https://github.com
 ## ICEPI-ZERO 
 
 openFPGALoader -c ft231X --pins=7:3:5:6 -f nanomig_impl.bit  
-openFPGALoader -c ft231X --pins=7:3:5:6 -f --offset=0x400000 kick31.rom
+openFPGALoader -c ft231X --pins=7:3:5:6 -f -o 0x400000 kick31.rom
 
 ## Rigid Disk Block Info
 Please make sure to use RDB (Rigid Disk Block) images with a **Start Offset 0**.  
