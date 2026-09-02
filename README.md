@@ -82,6 +82,11 @@ The necessary binaries can be found in the [project releases](https://github.com
   * Use ADF-Opus to create and modify ADF images under Windows [ADFOpus2025](https://github.com/chironb/ADFOpus2025)
 * With Disk Flashback you can mount ADF's & HDF's under Windows [Disk Flashback](https://robsmithdev.co.uk/diskflashback)
 
+## ICEPI-ZERO 
+
+openFPGALoader -c ft231X --pins=7:3:5:6 -f nanomig_impl.bit
+openFPGALoader -c ft231X --pins=7:3:5:6 -f --offset=0x400000 kick31.rom
+
 ## Rigid Disk Block Info
 Please make sure to use RDB (Rigid Disk Block) images with a **Start Offset 0**.  
 If unallocated space is present before the RDB, the HDF image won't be recognized.
