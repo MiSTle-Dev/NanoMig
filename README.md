@@ -86,8 +86,8 @@ The necessary binaries can be found in the [project releases](https://github.com
 1.) flash NamoMig
 ```openFPGALoader -c ft231X --pins=7:3:5:6 -f nanomig_impl.bit```  
 2.) flash Kickstart 
-```openFPGALoader -c ft231X --pins=7:3:5:6 -f -o 0x400000 kick31.rom```
-3.) connect ICEPI & Carrier
+```openFPGALoader -c ft231X --pins=7:3:5:6 -f -o 0x400000 kick31.rom```   
+3.) connect ICEPI & Carrier  
 4.) push button on carrier and connect it to your Computer to flash FPGA-Companion
 
 ## Rigid Disk Block Info
