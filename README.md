@@ -83,12 +83,12 @@ The necessary binaries can be found in the [project releases](https://github.com
 * With Disk Flashback you can mount ADF's & HDF's under Windows [Disk Flashback](https://robsmithdev.co.uk/diskflashback)
 
 ## ICEPI-ZERO 
-1.) flash NamoMig
+1.) flash NanoMig 
 ```openFPGALoader -c ft231X --pins=7:3:5:6 -f nanomig_impl.bit```  
 2.) flash Kickstart 
 ```openFPGALoader -c ft231X --pins=7:3:5:6 -f -o 0x400000 kick31.rom```   
 3.) connect ICEPI & Carrier  
-4.) push button on carrier and connect it to your Computer to flash FPGA-Companion
+4.) push button on carrier and connect it via USB to your Computer to flash FPGA-Companion
 
 ## Rigid Disk Block Info
 Please make sure to use RDB (Rigid Disk Block) images with a **Start Offset 0**.  
