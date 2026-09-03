@@ -90,6 +90,15 @@ The necessary binaries can be found in the [project releases](https://github.com
 3.) connect ICEPI & Carrier  
 4.) push button on carrier and connect it via USB to your Computer to flash FPGA-Companion
 
+Windows:  
+
+    Plug your FPGA board into your computer via USB.
+    Download and open Zadig.
+    Select Options -> List All Devices in Zadig.
+    Choose your FPGA cable or interface from the drop-down menu.
+    Change the target driver to WinUSB and click Replace Driver (or Install Driver). 
+
+
 ## Rigid Disk Block Info
 Please make sure to use RDB (Rigid Disk Block) images with a **Start Offset 0**.  
 If unallocated space is present before the RDB, the HDF image won't be recognized.
