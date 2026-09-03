@@ -96,7 +96,7 @@ Windows: Download and install OSS CAD SUITE ([download](https://github.com/Yosys
 2.) flash Kickstart  
 ```openFPGALoader -c ft231X --pins=7:3:5:6 -f -o 0x400000 kick31.rom```   
 3.) connect ICEPI & Carrier  
-4.) push button on Carrier and connect it via USB to your Computer to flash FPGA-Companion
+4.) push button on Carrier and connect it via USB to your Computer to flash FPGA-Companion ([download](fpga_companion.uf2))
 
 ## Rigid Disk Block Info
 Please make sure to use RDB (Rigid Disk Block) images with a **Start Offset 0**.  
