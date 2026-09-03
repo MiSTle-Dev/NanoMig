@@ -83,9 +83,7 @@ The necessary binaries can be found in the [project releases](https://github.com
 * With Disk Flashback you can mount ADF's & HDF's under Windows [Disk Flashback](https://robsmithdev.co.uk/diskflashback)
 
 ## ICEPI-ZERO 
-Windows:  
-
-Download and install OSS CAD SUITE ([download](https://github.com/YosysHQ/oss-cad-suite-build/releases)) and Zadig ([download](https://zadig.akeo.ie/))
+Windows: Download and install OSS CAD SUITE ([download](https://github.com/YosysHQ/oss-cad-suite-build/releases)) and Zadig ([download](https://zadig.akeo.ie/))
 
     Plug your FPGA board into your computer via USB.
     Open Zadig.
