@@ -178,7 +178,7 @@ always @(posedge clk) nmi_addr <= vbr + 32'h7c;
 assign sel_nmi_vector = (cpu_addr[31:2] == nmi_addr[31:2]) && (cpustate == 2'b10);
 `else
 assign sel_nmi_vector = 1'b0;
-`endif;
+`endif
 
 wire [15:0] ramdat;
 

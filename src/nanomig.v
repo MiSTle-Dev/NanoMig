@@ -239,17 +239,15 @@ wire	    ram_uds;
 reg         ram_write_ready;   // write accepted into the write buffer
 wire        ram_ready = cache_ack | ram_write_ready;
 `else
-reg	    ram_ready;
-`endif
-
-`ifndef ENABLE_CACHE
-reg fastram_ready_d;
-
 // cpu_ph1 is just before clk7_en, so this is
 // the very last moment we can receive ACK from SDRAM;
 // if it didn't happen then it means our request
 // didn't go through and we need to retry in the next cycle
-assign ram_ready = cpu_ph1 && (fastram_ready != fastram_ready_d);
+wire ram_ready = cpu_ph1 && (fastram_ready != fastram_ready_d);
+`endif
+
+`ifndef ENABLE_CACHE
+reg fastram_ready_d;
 
 // avoid selecting fastram when we didn't handle
 // ready signal yet (shouldn't happen but just
