@@ -147,8 +147,8 @@ reg cpu_ph1, cpu_ph2, cpu_sync;
 //
 // signal   | cycle
 // -------------------
-// c1       | 1 1 0 0
-// c3       | 0 1 1 0
+// c1       | 0 1 1 0
+// c3       | 0 0 1 1
 // -------------------
 // clk7_en  | 1 0 0 0
 // clk7n_en | 0 0 1 0
@@ -173,8 +173,8 @@ always @(*) begin
       cpu_ph1 = 1'b0;
       cpu_ph2 = 1'b0;
    end else begin
-      cpu_ph1 = !c1 && !c3 && cpu_sync;
-      cpu_ph2 =  c1 &&  c3 && cpu_sync;
+      cpu_ph1 = !c1 &&  c3 && cpu_sync;
+      cpu_ph2 =  c1 && !c3 && cpu_sync;
    end
 end
 
