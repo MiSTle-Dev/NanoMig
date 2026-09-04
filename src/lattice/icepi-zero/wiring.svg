@@ -24,9 +24,9 @@
      inkscape:deskcolor="#d1d1d1"
      inkscape:document-units="mm"
      showgrid="true"
-     inkscape:zoom="0.42048261"
-     inkscape:cx="240.20019"
-     inkscape:cy="824.05311"
+     inkscape:zoom="2.3786088"
+     inkscape:cx="576.38733"
+     inkscape:cy="442.06512"
      inkscape:window-width="1828"
      inkscape:window-height="1180"
      inkscape:window-x="75"
@@ -816,13 +816,13 @@
        xml:space="preserve"
        style="font-weight:bold;font-size:7.76111px;line-height:104%;font-family:'DejaVu Sans Mono';-inkscape-font-specification:'DejaVu Sans Mono Bold';text-align:center;letter-spacing:0px;word-spacing:0px;text-anchor:middle;fill:#1702ff;fill-opacity:1;stroke:none;stroke-width:0.264583px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
        x="173.78433"
-       y="123.91056"
+       y="105.38972"
        id="text425"><tspan
          sodipodi:role="line"
          id="tspan423"
          style="font-size:7.76111px;fill:#1702ff;fill-opacity:1;stroke:none;stroke-width:0.264583px"
          x="173.78433"
-         y="123.91056">CSN</tspan></text><text
+         y="105.38972">CSN</tspan></text><text
        xml:space="preserve"
        style="font-weight:bold;font-size:7.76111px;line-height:104%;font-family:'DejaVu Sans Mono';-inkscape-font-specification:'DejaVu Sans Mono Bold';text-align:center;letter-spacing:0px;word-spacing:0px;text-anchor:middle;fill:#1702ff;fill-opacity:1;stroke:none;stroke-width:0.264583px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
        x="173.72008"
@@ -867,7 +867,7 @@
        d="m 40.37005,120.84546 3.96875,-2.64584 v 5.29167 z"
        id="path3959" /><path
        style="fill:#1702ff;fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:0.264583px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
-       d="m 162.07838,120.84546 3.96875,-2.64583 v 5.29166 z"
+       d="m 162.07838,102.32451 3.96875,-2.645827 v 5.291657 z"
        id="path3959-9" /><path
        style="fill:#1702ff;fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:0.264583px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
        d="m 161.87698,130.10587 3.96875,-2.64583 v 5.29166 z"

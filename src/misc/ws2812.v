@@ -9,18 +9,18 @@ parameter WS2812_NUM 	= 0             ; // LED number of WS2812 (starts from 0)
 parameter WS2812_WIDTH 	= 24            ; // WS2812 data bit width
 parameter CLK_FRE 	= 28_375_160    ; // CLK frequency (mHZ)
 
-parameter DELAY_1_HIGH 	= (CLK_FRE / 1_000_000 * 0.85 )  - 1; //≈850ns±150ns     1 high level time
-parameter DELAY_1_LOW 	= (CLK_FRE / 1_000_000 * 0.40 )  - 1; //≈400ns±150ns 	 1 low level time
-parameter DELAY_0_HIGH 	= (CLK_FRE / 1_000_000 * 0.40 )  - 1; //≈400ns±150ns 	 0 high level time
-parameter DELAY_0_LOW 	= (CLK_FRE / 1_000_000 * 0.85 )  - 1; //≈850ns±150ns     0 low level time
-parameter DELAY_RESET 	= (CLK_FRE / 10 ) - 1; //0.1s reset time ＞50us
+localparam DELAY_1_HIGH	= ((85/5) * CLK_FRE / 20_000_000) - 1; //≈850ns±150ns  1 high level time
+localparam DELAY_1_LOW 	= ((40/5) * CLK_FRE / 20_000_000) - 1; //≈400ns±150ns  1 low level time
+localparam DELAY_0_HIGH	= ((40/5) * CLK_FRE / 20_000_000) - 1; //≈400ns±150ns  0 high level time
+localparam DELAY_0_LOW 	= ((85/5) * CLK_FRE / 20_000_000) - 1; //≈850ns±150ns  0 low level time
+localparam DELAY_RESET 	= (CLK_FRE / 10 ) - 1; //0.1s reset time ＞50us
 
-parameter IDLE 	 		= 0; //state machine statement
-parameter DATA_SEND  		= 1;
-parameter BIT_SEND_HIGH   	= 2;
-parameter BIT_SEND_LOW   	= 3;
+localparam IDLE 	 	= 0; //state machine statement
+localparam DATA_SEND  		= 1;
+localparam BIT_SEND_HIGH   	= 2;
+localparam BIT_SEND_LOW   	= 3;
 
-parameter INIT_DATA = 24'b1111; // initial pattern
+localparam INIT_DATA = 24'b1111; // initial pattern
 
 reg [ 1:0] state       = 0; // synthesis preserve  - main state machine control
 reg [ 8:0] bit_send    = 0; // number of bits sent - increase for larger led strips/matrix

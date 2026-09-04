@@ -1,0 +1,94 @@
+Net   "clk"  Loc = "IO_SB_A8" | SCHMITT_TRIGGER=true;
+
+Net "reset_n" Loc = "IO_EB_B0" | PULLUP=true; # SW3
+
+# leds
+Net   "leds_n[0]"   Loc = "IO_EB_B1"; # LED D1
+Net   "leds_n[1]"   Loc = "IO_EB_B2"; # LED D2
+Net   "leds_n[2]"   Loc = "IO_EB_B3"; # LED D3
+Net   "leds_n[3]"   Loc = "IO_EB_B4"; # LED D4
+Net   "leds_n[4]"   Loc = "IO_EB_B5"; # LED D5
+Net   "leds_n[5]"   Loc = "IO_EB_B6"; # LED D6
+Net   "leds_n[6]"   Loc = "IO_EB_B7"; # LED D7
+Net   "leds_n[7]"   Loc = "IO_EB_B8"; # LED D8
+
+# HDMI on PMOD A
+Net "TMDS_data_p[2]" Loc = "IO_NB_A0" | LVDS_BOOST=true; #JA1
+Net "TMDS_data_p[1]" Loc = "IO_NB_A1" | LVDS_BOOST=true; #JA2
+Net "TMDS_data_p[0]" Loc = "IO_NB_A2" | LVDS_BOOST=true; #JA3
+Net "TMDS_clk_p"     Loc = "IO_NB_A3" | LVDS_BOOST=true; #JA4
+Net "TMDS_data_n[2]" Loc = "IO_NB_B0" | LVDS_BOOST=true; #JA7
+Net "TMDS_data_n[1]" Loc = "IO_NB_B1" | LVDS_BOOST=true; #JA8
+Net "TMDS_data_n[0]" Loc = "IO_NB_B2" | LVDS_BOOST=true; #JA9
+Net "TMDS_clk_n"     Loc = "IO_NB_B3" | LVDS_BOOST=true; #JA10
+
+# map flash spi to Bank WC for now, should go to system flash
+Net   "mspi_clk"     Loc = "IO_WC_B0";
+Net   "mspi_cs"      Loc = "IO_WC_B1";
+Net   "mspi_di"      Loc = "IO_WC_B2";
+Net   "mspi_hold"    Loc = "IO_WC_B3";
+Net   "mspi_wp"      Loc = "IO_WC_B4";
+Net   "mspi_do"      Loc = "IO_WC_B5";
+
+# SD card slot
+Net   "sd_clk"       Loc = "IO_WC_B6";
+Net   "sd_cmd"       Loc = "IO_WC_B7"; // MOSI
+Net   "sd_dat[0]"    Loc = "IO_WC_B8"; // 0: MISO
+Net   "sd_dat[1]"    Loc = "IO_WC_A0";
+Net   "sd_dat[2]"    Loc = "IO_WC_A1";
+Net   "sd_dat[3]"    Loc = "IO_WC_A2";
+
+# companion on PMODB
+Net   "spi_dir"      Loc = "IO_NB_B4";
+Net   "spi_csn"      Loc = "IO_NB_B5" | PULLUP=true;
+Net   "spi_irqn"     Loc = "IO_NB_B6";
+Net   "spi_dat"      Loc = "IO_NB_A4" | PULLUP=true;
+Net   "spi_sclk"     Loc = "IO_NB_A5" | PULLUP=true;
+# Net   "spi_spare"     Loc = "IO_NB_A6" | PULLUP=true;
+
+# Map SDRAM to Bank EA and SA, needs adjustments for real addon.
+# This unfortunately needs 38 pins while two banks only have 36
+# These SDRAMs have four banks of 8MB and we usually only need
+# 8MB total RAM. So the bank address could be fixed to save up
+# to two pins.
+Net   "O_sdram_clk"      Loc = "IO_EA_B0";
+Net   "O_sdram_cs_n"     Loc = "IO_EA_B1";  # chip select
+Net   "O_sdram_cas_n"    Loc = "IO_EA_B2";  # columns address select
+Net   "O_sdram_ras_n"    Loc = "IO_EA_B3";  # row address select
+Net   "O_sdram_wen_n"    Loc = "IO_EA_B4";  # write enable
+Net   "O_sdram_addr[0]"  Loc = "IO_EA_B5";
+Net   "O_sdram_addr[1]"  Loc = "IO_EA_B6";
+Net   "O_sdram_addr[2]"  Loc = "IO_EA_B7";
+Net   "O_sdram_addr[3]"  Loc = "IO_EA_B8";
+Net   "O_sdram_addr[4]"  Loc = "IO_EA_A0";
+Net   "O_sdram_addr[5]"  Loc = "IO_EA_A1";
+Net   "O_sdram_addr[6]"  Loc = "IO_EA_A2";
+Net   "O_sdram_addr[7]"  Loc = "IO_EA_A3";
+Net   "O_sdram_addr[8]"  Loc = "IO_EA_A4";
+Net   "O_sdram_addr[9]"  Loc = "IO_EA_A5";
+Net   "O_sdram_addr[10]" Loc = "IO_EA_A6";
+Net   "O_sdram_addr[11]" Loc = "IO_EA_A7";
+Net   "O_sdram_addr[12]" Loc = "IO_EA_A8";
+
+# SDRAM "data" Bank
+Net   "O_sdram_dqm[0]"   Loc = "IO_SA_B0";  #  2*8bit
+Net   "O_sdram_dqm[1]"   Loc = "IO_SA_B1";
+Net   "IO_sdram_dq[0]"   Loc = "IO_SA_B2";
+Net   "IO_sdram_dq[1]"   Loc = "IO_SA_B3";
+Net   "IO_sdram_dq[2]"   Loc = "IO_SA_B4";
+Net   "IO_sdram_dq[3]"   Loc = "IO_SA_B5";
+Net   "IO_sdram_dq[4]"   Loc = "IO_SA_B6";
+Net   "IO_sdram_dq[5]"   Loc = "IO_SA_B7";
+Net   "IO_sdram_dq[6]"   Loc = "IO_SA_B8";
+Net   "IO_sdram_dq[7]"   Loc = "IO_SA_A0";
+Net   "IO_sdram_dq[8]"   Loc = "IO_SA_A1";
+Net   "IO_sdram_dq[9]"   Loc = "IO_SA_A2";
+Net   "IO_sdram_dq[10]"  Loc = "IO_SA_A3";
+Net   "IO_sdram_dq[11]"  Loc = "IO_SA_A4";
+Net   "IO_sdram_dq[12]"  Loc = "IO_SA_A5";
+Net   "IO_sdram_dq[13]"  Loc = "IO_SA_A6";
+Net   "IO_sdram_dq[14]"  Loc = "IO_SA_A7"; 
+Net   "IO_sdram_dq[15]"  Loc = "IO_SA_A8";
+
+#Net   "O_sdram_ba[0]"    Loc = "IO_NA_B0";  # eek ... needs a third bank
+#Net   "O_sdram_ba[1]"    Loc = "IO_NA_B1";

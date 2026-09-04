@@ -19,21 +19,20 @@
 
 int file_image_len[8] = {-1,-1,-1,-1,-1,-1,-1,-1 };
 
+#ifdef MAX_ROMS
+int rom_image_len[8] = {-1,-1,-1,-1,-1,-1,-1,-1 };
+#endif
+
 extern TB_NAME *tb;
 extern double simulation_time;
 
-// disable colorization for easier handling in editors 
-#if 1
 #define RED      "\033[1;31m"
 #define GREEN    "\033[1;32m"
 #define YELLOW   "\033[1;33m"
+#define BLUE     "\033[1;34m"
+#define MAGENTA  "\033[1;35m"
+#define CYAN     "\033[1;36m"
 #define END      "\033[0m"
-#else
-#define RED
-#define GREEN
-#define YELLOW
-#define END
-#endif
 
 extern char *sector_string(int drive, uint32_t lba);
 
@@ -108,6 +107,7 @@ void hexdiff(void *data, void *cmp, int size) {
   hexdiff_color(data, cmp, size, (char*)RED);
 }
 
+#ifndef NO_COMPANION
 /* ============================= FPGA Companion (sd card part) ====================== */
 void sd_setup_fake_sector(uint16_t sector, uint8_t *buf, uint8_t mask) {  
   // fill buffer with dummy data that is unique for this sector
@@ -117,7 +117,7 @@ void sd_setup_fake_sector(uint16_t sector, uint8_t *buf, uint8_t mask) {
   }
 }
 
-#define MS2FC(a) ((long)((a)/(2000*TICKLEN)))
+#define MS2FC(a) ((long)((a)/(2000.0*TICKLEN)))
 static int mcu_read_handler(int index) {
   static uint32_t sector;
   static int cnt = -1;
@@ -170,9 +170,6 @@ static int mcu_write_handler(int index) {
   if(!index) {
     // fake image is 64k sectors
     sector = random() & 0xffff;
-  }
-  
-  if(index == 0) {
     tb->mcu_data_in = 5;     // MCU write command
     tb->mcu_data_start = 1;  //     -"-
     sd_setup_fake_sector(sector, buf, 0x00);
@@ -193,6 +190,55 @@ static int mcu_write_handler(int index) {
   return !tb->mcu_data_out;    
 }
 
+#ifdef MAX_ROMS
+static FILE *rom_fd[8] = { NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL };
+
+static char *rom_image_buffer = NULL;
+static int rom_image_buffer_size = 0;
+static int rom_image_buffer_index = 0;      
+
+static int mcu_image_handler(int index_ext) {
+  static int cnt = 0;
+  static int index = 0;
+
+  if(index_ext == 0)
+    index = 0;
+  
+  // only strobe every n'th byte
+  if(cnt++ < 1) {
+    tb->mcu_data_strobe = 0;
+    return 0; // not done, yet
+  }
+  
+  tb->mcu_data_strobe = 1;
+  cnt = 0;
+  
+  if(index == 0) {    
+    printf(YELLOW "%.3fms MCU start image transfer" END "\n", simulation_time*1000);
+    tb->mcu_data_start = 1;
+    tb->mcu_data_in = 8;
+  } else if(index == 1)
+    tb->mcu_data_in = 2;         // image write subcommand
+  else if(index == 2)
+    tb->mcu_data_in = 0;         // TODO: image no!
+  else
+    tb->mcu_data_in = rom_image_buffer[rom_image_buffer_index++];
+
+  index++;
+  
+  // done sending data?
+  if(rom_image_buffer_index == rom_image_buffer_size) {  
+    printf(YELLOW "%.3fms MCU image transfer done" END "\n", simulation_time*1000);
+    free(rom_image_buffer);
+    rom_image_buffer = NULL;
+  
+    return 1;
+  }
+
+  return 0;
+}
+#endif
+
 static int mcu_irq_handler(int index) {
   static uint8_t req;
   static uint32_t sector;
@@ -202,6 +248,7 @@ static int mcu_irq_handler(int index) {
   if(index == 0) {
     tb->mcu_data_in = 1;  // get status
     tb->mcu_data_start = 1;
+    req = 0;
   } else if(index == 1)
     tb->mcu_data_in = 0;
   else if(index == 2) {
@@ -210,24 +257,86 @@ static int mcu_irq_handler(int index) {
   } else if(index <= 6)
     sector = (sector << 8) | tb->mcu_data_out; 
 
-  if(index == 6) {
-    printf("\033[1;33m%.3fms MCU sector translation req 0x%02x, sector %u\033[0m\n", simulation_time*1000, req, sector);
-    // set request in msb to allow sd_card.cpp to distinguish the drives
-    sector |= (req<<24);
+  // req == 0 means this is not a request for sector IO
+  if(req) {
+    if(index == 6) {
+      printf("\033[1;33m%.3fms MCU sector translation req 0x%02x, sector %u\033[0m\n",
+	     simulation_time*1000, req, sector);
+      // set request in msb to allow sd_card.cpp to distinguish the drives
+      sector |= (req<<24);
+    }
+    
+    // send reply from index 6 on
+    if(index == 7) {
+      tb->mcu_data_start = 1;
+      tb->mcu_data_in = 2;
+    } else if(index > 7 && index <= 11) {
+      tb->mcu_data_start = 0;
+      tb->mcu_data_in = (sector >> 24);
+      sector <<= 8;
+    }
+
+    // monitor until the core reports "not busy"
+    return (index > 11) && !tb->mcu_data_out;
   }
 
-  // send reply from index 6 on
-  if(index == 7) {
-    tb->mcu_data_start = 1;
-    tb->mcu_data_in = 2;
-  } else if(index > 7 && index <= 11) {
-    tb->mcu_data_start = 0;
-    tb->mcu_data_in = (sector >> 24);
-    sector <<= 8;
-  }    
+#ifdef MAX_ROMS
+  // we get here if status returns no sector request
+  if(index > 6) {
+    static int buffer_size;
+    static int accepted;
+    
+    // request image status
 
-  // monitor until the core reports "not busy"
-  return (index > 11) && !tb->mcu_data_out;
+    if(index == 7) {
+      printf("\033[1;33m%.3fms MCU no sector request\033[0m\n", simulation_time*1000);
+      tb->mcu_data_start = 1;
+      tb->mcu_data_in = 8;
+    } else if(index == 8)
+      tb->mcu_data_in = 0;         // image status subcommand
+    else if(index == 9)
+      tb->mcu_data_in = 0;         // TODO: image no!
+    else if(index == 10) {
+      accepted = (tb->mcu_data_out&0x80)?1:0;
+      printf("%s%.3fms image status: %02x -> %s" END "\n",
+	     accepted?GREEN:RED, simulation_time*1000, tb->mcu_data_out,
+	     accepted?"OK":"NOT ACCEPTED");
+    } else if(index == 11)
+      buffer_size = tb->mcu_data_out;
+    else if(index == 12) {
+      buffer_size = 256 * buffer_size + tb->mcu_data_out;
+      printf("%.3fms image buffer size: %d\n", simulation_time*1000, buffer_size);
+
+      // the buffer should be gone by now. Otherwise the core has raised the IRQ
+      // while still in transfer
+      if(rom_image_buffer) {
+	printf(RED "%.3fms rom image buffer was not empty" END "\n", simulation_time*1000);
+	free(rom_image_buffer);
+	rom_image_buffer = NULL;
+      }
+      
+      // now send as much data as buffer can hold
+      // buffer can actually be 0 if the irq has been raised by the sector translation and not
+      // for the rom image transfer. But this should never happen es the core should not
+      // be running and doing disk io during a rom download
+      if(accepted) {
+	rom_image_buffer = (char*)malloc(buffer_size);
+	// TODO: handle multiple images
+	int res = fread(rom_image_buffer, 1, buffer_size, rom_fd[0]);
+	// hexdump(rom_image_buffer, 32);
+
+	if(res != buffer_size)
+	  printf(RED "%.3fms image underrun %d, EOF " END "\n", simulation_time*1000, res);
+	else {	
+	  rom_image_buffer_size = buffer_size;
+	  rom_image_buffer_index = 0;
+	}
+      }
+    }
+  }
+#endif
+    
+  return index >= 12;
 }
 
 void sd_mount(float);
@@ -241,42 +350,89 @@ static int mcu_sdc_insert_handler(int index) {
   // max 3 drives (two floppies, one hdd)
   int drive = index / 16;
   int drive_idx = index % 16;
-  if(file_image_len[drive] >= 0) {
-    if(!drive_idx) {
-      tb->mcu_data_in = 4;  // insert disk command
-      tb->mcu_data_start = 1;
-    }
-    else if(drive_idx == 1) tb->mcu_data_in = drive;
-    else if(drive_idx == 2) tb->mcu_data_in = file_image_len[drive] >> 24;
-    else if(drive_idx == 3) tb->mcu_data_in = file_image_len[drive] >> 16;
-    else if(drive_idx == 4) tb->mcu_data_in = file_image_len[drive] >> 8;
-    else if(drive_idx == 5) tb->mcu_data_in = file_image_len[drive] >> 0;
 
+  if(drive < MAX_DRIVES) {   
+    if(file_image_len[drive] >= 0) {
+      if(!drive_idx) {
+	tb->mcu_data_in = 4;  // insert disk command
+	tb->mcu_data_start = 1;
+      }
+      else if(drive_idx == 1) tb->mcu_data_in = drive;
+      else if(drive_idx == 2) tb->mcu_data_in = file_image_len[drive] >> 24;
+      else if(drive_idx == 3) tb->mcu_data_in = file_image_len[drive] >> 16;
+      else if(drive_idx == 4) tb->mcu_data_in = file_image_len[drive] >> 8;
+      else if(drive_idx == 5) tb->mcu_data_in = file_image_len[drive] >> 0;
+      
 #ifdef ENABLE_DIRECT_MAP
-    else if(drive_idx == 6)
-      tb->mcu_data_strobe = 0;
-    else if(drive_idx == 7) {
-      tb->mcu_data_in = 6;         // direct enable signal
-      tb->mcu_data_start = 1;
-    } else if(drive_idx == 8)
-      tb->mcu_data_in = drive;
-    else if(drive_idx == 9)
-      tb->mcu_data_in = 1<<drive;  // drive maps to sectors
-    else if(drive_idx <= 12)
-      tb->mcu_data_in = 0;
+      else if(drive_idx == 6)
+	tb->mcu_data_strobe = 0;
+      else if(drive_idx == 7) {
+	tb->mcu_data_in = 6;         // direct enable signal
+	tb->mcu_data_start = 1;
+      } else if(drive_idx == 8)
+	tb->mcu_data_in = drive;
+      else if(drive_idx == 9)
+	tb->mcu_data_in = 1<<drive;  // drive maps to sectors
+      else if(drive_idx <= 12)
+	tb->mcu_data_in = 0;
 #endif
     
-    else tb->mcu_data_strobe = 0;	  
-  }  
-  
-  return index > MAX_DRIVES*12;
+      else tb->mcu_data_strobe = 0;	  
+    }
+  } else {
+#ifdef MAX_ROMS
+    int image = drive - MAX_DRIVES;
+    if(rom_image_len[image] >= 0) {
+      static int buffer_size;
+
+      if(!drive_idx) {
+	tb->mcu_data_in = 8;     // image command
+	tb->mcu_data_start = 1;
+      }
+      else if(drive_idx == 1) tb->mcu_data_in = 1;      // image select subcommand
+      else if(drive_idx == 2) tb->mcu_data_in = image;  
+      else if(drive_idx == 3) tb->mcu_data_in = rom_image_len[image] >> 24;
+      else if(drive_idx == 4) tb->mcu_data_in = rom_image_len[image] >> 16;
+      else if(drive_idx == 5) tb->mcu_data_in = rom_image_len[image] >> 8;
+      else if(drive_idx == 6) tb->mcu_data_in = rom_image_len[image] >> 0;
+
+      // request status
+      else if(drive_idx == 7)
+	tb->mcu_data_strobe = 0;
+      else if(drive_idx == 8) {
+	tb->mcu_data_in = 8;         // image command
+	tb->mcu_data_start = 1;
+      } else if(drive_idx == 9)
+	tb->mcu_data_in = 0;         // image status subcommand
+      else if(drive_idx == 10)
+	tb->mcu_data_in = 0;
+      else if(drive_idx == 11)
+	printf("%s%.3fms image status: %02x -> %s" END "\n", (tb->mcu_data_out&0x80)?GREEN:RED, simulation_time*1000, tb->mcu_data_out,
+	       (tb->mcu_data_out&0x80)?"OK":"NOT ACCEPTED");
+      else if(drive_idx == 12)
+	buffer_size = tb->mcu_data_out;
+      else if(drive_idx == 13)
+	printf("%.3fms image buffer size: %d\n", simulation_time*1000, 256 * buffer_size + tb->mcu_data_out);
+
+      else tb->mcu_data_strobe = 0;	  
+      
+      // subsequenty, the core should raise an interrupt to request data
+    }
+#endif
+  }
+
+  return index > (MAX_DRIVES
+#ifdef MAX_ROMS
+		  +MAX_ROMS
+#endif
+		  )*16;
 }
 
 void fc_handle(void) {
   // FPGA companion
   static int companion_byte = 0;
   static int companion_cnt = 0;
-  static int companion_next = MS2FC(10);
+  static int companion_next = MS2FC(4);   // 4 ms is still in reset
   static int (*handler)(int) = mcu_sdc_insert_handler;
 
   // if(!(companion_cnt % 1000)) printf("%d of %d\n", (long)(3/(2*TICKLEN)), companion_cnt);
@@ -301,7 +457,13 @@ void fc_handle(void) {
       if(handler(companion_byte++)) {
 	handler = NULL;
 	companion_byte = 0;
-	
+#ifdef MAX_ROMS
+	// check if a image transfer is pending
+	if(rom_image_buffer) {
+	  handler = mcu_image_handler;
+	  companion_next = companion_cnt + MS2FC(.01);
+	} else
+#endif
 	// check if irq is pending and run its handler then
 	if(tb->mcu_irq) {
 	  printf("\033[1;32m%.3fms MCU delayed handling IRQ\033[0m\n", simulation_time*1000);
@@ -335,6 +497,7 @@ void fc_handle(void) {
   }
 #endif
 }  
+#endif
 
 // =========================================== SD card itself ==========================================
 
@@ -427,35 +590,75 @@ static void update_crc(uint8_t *sector_data) {
 // total cid respose is 136 bits / 17 bytes
 unsigned char cid[17] = "\x3f" "\x02TMS" "A08G" "\x14\x39\x4a\x67" "\xc7\x00\xe4";
 
-static FILE *fd[8] = { NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL };
+static FILE *drv_fd[8] = { NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL };
 
 void fdclose(void) {
   for(int i=0;i<8;i++) {  
-    if(fd[i]) {
-      printf("closing file image %d\n", i);
-      fclose(fd[i]);
-      fd[i] = NULL;
+    if(drv_fd[i]) {
+      printf("closing drive file image %d\n", i);
+      fclose(drv_fd[i]);
+      drv_fd[i] = NULL;
     }
+#ifndef NO_COMPANION
+    if(rom_fd[i]) {
+      printf("closing rom file image %d\n", i);
+      fclose(rom_fd[i]);
+      rom_fd[i] = NULL;
+    }
+#endif
   }
 }
 
 void sd_mount(float ms) {
+#ifndef NO_COMPANION  
   for(int drive=0;drive<8;drive++) {  
     if(file_image[drive]) {
-      fd[drive] = fopen(file_image[drive], "r+b");
-      if(!fd[drive]) {
-	printf("Unable to open %s\n", file_image[drive]);
+      drv_fd[drive] = fopen(file_image[drive], "r+b");
+      if(!drv_fd[drive]) {
+	printf("Unable to open drive %d image %s\n", drive, file_image[drive]);
 	exit(-1);
+      } else {
+	// mount drive images
+	fseek(drv_fd[drive], 0, SEEK_END);
+	file_image_len[drive] = ftello(drv_fd[drive]);
+	printf("%.3fms DRV %d mounting %s, size = %d\n", ms, drive, file_image[drive], file_image_len[drive]);
+	fseek(drv_fd[drive], 0, SEEK_SET);
       }
     }
-      
-    if(fd[drive]) {	
-      fseek(fd[drive], 0, SEEK_END);
-      file_image_len[drive] = ftello(fd[drive]);
-      printf("%.3fms DRV %d mounting %s, size = %d\n", ms, drive, file_image[drive], file_image_len[drive]);
-      fseek(fd[drive], 0, SEEK_SET);
+  }
+#else
+  if(file_image[IMAGE_INDEX]) {
+    drv_fd[IMAGE_INDEX] = fopen(file_image[IMAGE_INDEX], "r+b");
+    if(!drv_fd[IMAGE_INDEX]) {
+      printf("Unable to open drive %d image %s\n", IMAGE_INDEX, file_image[IMAGE_INDEX]);
+      exit(-1);
+    } else {
+      // mount drive image
+      printf("%.3fms companion-less DRV %d mounting %s\n", ms, IMAGE_INDEX, file_image[IMAGE_INDEX]);
+      fseek(drv_fd[IMAGE_INDEX], 0, SEEK_SET);
     }
   }
+#endif
+    
+#ifndef NO_COMPANION
+#ifdef MAX_ROMS
+  for(int img=0;img<8;img++) {  
+    if(rom_image[img]) {
+      rom_fd[img] = fopen(rom_image[img], "r+b");
+      if(!rom_fd[img]) {
+	printf("Unable to open rom %d image %s\n", img, rom_image[img]);
+	exit(-1);
+      } else {
+	// mount img images
+	fseek(rom_fd[img], 0, SEEK_END);
+	rom_image_len[img] = ftello(rom_fd[img]);
+	printf("%.3fms IMAGE %d mounting %s, size = %d\n", ms, img, rom_image[img], rom_image_len[img]);
+	fseek(rom_fd[img], 0, SEEK_SET);
+      }
+    }
+  }
+#endif
+#endif
 }
 
 void sd_handle(void)  {
@@ -526,12 +729,12 @@ void sd_handle(void)  {
 	    int lba = dat_arg & 0xffffff;
 
 	    if(i) {	    
-	      if(fd[drive]) {
+	      if(drv_fd[drive]) {
 		uint8_t ref[512];
 		
 		// read original sector for comparison
-		fseek(fd[drive], 512 * lba, SEEK_SET);
-		int items = fread(ref, 2, 256, fd[drive]);
+		fseek(drv_fd[drive], 512 * lba, SEEK_SET);
+		int items = fread(ref, 2, 256, drv_fd[drive]);
 		if(items != 256) perror("fread()");
 
 		// a difference in data for writing does not mean
@@ -542,14 +745,15 @@ void sd_handle(void)  {
 		hexdump(sector_data, 520);
 	      
 #ifdef WRITE_BACK
-	      fseek(fd[drive], 512 * lba, SEEK_SET);
-	      if(fwrite(sector_data, 2, 256, fd[drive]) != 256) {
+	      fseek(drv_fd[drive], 512 * lba, SEEK_SET);
+	      if(fwrite(sector_data, 2, 256, drv_fd[drive]) != 256) {
 		printf("SDC WRITE ERROR\n");
 		exit(-1);
 	      }	    
-	      fflush(fd[drive]);
+	      fflush(drv_fd[drive]);
 #endif
 	    } else {
+#ifndef NO_COMPANION
 	      // MCU data
 	      printf("MCU wrote %u:\n", lba);
 
@@ -559,6 +763,10 @@ void sd_handle(void)  {
 	      hexdiff(sector_data, ref, 512);
 
 	      assert(!memcmp(sector_data, ref, 512));
+#else
+	      printf("Spurious write\n");
+	      exit(-1);
+#endif
 	    }
 	      
 	    dat_bits--;
@@ -659,8 +867,8 @@ void sd_handle(void)  {
 	    // i == 0 for MCU request
 	    int lba = arg & 0xffffff;
 	    if(i) { while(!(i&1)) { drive++; i>>=1; }
-	      printf("%.3fms SDC: Request drive #%d read single block %d (%s)\n", simulation_time*1000,
-		     drive, lba, sector_string(drive, lba));
+	      printf("%.3fms SDC: Request drive #%d read single block %d (%s)\n",
+		     simulation_time*1000, drive, lba, sector_string(drive, lba));
 
 	      // check if sector is actually within the drive image
 	      if(lba >= file_image_len[drive]/512) {
@@ -668,21 +876,27 @@ void sd_handle(void)  {
 		exit(-1);  // exit to never miss this!		
 	      }
 	    } else {
+#ifndef NO_COMPANION	      
 	      printf("%.3fms SDC: Request MCU read single block %d\n", simulation_time*1000, lba);
 
 	      if(lba >= 65535) {
 		printf("Error, MCU access outside image\n");
 		exit(-1);  // exit to never miss this!		
 	      }
+#else
+	      // when simulating a companion-less setup, then all requests are core requests
+	      printf("%.3fms SDC: Request companion-less read single block %d\n", simulation_time*1000, lba);
+#endif
 	    }
 	      
 	    cmd_out = reply(17, 0);    // ok
 
+#ifndef NO_COMPANION
 	    if(i) {	    
-	      if(fd[drive]) {
+	      if(drv_fd[drive]) {
 		// load sector
-		fseek(fd[drive], 512 * lba, SEEK_SET);
-		int items = fread(sector_data, 2, 256, fd[drive]);
+		fseek(drv_fd[drive], 512 * lba, SEEK_SET);
+		int items = fread(sector_data, 2, 256, drv_fd[drive]);
 		if(items != 256) perror("fread()");
 
 		hexdump(sector_data, 32);
@@ -693,8 +907,21 @@ void sd_handle(void)  {
 	    } else {
 	      // MCU read
 	      printf("%.3fms SDC: Fake MCU read data\n", simulation_time*1000);
-	      sd_setup_fake_sector(lba, sector_data, 0x55);  
+	      sd_setup_fake_sector(lba, sector_data, 0x55);
+	    }	  
+#else
+	    if(!drv_fd[IMAGE_INDEX]) {	      
+	      printf("Spurious read\n");
+	      exit(-1);
+	    } else { 
+	      // load sector
+	      fseek(drv_fd[IMAGE_INDEX], 512 * lba, SEEK_SET);
+	      int items = fread(sector_data, 2, 256, drv_fd[IMAGE_INDEX]);
+	      if(items != 256) perror("fread()");
+	      
+	      hexdump(sector_data, 32);
 	    }
+#endif
 	      
 	    update_crc(sector_data);
 	    dat_ptr = sector_data;
@@ -710,10 +937,12 @@ void sd_handle(void)  {
 	    // i == 0 for MCU request
 	    int lba = arg & 0xffffff;
 	    if(i) { while(!(i&1)) { drive++; i>>=1; }
-	      printf("%.3fms SDC: Request drive #%d write single block %d (%s)\n", simulation_time*1000,
+	      printf("%.3fms SDC: Request drive #%d write single block %d (%s)\n",
+		     simulation_time*1000,
 		     drive, lba, sector_string(drive, lba));
 	    } else
-	      printf("%.3fms SDC: Request MCU write single block %d\n", simulation_time*1000, lba);
+	      printf("%.3fms SDC: Request MCU write single block %d\n",
+		     simulation_time*1000, lba);
 	    
             cmd_out = reply(24, 0);    // ok
 
@@ -733,26 +962,32 @@ void sd_handle(void)  {
           
           cmd_in = -1;
         } else
-          printf("%.3fms SDC: CMD %02x, ARG %08lx, CRC7 %02x != %02x!!\n", simulation_time*1000, cmd, arg, crc7, getCRC(cmd, arg));         
+          printf("%.3fms SDC: CMD %02x, ARG %08lx, CRC7 %02x != %02x!!\n",
+		 simulation_time*1000, cmd, arg, crc7, getCRC(cmd, arg));         
       }      
     }      
     last_sdclk = tb->sdclk;     
   }
-
+#ifndef NO_COMPANION
   // do a simple FPGA Companion
   fc_handle();
+#endif
 }      
 
 void sd_init(void) {
   // assure reproducable results
   srandom(0x12345678);
 
+#ifndef NO_COMPANION
   // mcu is idle
   tb->mcu_data_strobe = 0;
   tb->mcu_data_start = 0;
   tb->mcu_data_in = 0;
   tb->mcu_iack = 0;
-
+#else
+  sd_mount(simulation_time*1000);
+#endif
+  
   // put sd card bus into idle state
   tb->sdcmd_in = 1;
   tb->sddat_in = 0xf;
@@ -760,7 +995,7 @@ void sd_init(void) {
 
 void sd_get_sector(int drive, int lba, uint8_t *data) {
   // read original sector for comparison
-  fseek(fd[drive], 512 * lba, SEEK_SET);
-  int items = fread(data, 2, 256, fd[drive]);
+  fseek(drv_fd[drive], 512 * lba, SEEK_SET);
+  int items = fread(data, 2, 256, drv_fd[drive]);
   if(items != 256) perror("fread()");
 }

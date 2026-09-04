@@ -125,11 +125,6 @@ end
 //0xda201c Status | Command
 //0xda3018 Control (not used because of 4xIDE)
 
-assign ide_readdata = ide_address[4] ? ide1_readdata : ide0_readdata;
-assign led  = ide0_drq | ide1_drq;
-assign nrdy = sel_tfr & !addr[4:2] & (port_num ? ide1_nodata : ide0_nodata);
-assign irq  = intreq & intena;
-
 reg longword_r;
 always @(posedge clk) longword_r <= rd && longword && !addr[4:1];
 
@@ -141,6 +136,7 @@ wire [31:0] ide0_data;
 wire [15:0] ide0_readdata;
 wire        ide0_intreq, ide0_drq, ide0_nodata;
 
+`ifndef DISABLE_IDE
 ide ide0
 (
 	.clk(clk),
@@ -153,6 +149,7 @@ ide ide0
 	.io_readdata({ide0_data[23:16],ide0_data[31:24],ide0_data[7:0],ide0_data[15:8]}),
 	.io_writedata({16'd0,data_in[7:0],data_in[15:8]}),
 	.io_32(io_32),
+        .io_wait(),
 
 	.request(ide_req[2:0]),
 	.drq(ide0_drq),
@@ -167,11 +164,13 @@ ide ide0
 	.mgmt_read(ide_read & ~ide_address[4]),
 	.mgmt_readdata(ide0_readdata)
 );
-
+`endif
+   
 wire [31:0] ide1_data;
 wire [15:0] ide1_readdata;
 wire        ide1_intreq, ide1_drq, ide1_nodata;
 
+`ifndef DISABLE_IDE
 ide ide1
 (
 	.clk(clk),
@@ -184,6 +183,7 @@ ide ide1
 	.io_readdata({ide1_data[23:16],ide1_data[31:24],ide1_data[7:0],ide1_data[15:8]}),
 	.io_writedata({16'd0,data_in[7:0],data_in[15:8]}),
 	.io_32(io_32),
+        .io_wait(),
 
 	.request(ide_req[5:3]),
 	.drq(ide1_drq),
@@ -198,6 +198,7 @@ ide ide1
 	.mgmt_read(ide_read & ide_address[4]),
 	.mgmt_readdata(ide1_readdata)
 );
+`endif
    
 wire   intreq  = ide0_intreq | ide1_intreq;
 wire   gayleid = ~gayleid_cnt[1] | gayleid_cnt[0];
@@ -212,6 +213,11 @@ assign data_out = (sel_tfr     & rd ? ((longword_r & addr[1]) ? tfr[31:16] : tfr
                 | (sel_gayleid & rd ? {gayleid,15'b000_0000_0000_0000}                  : 16'h0000)
                 | (sel_cfg     & rd ? {cfg,        12'b0000_0000_0000}                  : 16'h0000);
 
+
+assign ide_readdata = ide_address[4] ? ide1_readdata : ide0_readdata;
+assign led  = ide0_drq | ide1_drq;
+assign nrdy = sel_tfr & !addr[4:2] & (port_num ? ide1_nodata : ide0_nodata);
+assign irq  = intreq & intena;
 
 endmodule
 

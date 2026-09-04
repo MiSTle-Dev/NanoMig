@@ -4,14 +4,16 @@ This is a port of NanoMig to the [Lattice ECP5 FPGA family](https://www.lattices
 
 ![IcePi-Zero and RP-Pico Breadboard Setup](icepizero_rpico.jpg)
 
+It also runs on the [IcePi Carrier](https://github.com/MiSTle-Dev/Boards/tree/main/icepi_carrier).
+
 ## Current state
 
   - NanoMig working
-  - IDE temporarily disabled due to excessive logic usage
+  - ~~IDE temporarily disabled due to excessive logic usage~~ fixed
   - Joysticks and Companion through GPIO
   - ~~Temporary work-around for [flash clock issues](tests)~~ fixed
-  - HDMI signal are driven by logic. Should finally use DDR HW serializers or the like
-  - Uses OSD menu config from Gowin setup. Needs a custom config
+  - ~~HDMI signal are driven by logic. Should finally use DDR HW serializers or the like~~ fixed
+  - ~~Uses OSD menu config from Gowin setup. Needs a custom config~~ fixed
 
 ## Setup
 

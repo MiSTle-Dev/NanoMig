@@ -66,8 +66,8 @@ wire [ 8: 2] ddfdiff;
 wire [ 8: 2] ddfdiff_masked;
 reg  [15: 1] bpl1mod;             // modulo for odd bitplanes
 reg  [15: 1] bpl2mod;             // modulo for even bitplanes
-wire [15: 1] bpl1mod_bscan;       // modulo for odd bitplanes, adjusted for bitplane scandoubling
-wire [15: 1] bpl2mod_bscan;       // modulo for even bitplanes, adjusted for bitplane scandoubling
+reg [15: 1] bpl1mod_bscan;        // modulo for odd bitplanes, adjusted for bitplane scandoubling - AMR, and extra delay, for RAMJAM: Copperslave.
+reg [15: 1] bpl2mod_bscan;        // modulo for even bitplanes, adjusted for bitplane scandoubling
 
 reg  [ 5: 0] bplcon0;             // bitplane control (SHRES, HIRES and BPU bits)
 reg  [ 5: 0] bplcon0_delayed;     // delayed bplcon0 (compatibility)
@@ -374,13 +374,20 @@ always @ (posedge clk) begin
 end
 
 // softena : software display data fetch window
+
+// AMR - OCS and ECS/AGA behave differently when DDFSTRT == DDFSTOP.
+// On OCS the fetch runs until hard_stop. On ECS/AGA it stops after one complete fetch cycle.
+reg softena_off;
+
 always @ (posedge clk) begin
   if (clk7_en) begin
-    if (hpos[0])
+    if (hpos[0]) begin
       if (soft_start && (ecs || vdiwena && dmaena) && !ddfstrt_sel) // OCS: display can start only when vdiwena condition is true
         softena <= #1 1'b1;
-      else if (soft_stop || !ecs && hard_stop)
+      else if (softena_off || (soft_stop || !ecs && hard_stop))
         softena <= #1 1'b0;
+      softena_off<=soft_stop && soft_start && ecs;  // AMR - ECS / AGA: DDFSTRT==DDFSTOP, disable fetch after one fetch cycle.
+    end
   end
 end
 
@@ -465,8 +472,13 @@ end
 assign dma = (ddfrun) && dmaena_delayed[1] && hpos[0] && (plane[4:0] < {1'b0,bpu[3:0]}) ? 1'b1 : 1'b0;
 
 // adjust BPLxMOD for scandoubling
-assign bpl1mod_bscan = fmode[14] ? ((vdiwstrt[0] ^ vpos[0]) ? bpl2mod : bpl1mod) : bpl1mod;
-assign bpl2mod_bscan = fmode[14] ? ((vdiwstrt[0] ^ vpos[0]) ? bpl2mod : bpl1mod) : bpl2mod;
+// AMR - incorporate a delay too
+always @(posedge clk) begin
+	if (clk7_en && hpos[0]) begin
+		bpl1mod_bscan <= fmode[14] ? ((vdiwstrt[0] ^ vpos[0]) ? bpl2mod : bpl1mod) : bpl1mod;
+		bpl2mod_bscan <= fmode[14] ? ((vdiwstrt[0] ^ vpos[0]) ? bpl2mod : bpl1mod) : bpl2mod;
+	end
+end
 
 // dma pointer arithmetic unit
 always @ (*) begin

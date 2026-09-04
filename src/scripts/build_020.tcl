@@ -8,13 +8,16 @@ add_file tang/nano20k/top_020.sv
 add_file nanomig.v
 add_file minimig-aga/amiga_clk.v
 add_file minimig-aga/cpu_wrapper.v
-add_file minimig-aga/minimig.v 
+add_file minimig-aga/cpu_cache_new.v
+add_file minimig-aga/dpram.v
+add_file minimig-aga/dpram_be_1024x16.v
+add_file minimig-aga/minimig.v
 add_file minimig-aga/ciaa.v
 add_file minimig-aga/ciab.v
 add_file minimig-aga/cia_int.v
 add_file minimig-aga/cia_timera.v
 add_file minimig-aga/cia_timerb.v
-add_file minimig-aga/cia_timerd.v 
+add_file minimig-aga/cia_timerd.v
 add_file minimig-aga/paula.v
 add_file minimig-aga/paula_uart.v
 add_file minimig-aga/paula_audio_channel.v
@@ -39,6 +42,8 @@ add_file minimig-aga/agnus_copper.v
 add_file minimig-aga/agnus_spritedma.v
 add_file minimig-aga/denise.v
 add_file minimig-aga/denise_bitplane_shifter.v
+add_file minimig-aga/bitplane_ram.v
+add_file minimig-aga/sprite_ram.v
 add_file minimig-aga/denise_collision.v
 add_file minimig-aga/denise_colortable.v
 add_file minimig-aga/denise_playfields.v
@@ -82,6 +87,7 @@ add_file misc/flash_dspi.v
 add_file tang/nano20k/gowin_dpb/sector_dpram.v
 add_file tang/nano20k/gowin_dpb/ide_dpram.v
 add_file misc/sdram.sv
+add_file misc/rst_sync.v
 add_file tang/nano20k/nanomig.cst
 add_file tang/nano20k/nanomig_020.sdc
 add_file fx68k/microrom.mem
@@ -104,4 +110,5 @@ set_option -multi_boot 0
 set_option -mspi_jump 0
 set_option -loading_rate 25.000
 
+set_option -place_option 1
 run all

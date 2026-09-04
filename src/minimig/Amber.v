@@ -199,11 +199,20 @@ end
 //scanlines effect
 `ifdef SCANLINES 
 always @(posedge clk28m)
-	if (dblscan && scanline_ena && scanline[1])
+	if (dblscan && scanline_ena && scanline == 2'b10)       // Black, every second line is black
 		{red_out,green_out,blue_out} <= 12'h000;
-	else if (dblscan && scanline_ena && scanline[0])
+	else if (dblscan && scanline_ena && scanline == 2'b01)  // Dim, every second line is darker
 		{red_out,green_out,blue_out} <= {1'b0,t_red[3:1],1'b0,t_green[3:1],1'b0,t_blue[3:1]};
-	else
+	else if (dblscan && scanline == 2'b11) begin            // Balanced, see https://www.buffee.ca/scanlines/
+	   if(scanline_ena)
+	     {red_out,green_out,blue_out} <= { {   t_red[2:0], 1'b1 } & {4{  t_red[3]}},
+					       { t_green[2:0], 1'b1 } & {4{t_green[3]}},
+					       {  t_blue[2:0], 1'b1 } & {4{ t_blue[3]}} };	   
+	   else
+	     {red_out,green_out,blue_out} <= { {   t_red[2:0], 1'b0 } | {4{  t_red[3]}},
+					       { t_green[2:0], 1'b0 } | {4{t_green[3]}},
+					       {  t_blue[2:0], 1'b0 } | {4{ t_blue[3]}} }; 
+	end else
 		{red_out,green_out,blue_out} <= {t_red,t_green,t_blue};
 `else
 always @(t_red or t_green or t_blue)

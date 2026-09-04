@@ -38,6 +38,13 @@
   <menu label="NanoMig">
     <fileselector label="Floppy DF0:" ext="adf" index="0"/>
     <menu label="System">
+        <!--IS mistle_gw5a_25 -->
+	<list label="CPU:" id="T" default="2" action="reset">
+	  <listentry label="68000" value="0"/>
+	  <listentry label="68010" value="1"/>
+	  <listentry label="68020" value="2"/>
+	</list>
+	<!--END-->
 	<!--IS tang_nano20k_020 -->
 	<list label="CPU:" id="T" default="2" action="reset">
 	<listentry label="68000" value="0"/>
@@ -49,6 +56,9 @@
 	<listentry label="OCS-A500" value="0"/>
 	<listentry label="OCS-A1000" value="1"/>
 	<listentry label="ECS" value="2"/>
+	<!--IS mistle_gw5a_25 tang_nano20k_020 -->
+	<listentry label="AGA" value="3"/>
+	<!--END-->
       </list>
       <list label="Chipmem:" id="Y" default="0" action="reset">
 	<listentry label="512kB" value="0"/>
@@ -71,6 +81,16 @@
 	<listentry label="8MB" value="3"/>
 	<!--END-->
       </list>	
+      <list label="Turbo:" id="Z" default="3">
+    <listentry label="None" value="0"/>
+    <listentry label="Chip" value="1"/>
+    <listentry label="Kick" value="2"/>
+    <listentry label="Both" value="3"/>
+      </list>
+      <list label="Turbo data:" id="U" default="0">
+    <listentry label="Disabled" value="0"/>
+    <listentry label="Enabled" value="1"/>
+      </list>
       <list label="Video:" id="V" default="0">
 	<listentry label="PAL" value="0"/>
 	<listentry label="NTSC" value="1"/>
@@ -123,6 +143,7 @@
 		<listentry label="None" value="0"/>
 		<listentry label="Dim" value="1"/>
 		<listentry label="Black" value="2"/>
+		<listentry label="Balanced" value="3"/>
      </list>
      <list label="Filter:" id="F" default="0">
 		<listentry label="None" value="0"/>

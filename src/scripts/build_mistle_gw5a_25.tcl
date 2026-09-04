@@ -4,16 +4,20 @@ source scripts/update_xml.tcl
 
 set_device GW5A-LV25LQ144C1/I0 -name GW5A-25A
 
+add_file mistle/gw5a_25/top.sv
 add_file nanomig.v
 add_file minimig-aga/amiga_clk.v
 add_file minimig-aga/cpu_wrapper.v
-add_file minimig-aga/minimig.v 
+add_file minimig-aga/cpu_cache_new.v
+add_file minimig-aga/dpram.v	
+add_file minimig-aga/dpram_be_1024x16.v
+add_file minimig-aga/minimig.v
 add_file minimig-aga/ciaa.v
 add_file minimig-aga/ciab.v
 add_file minimig-aga/cia_int.v
 add_file minimig-aga/cia_timera.v
 add_file minimig-aga/cia_timerb.v
-add_file minimig-aga/cia_timerd.v 
+add_file minimig-aga/cia_timerd.v
 add_file minimig-aga/paula.v
 add_file minimig-aga/paula_uart.v
 add_file minimig-aga/paula_audio_channel.v
@@ -47,6 +51,8 @@ add_file minimig-aga/denise_hamgenerator.v
 add_file minimig-aga/denise_spritepriority.v
 add_file minimig-aga/denise_sprites.v
 add_file minimig-aga/denise_colortable_ram_mf.v
+add_file minimig-aga/sprite_ram.v
+add_file minimig-aga/bitplane_ram.v
 add_file minimig-aga/gary.v
 add_file minimig-aga/gayle.v
 add_file minimig-aga/ide.v
@@ -85,11 +91,13 @@ add_file tang/primer25k/gowin_pll/pll_142m_mod.v
 add_file tang/primer25k/gowin_pll/pll_init.v
 add_file tang/primer25k/gowin_dpb/sector_dpram.v
 add_file tang/primer25k/gowin_dpb/ide_dpram.v
+#add_file tang/primer25k/gowin_dp/sprite_ram.v
+#add_file tang/primer25k/gowin_dp/bitplane_ram.v
 add_file misc/ws2812.v
-add_file mistle/gw5a_25/top.sv
 add_file misc/sdram.sv
-add_file mistle/gw3a_20/nanomig.cst
-add_file mistle/gw3a_20/nanomig.sdc
+add_file misc/rst_sync.v
+add_file mistle/gw5a_25/nanomig.cst
+add_file mistle/gw5a_25/nanomig.sdc
 add_file fx68k/microrom.mem
 add_file fx68k/nanorom.mem
 add_file tg68k/TG68K_Pack.vhd
@@ -104,15 +112,11 @@ set_option -verilog_std sysv2017
 set_option -top_module top
 set_option -use_mspi_as_gpio 1
 set_option -use_sspi_as_gpio 1
-set_option -use_done_as_gpio 1
 set_option -use_cpu_as_gpio 1
-set_option -use_i2c_as_gpio 1
-set_option -use_ready_as_gpio 1
-set_option -use_jtag_as_gpio 1
 set_option -cst_warn_to_error 1
 set_option -multi_boot 0
 set_option -mspi_jump 0
-set_option -bit_compress 1
 set_option -loading_rate 70.000
+set_option -place_option 1
 
 run all

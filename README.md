@@ -11,11 +11,12 @@ This is still a work in progress. The current version is based on the [MiSTer Mi
 Current state:
 
   * Minimig based on [MiSTer Minimig AGA](https://github.com/MiSTer-devel/Minimig-AGA_MiSTer)
-  * Amiga 500 and Amiga 1000 modes
+  * Amiga 500, 1000 and Amiga 1200 modes
   * Kick ROM stored in flash ROM
-  * Up to 2MB chip, 4MB fast and 1.5MB slow RAM
-  * Accelerated 68020 support (in the works)
-  * OCS and ECS chipset (no AGA on TN20K!)
+  * 2MB chip, 4MB fast and 1.5MB slow RAM on Tang Nano
+  * 2MB chip, 28MB fast and 1.5MB slow RAM on ICEPI-ZERO
+  * Accelerated 68020 support + CPU cache
+  * OCS, ECS, AGA chipset 
   * ROM loader (Kickstart 1.3 / 3.1 / 3.2 / DiagRom)
   * Up to four virtual floppy drives
   * Floppy disk write support
@@ -23,30 +24,28 @@ Current state:
   * Keyboard and mouse via USB
   * Joysticks via USB or DB9 ports 
   * Up to two virtual IDE hard disks, read and write support
-  * Runs on [Tang Nano 20k](https://wiki.sipeed.com/hardware/en/tang/tang-nano-20k/nano-20k.html), [Primer 25K](https://wiki.sipeed.com/hardware/en/tang/tang-primer-25k/primer-25k.html), [Mega 138K Pro](https://wiki.sipeed.com/hardware/en/tang/tang-mega-138k/mega-138k-pro.html) and [Tang Console with Mega 60k / 138k module](https://wiki.sipeed.com/hardware/en/tang/tang-console/mega-console.html)
+  * Runs on [Tang Nano 20k](https://wiki.sipeed.com/hardware/en/tang/tang-nano-20k/nano-20k.html), [Primer 25K](https://wiki.sipeed.com/hardware/en/tang/tang-primer-25k/primer-25k.html), [Mega 138K Pro](https://wiki.sipeed.com/hardware/en/tang/tang-mega-138k/mega-138k-pro.html) and [Tang Console with Mega 60k / 138k module],(https://wiki.sipeed.com/hardware/en/tang/tang-console/mega-console.html), ICEPI-ZERO (25K) and ICEPI-ZERO XL (45K)
   * [Fully simulated](sim)
 
 Planned features:
 
-  * AGA support (is planned for the Arora III FPGA series e.g. GW3A-20)
   * Drive Sounds for FDD & HDD (hardware addon / buzzer)
-
-Outlook:
-
-  * RTG implementation
+  * RTG - Retargetable Graphics
+  * Toccata - Sound Card
   * WIFI support
-  * Flickerfixer
 
 ## Videos
 
 These youtube shorts mainly document the progress:
 
+  * [NanoMig #14: Pinball Fantasies AGA with NanoMig on IcePi-Zero](https://youtube.com/shorts/jC65ZZHPN4U)
+  * [NanoMig #13: Custom Gowin GW5A-25 board running Amiga sysinfo](https://youtube.com/shorts/j_aBcW0Sc64)
   * [NanoMig #12: Changing kickstart via menu](https://youtube.com/shorts/6RkL1LHsOUQ)
-  * [NanoMig #11: Tiny FPGA, big screen](https://youtube.com/shorts/DdKW_RedTvs)
-  * [NanoMig #10: World of Commodore Amiga Demo on Tang Primer 25k](https://youtube.com/shorts/XdLlrg1wgko)
 
 <details><summary>More ...</summary>
 <ul>
+  <li><a href="https://youtube.com/shorts/DdKW_RedTvs">NanoMig #11: Tiny FPGA, big screen</a></li>
+  <li><a href="https://youtube.com/shorts/XdLlrg1wgko">NanoMig #10: World of Commodore Amiga Demo on Tang Primer 25k</a></li>
   <li><a href="https://youtube.com/shorts/NHFjJwGAOZ0">NanoMig #9: Amiga speedball 2 on Tang Mega 138k Pro</a></li>
   <li><a href="https://youtube.com/shorts/9LJ0tsSZb60">NanoMig #8: Booting from virtual Harddisk</a></li>
   <li><a href="https://youtube.com/shorts/vbYURdxtEAQ">NanoMig #7: Tiniest Amiga running Gods</a></li>
@@ -83,13 +82,29 @@ The necessary binaries can be found in the [project releases](https://github.com
   * Use ADF-Opus to create and modify ADF images under Windows [ADFOpus2025](https://github.com/chironb/ADFOpus2025)
 * With Disk Flashback you can mount ADF's & HDF's under Windows [Disk Flashback](https://robsmithdev.co.uk/diskflashback)
 
+## ICEPI-ZERO 
+Windows: Download and install OSS CAD SUITE ([download](https://github.com/YosysHQ/oss-cad-suite-build/releases)) and Zadig ([download](https://zadig.akeo.ie/))
+
+    Plug your FPGA board into your computer via USB.
+    Open Zadig.
+    Select Options -> List All Devices in Zadig.
+    Choose your FPGA cable or interface from the drop-down menu.
+    Change the target driver to WinUSB and click Replace Driver (or Install Driver). 
+
+1.) flash NanoMig to ICEPI  
+```openFPGALoader -c ft231X --pins=7:3:5:6 -f nanomig_impl.bit```  
+2.) flash Kickstart  
+```openFPGALoader -c ft231X --pins=7:3:5:6 -f -o 0x400000 kick31.rom```   
+3.) connect ICEPI & Carrier  
+4.) push button on Carrier and connect it via USB to your Computer to flash FPGA-Companion ([download](fpga_companion.uf2))
+
 ## Rigid Disk Block Info
 Please make sure to use RDB (Rigid Disk Block) images with a **Start Offset 0**.  
 If unallocated space is present before the RDB, the HDF image won't be recognized.
 
-
 ## Credits
-Many thanks to **Alastair M. Robinson** ([robinsonb5](https://github.com/robinsonb5)) for his contributions to the **NanoMig**, in particular **Fastram** and **68020** cpu! 
+Many thanks to **Alastair M. Robinson** ([robinsonb5](https://github.com/robinsonb5)) for his contributions to the **NanoMig**, in particular **Fastram** and **68020** cpu!
+Many thanks to **Mateusz Nalewajski** ([m1nl](https://github.com/m1nl)) and **djnice** ([djnice](https://github.com/djnice)) for the implementation of the **AGA chipset** with Embedded Block Ram and many more contributions!
 
 ## Build setting (Tang Nano 20K only!)
 The core needs to be able to react on bl616 jtagsel Signal (all boards except tn20k).  
@@ -106,7 +121,7 @@ Only for the TN20K: **Use JTAG as regular IO** must be unselected in Gowin EDA C
 | 0 | POWER         | x     | x     | x   |x         |x|
 | 1 | F.DISK        | x     | x     | x   |x         |x|
 | 2 | H.DISK        | x     | -     |   - |x         |-|
-| 3 | ???           | x     | -     |   - |x         |-|
+| 3 | KICK READY    | x     | -     |   - |x         |-|
 | 4 | SD-READ       | x     | -     |   - |x         |-|
 | 5 | SD-WRITE      | x     | -     |   - |x         |-|
 

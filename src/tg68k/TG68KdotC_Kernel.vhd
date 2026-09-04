@@ -147,7 +147,7 @@ architecture logic of TG68KdotC_Kernel is
 
 	signal use_VBR_Stackframe	: std_logic;
 
-	signal syncReset			: std_logic_vector(3 downto 0);
+	signal syncReset			: std_logic_vector(3 downto 0) := "0000";
 	signal Reset				: std_logic;
 	signal clkena_lw			: std_logic;
 	signal TG68_PC				: std_logic_vector(31 downto 0);
@@ -441,7 +441,8 @@ ALU: TG68K_ALU
 	nWr <= '0' WHEN state="11" ELSE '1';
 	busstate <= state;
 	nResetOut <= '0' WHEN exec(opcRESET)='1' ELSE '1';
-	
+	Reset <= NOT syncReset(3);
+
 	-- does shift for byte access. note active low me
 	-- should produce address error on 68000
 	memmaskmux <= memmask when addr(0) = '1' else memmask(4 downto 0) & '1';
@@ -449,17 +450,13 @@ ALU: TG68K_ALU
 	nLDS <= memmaskmux(4);
 	clkena_lw <= '1' WHEN clkena_in='1' AND memmaskmux(3)='1' ELSE '0';
 	clr_berr <= '1' WHEN setopcode='1' AND trap_berr='1' ELSE '0';
-	
+
 	PROCESS (clk, nReset)
 	BEGIN
 		IF nReset='0' THEN
 			syncReset <= "0000";
-			Reset <= '1'; 
 	  	ELSIF rising_edge(clk) THEN
-			IF clkena_in='1' THEN
-				syncReset <= syncReset(2 downto 0)&'1';
-				Reset <= NOT syncReset(3);	
-			END IF;
+			syncReset <= syncReset(2 downto 0)&'1';
 		END IF;
 		IF rising_edge(clk) THEN
 			IF VBR_Stackframe=1 or (cpu(0)='1' and VBR_Stackframe=2) THEN
@@ -2089,9 +2086,9 @@ PROCESS (clk, cpu, OP1out, OP2out, opcode, exe_condition, nextpass, micro_state,
 									ea_build_now <= '1';
 									write_back <='1';
 									set_exec(opcAND) <= '1';
-								IF cpu(0)='1' AND state="10" AND addrvalue='0' THEN
-									skipFetch <= '1';
-								END IF;
+									IF cpu(0)='1' AND state="10" AND addrvalue='0' THEN
+										skipFetch <= '1';
+									END IF;
 									IF setexecOPC='1' THEN
 										set(OP1out_zero) <= '1';
 									END IF;
@@ -3447,7 +3444,9 @@ PROCESS (clk, cpu, OP1out, OP2out, opcode, exe_condition, nextpass, micro_state,
 					IF exe_condition='1' THEN
 						TG68_PC_brw <= '1';	--pc+0000
 						next_micro_state <= nop;
-						skipFetch <= '1';	
+						if long_start='0' then
+							skipFetch <= '1'; -- AMR/GS - can't skip fetch for bra.l
+						end if;
 					END IF;
 					
 				WHEN bsr1 =>		--bsr short
@@ -3457,8 +3456,8 @@ PROCESS (clk, cpu, OP1out, OP2out, opcode, exe_condition, nextpass, micro_state,
 				WHEN bsr2 =>		--bsr
 					IF long_start='0' THEN	
 						TG68_PC_brw <= '1';	
+						skipFetch <= '1';	-- AMR - can't skip fetch for bsr.l
 					END IF;
-					skipFetch <= '1';	
 					set(longaktion) <= '1';
 					writePC <= '1';
 					setstate <= "11";

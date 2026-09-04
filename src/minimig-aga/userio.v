@@ -85,8 +85,12 @@ wire         _mright;       // right mouse buttons
 reg           joy1enable;   // joystick 1 enable (mouse/joy switch)
 wire         test_load;     // load test value to mouse counter
 wire  [15:0] test_data;     // mouse counter test value
-reg          cd32pad;
-reg          joy_swap;
+
+// these have been configurable historically. They are currently disabled but may
+// become used, again
+wire         cd32pad = 1'b0;
+wire         joy_swap = 1'b0;
+wire         joy_ana_en = 1'b0;
 
 //--------------------------------------------------------------------------------------
 //--------------------------------------------------------------------------------------
@@ -100,7 +104,6 @@ always @ (posedge clk) begin
 	end
 end
 
-reg        joy_ana_en;
 reg [15:0] ajoy1,ajoy2;
 
 always @(posedge clk) begin
@@ -115,6 +118,8 @@ reg   [7:0] pot1y;
 
 // POT[0/1]DAT registers
 reg [3:0] potcnt;
+
+reg  [4-1:0] potcap;
 
 // button on the pot pins
 always @ (posedge clk) begin
@@ -148,8 +153,10 @@ end
 wire joy2_pin5 = ~(potreg[13] & ~potreg[12]);
 wire joy1_pin5 = ~(potreg[9]  & ~potreg[8]);
 
+reg [8-1:0] cd32pad1_reg;
+reg [8-1:0] cd32pad2_reg;
+
 // potcap reg
-reg  [4-1:0] potcap;
 always @ (posedge clk) begin
 	if (reset)
 		potcap <= 0;
@@ -179,7 +186,6 @@ end
 
 wire cd32pad1_reg_load  = joy1_pin5;
 wire cd32pad1_reg_shift = _fire0_dat && !fire1_d;
-reg [8-1:0] cd32pad1_reg;
 always @ (posedge clk) begin
 	if (reset)                   cd32pad1_reg <= 8'hff;
 	else if (cd32pad1_reg_load)  cd32pad1_reg <= {_djoy1[5], _djoy1[4], _djoy1[6], _djoy1[7], _djoy1[8], _djoy1[9], _djoy1[10], 1'b1};
@@ -195,7 +201,6 @@ end
 
 wire cd32pad2_reg_load  = joy2_pin5;
 wire cd32pad2_reg_shift = _fire1_dat && !fire2_d;
-reg [8-1:0] cd32pad2_reg;
 always @ (posedge clk) begin
 	if (reset)                   cd32pad2_reg <= 8'hff;
 	else if (cd32pad2_reg_load)  cd32pad2_reg <= {_djoy2[5], _djoy2[4], _djoy2[6], _djoy2[7], _djoy2[8], _djoy2[9], _djoy2[10], 1'b1};
@@ -278,6 +283,8 @@ end
 //--------------------------------------------------------------------------------------
 //--------------------------------------------------------------------------------------
 
+reg  [ 7:0] mouse0scr;
+
 // data output multiplexer
 always @(*) begin
 	if ((reg_address_in[8:1]==JOY0DAT[8:1]) && joy1enable)//read port 1 joystick
@@ -318,7 +325,6 @@ assign test_data = data_in[15:0];
 //// mouse ////
 reg  [ 7:0] xcount;
 reg  [ 7:0] ycount;
-reg  [ 7:0] mouse0scr;
 
 // mouse counters
 always @(posedge clk) begin

@@ -7,7 +7,6 @@
 // -> run cpu on unused hpos[0] == 1 for turbo
 // TODO:
 // - check IDE head adressing heads[0] vs heads[drive]
-
 module nanomig (
    input	 clk_sys,
    input	 reset,
@@ -35,9 +34,10 @@ module nanomig (
    input [5:0]	 chipset_config,
    input [3:0]	 floppy_config,
    input [3:0]	 video_config,
+   input [2:0]  turbo_config,
 `ifndef DISABLE_IDE
    input [5:0]	 ide_config,
-   output	 	 hdd_led,
+   output	 hdd_led,
 `endif
 		
    output [14:0] audio_left, // left DAC data
@@ -54,7 +54,12 @@ module nanomig (
    // UART/RS232 for e.g. DiagROM or MIDI
    output	 uart_tx,
    input	 uart_rx,
-		 
+
+`ifdef ENABLE_RTC
+   // RTC time information as e.g. received via NTP
+   input [11:0]	 rtc,
+`endif
+
    // Interface MiSTeryNano sd card interface. This very simple connection allows the core
    // to request sectors from within a OSD selected image file
    input [7:0]	 sdc_img_mounted,
@@ -80,27 +85,24 @@ module nanomig (
    output	 _ram_we, // sram write enable
    output	 _ram_oe, // sram output enable
 
-   output reg	 fastram_sel,
-   output [22:1] fastram_addr,
+   output 	 fastram_sel,
+   output [23:1] fastram_addr,
    output	 fastram_lds,
    output	 fastram_uds,
    input [15:0]	 fastram_dout,
+   input [47:0]	 fastram_dout48, // upper 48 bits of a 64 bit aligned read (cache line fill)
    output [15:0] fastram_din,
    output	 fastram_wr,
    input	 fastram_ready
 ); 
-`ifndef LATTICE
+`ifndef GATEMATE
+ `ifndef LATTICE
   `default_nettype none
+ `endif
 `endif
    
 wire cpu_rst;
 wire [15:0] ram_din;
-wire uart_cts;
-wire uart_rts;
-wire uart_dsr;
-wire uart_dtr;
-wire field1;
-wire lace;
 
 reg reset_d;
 always @(posedge clk_sys, posedge reset) begin
@@ -135,25 +137,49 @@ amiga_clk amiga_clk
         .reset_n  ( ~por       )
 );
 
-// TODO: cpu_ph1 and cpu_ph2 are derived from a 114Mhz clock in original
+// cpu_ph1 and cpu_ph2 are derived from a 114Mhz clock in original
 // minimig aga. Current setting is taken from simulation:
 // cpu_ph1 is valid before clk7_en and cpu_ph2 is after clk7_en
 // so order is: cpu_ph1, clk7_en, cpu_ph2, clk7n_en
-reg  cpu_ph1, cpu_ph2;
+reg cpu_ph1, cpu_ph2, cpu_sync;
+
+// == Timing model
+//
+// signal   | cycle
+// -------------------
+// c1       | 1 1 0 0
+// c3       | 0 1 1 0
+// -------------------
+// clk7_en  | 1 0 0 0
+// clk7n_en | 0 0 1 0
+// cpu_ph1  | 0 0 0 1
+// cpu_ph2  | 0 1 0 0
+// -------------------
+//             ^
+//             |--- SDRAM cycle starts somewhere in the middle
+//
+
+// set cpu_sync to 1 on ph2 to
+// ensure the cycle starts with ph1
 always @(posedge clk_sys) begin
+   if (~cpu_rst)
+      cpu_sync <= 1'b0;
+   else if (c1 && c3)
+      cpu_sync <= 1'b1;
+end
+
+always @(*) begin
    if (~cpu_rst) begin
-      cpu_ph1 <= 1'b0;
-      cpu_ph2 <= 1'b0;
-   end else begin 
-//      cpu_ph1 <= !c1 &&  c3;  // on negedge clk_sys
-//      cpu_ph2 <=  c1 && !c3;  // -"-
-      cpu_ph1 <=   c1 &&  c3;
-      cpu_ph2 <=  !c1 && !c3;
+      cpu_ph1 = 1'b0;
+      cpu_ph2 = 1'b0;
+   end else begin
+      cpu_ph1 = !c1 && !c3 && cpu_sync;
+      cpu_ph2 =  c1 &&  c3 && cpu_sync;
    end
 end
 
 wire  [1:0] cpu_state;
-// wire        cpu_nrst_out;
+wire        cpu_clkena;
 wire  [3:0] cpu_cacr;
 wire [31:0] cpu_nmi_addr;
 
@@ -169,12 +195,12 @@ wire [23:1] chip_addr;
 
 wire	    ovl;
    
-wire [1:0] cpucfg = (cpu_config == 2'd2) ? 2'b11 : cpu_config; //CPU-Type: 00 = 68000, 01 = 68010, 11 = 68020
+wire [1:0] cpucfg = cpu_config; // CPU-Type: 00 = 68000, 01 = 68010, 11 = 68020
+wire [1:0] chipram_config = memory_config[1:0];
+wire [1:0] slowram_config = memory_config[3:2];
 
-// cache bits: dcache, kick, chip
-// wire [2:0] cachecfg = { 1'b0, ~ovl, 1'b0 };
-wire [2:0] cachecfg = 3'b000;  // no turbo chip and kick, no caches   
-// wire [2:0] cachecfg = 3'b010;  // permanent turbo kick
+// cache bits: data, kick, chip
+wire [2:0] turbocfg = turbo_config & { 1'b1, 1'b1, ~ovl };  // turbo data, turbo kick, turbo chip when no overlay
 
 wire	   pwr_led_bright;
 
@@ -205,44 +231,35 @@ wire	    ram_lds;
 wire	    ram_uds;
    
 // ram_ready finally is the clkena for the tg68k
-reg	    ram_ready;
+`ifdef ENABLE_CACHE
+// ram_ready follows the cache acknowledge level directly instead of being
+// re-registered: cache_cs drops in the same cycle (see cache_cs below), which
+// makes the cache clear its ack, so this stays a single cycle pulse but
+// arrives one clock earlier - on every single cpu memory access.
+reg         ram_write_ready;   // write accepted into the write buffer
+wire        ram_ready = cache_ack | ram_write_ready;
+`else
+// cpu_ph1 is just before clk7_en, so this is
+// the very last moment we can receive ACK from SDRAM;
+// if it didn't happen then it means our request
+// didn't go through and we need to retry in the next cycle
+wire ram_ready = cpu_ph1 && (fastram_ready != fastram_ready_d);
+`endif
 
-// generate a ram_cs at the begin of the bus cycle, so the ram cycle starts
-// at the right time
-wire	    ram_cs = (cpu_ph2 && ram_sel) || ram_cs_trigger || ram_cs_triggerD; 
+`ifndef ENABLE_CACHE
+reg fastram_ready_d;
 
-reg	    ram_cs_trigger;   
-always @(negedge clk_sys)
-   if( cpu_ph2 )      ram_cs_trigger <= ram_sel;
-   else if( clk7_en ) ram_cs_trigger <= 1'b0;   
+// avoid selecting fastram when we didn't handle
+// ready signal yet (shouldn't happen but just
+// in case, it's better to keep it)
+assign fastram_sel = ram_sel && (fastram_ready == fastram_ready_d);
 
-reg	    ram_cs_triggerD;
-always @(posedge clk_sys)
-  ram_cs_triggerD <= ram_cs_trigger;   
-   
-// neg/clk7
-    `ifdef ENABLE_TG68K  
-        reg frr_d=1'b0;
-        always @(posedge clk_sys) begin
-        ram_ready<=1'b0;
-        if(clk7_en) begin
-            if(fastram_ready!=frr_d)
-                ram_ready<=1'b1;
-            frr_d <= fastram_ready;
-        end
-	`else
-		reg frr_d=1'b0;
-        always @(posedge clk_sys) begin
-        if(!cpu_rst)
-            ram_ready<=1'b0;
-        else if(!ram_sel)
-            ram_ready<=1'b0;
-        else if(fastram_ready!=frr_d)
-            ram_ready<=1'b1;
-        frr_d <= fastram_ready;	
-    `endif
+always @(posedge clk_sys) begin
+  if (!cpu_rst || cpu_ph1)
+    fastram_ready_d <= fastram_ready;
 end
-   
+`endif
+
 cpu_wrapper cpu_wrapper
 (
 	.reset        (cpu_rst         ),
@@ -262,6 +279,7 @@ cpu_wrapper cpu_wrapper
 	.chip_dtack   (chip_dtack      ),
 	.chip_ipl     (chip_ipl        ),
 
+ `ifdef FASTCHIP_DEPRECATED
 	.fastchip_dout   (  ),
 	.fastchip_sel    (  ),
 	.fastchip_lds    (  ),
@@ -270,13 +288,16 @@ cpu_wrapper cpu_wrapper
 	.fastchip_selack (  ),
 	.fastchip_ready  ( 1'b0 ),
 	.fastchip_lw     (  ),
-
+`endif
+ 
 	.cpucfg       (cpucfg          ),
-	.cachecfg     (cachecfg        ),
+	.turbocfg     (turbocfg        ),
 	.fastramcfg   (fastram_config  ),
+	.chipramcfg   (chipram_config  ),
+	.slowramcfg   (slowram_config  ),
 	.bootrom      (1'b0            ),
 
-	.ramsel       (ram_sel         ),
+	.ramreq       (ram_sel         ),
 	.ramaddr      (ram_addr        ),
 	.ramlds       (ram_lds         ),
 	.ramuds       (ram_uds         ),
@@ -287,39 +308,263 @@ cpu_wrapper cpu_wrapper
 
 	//custom CPU signals
 	.cpustate     (cpu_state       ),
+	.cpu_clkena   (cpu_clkena      ),
 	.cacr         (cpu_cacr        ),
 	.nmi_addr     (cpu_nmi_addr    )
 );
    
-`ifdef ENABLE_TG68K
-	reg ram_sel_d;
-	reg ram_ready_d;
-	always @(posedge clk_sys) begin
-		ram_ready_d <= ram_ready;
-	if( clk7n_en) begin
-			if(ram_sel && !ram_ready_d)
-				fastram_sel <= 1'b1;
-		end
-	if( fastram_ready != frr_d ) fastram_sel <= 1'b0;   
-	end
-`else
-	reg ram_sel_d;
-	always @(posedge clk_sys) begin
-	if( cpu_ph2) begin
-			if(!ram_sel_d)
-				fastram_sel <= ram_sel;
-			ram_sel_d <= ram_sel;
-		end
-	if( fastram_ready != frr_d ) fastram_sel <= 1'b0;   
-	end			
-`endif	
+`ifdef ENABLE_CACHE
+// ----------------------- cpu cache (MiSTer cpu_cache_new) -----------------------
+// The cache sits between the cpu's direct ram path and the sdram. Reads are
+// served from the cache on a hit, a miss fetches a full 64 bit line from the
+// sdram (critical word first). Writes are write-through with a one entry
+// write buffer, the cpu is acknowledged as soon as the cache accepted the
+// write. All chip bus writes (cpu or dma) are snooped to keep cached
+// chip ram / kickstart data coherent.
+// A chip bus write updates memory behind the cache's back (blitter, copper,
+// disk dma or - with the data cache disabled - the cpu itself). Pulse the
+// snoop port at the start of every such write; address and data stay valid
+// for the whole 7MHz bus cycle, which covers the three clk_sys cycles the
+// snoop state machine needs to look up and update the cached copy.
+`ifdef CHIPRAM_CACHE
+// Chip bus writes have to reach the cache or freshly loaded code keeps
+// executing from stale cache lines. Two problems have to be solved:
+//   - the write strobe is only asserted for about two of the four clocks of a
+//     7MHz bus cycle, while the cache samples the snoop address and data three
+//     clocks after being told about the write, so the live bus signals would
+//     hand it the following access instead,
+//   - the cache needs three clocks per snoop while the chip bus can deliver a
+//     write every four, so a write arriving while the snoop machine is still
+//     busy would be dropped silently.
+// Writes are therefore queued and handed over at a fixed one-per-four-clocks
+// pace, with address, data and byte selects held stable until the cache has
+// consumed them.
+reg         ram_we_n_d;
+reg  [22:1] snoop_adr_r;
+reg  [15:0] snoop_dat_r;
+reg  [1:0]  snoop_bs_r;
+reg         snoop_act;
 
-assign fastram_addr = ram_addr;
-assign fastram_lds = ram_lds;
-assign fastram_uds = ram_uds;
-assign ram_dout = fastram_dout;
-assign fastram_din = ram_din;
-assign fastram_wr = (cpu_state[1:0]==2'b11) ? 1'b1 : 1'b0;
+// two entries are enough: the chip bus delivers a write at most every four
+// clocks and one is handed over every four, so the queue only has to absorb
+// the case where a write arrives while the previous one is still being passed
+reg  [22:1] sq_adr [0:1];
+reg  [15:0] sq_dat [0:1];
+reg  [1:0]  sq_bs  [0:1];
+reg  [1:0]  sq_wr, sq_rd;
+reg  [1:0]  sq_pace;
+wire        sq_empty = (sq_wr == sq_rd);
+wire        sq_full  = ((sq_wr - sq_rd) == 2'd2);
+wire        sq_push  = ram_we_n_d && !_ram_we;
+
+always @(posedge clk_sys) begin
+  ram_we_n_d <= _ram_we;
+  snoop_act  <= 1'b0;
+
+  if(sq_push && !sq_full) begin
+    sq_adr[sq_wr[0]] <= ram_address[22:1];
+    sq_dat[sq_wr[0]] <= ram_data;
+    sq_bs [sq_wr[0]] <= {~_ram_bhe, ~_ram_ble};
+    sq_wr              <= sq_wr + 2'd1;
+  end
+
+  if(sq_pace != 2'd0)
+    sq_pace <= sq_pace - 2'd1;
+  else if(!sq_empty) begin
+    snoop_adr_r <= sq_adr[sq_rd[0]];
+    snoop_dat_r <= sq_dat[sq_rd[0]];
+    snoop_bs_r  <= sq_bs [sq_rd[0]];
+    snoop_act   <= 1'b1;
+    sq_rd       <= sq_rd + 2'd1;
+    sq_pace     <= 2'd3;
+  end
+
+  if(!cpu_rst) begin
+    sq_wr   <= 2'd0;
+    sq_rd   <= 2'd0;
+    sq_pace <= 2'd0;
+  end
+end
+
+`else
+wire        snoop_act   = 1'b0;   // nothing cached that the chip bus can modify
+wire [22:1] snoop_adr_r = 22'd0;
+wire [15:0] snoop_dat_r = 16'd0;
+wire [1:0]  snoop_bs_r  = 2'd0;
+`endif
+
+wire        cache_ack;
+wire        cache_wb_en;
+wire        cache_req;
+wire [15:0] cache_dat_r;
+// The TG68K starts its next bus cycle right after clkena without dropping
+// its request, but the cache needs to see its cpu_cs deasserted after every
+// acknowledged access. Blanking it during the ready cycle itself (instead of
+// the cycle after, as an extra register did) saves one clock on every single
+// cpu memory access - the same trick minimig uses on mister.
+wire        cache_cs = ram_sel & ~ram_ready;
+reg         cache_fill_ack;
+reg  [15:0] cache_fill_dat;
+
+`ifdef ENABLE_RAM32
+// We need to extend address width for devices with more than
+// 8MiB SDRAM to make 8MiB FastRAM work properly
+localparam CACHE_ADDR_WIDTH = 24;
+`else
+localparam CACHE_ADDR_WIDTH = 23;
+`endif
+
+cpu_cache_new #(
+  .ADDR_WIDTH(CACHE_ADDR_WIDTH)
+) cpu_cache (
+  .clk            (clk_sys),
+  .rst            (!cpu_rst),
+  .cpu_cache_ctrl (cpu_cacr),
+  .cache_inhibit  (1'b0),
+  .cpu_cs         (cache_cs),
+  .cpu_adr        (ram_addr[CACHE_ADDR_WIDTH-1:1]),
+  .cpu_bs         ({~ram_uds, ~ram_lds}),
+  .cpu_we         (cpu_state == 2'd3),
+  .cpu_ir         (cpu_state == 2'd0),
+  .cpu_dr         (cpu_state == 2'd2),
+  .cpu_dat_w      (ram_din),
+  .cpu_dat_r      (cache_dat_r),
+  .cpu_ack        (cache_ack),
+  .wb_en          (cache_wb_en),
+  .sdr_dat_r      (cache_fill_dat),
+  .sdr_read_req   (cache_req),
+  .sdr_read_ack   (cache_fill_ack),
+  .snoop_act      (snoop_act),
+  .snoop_adr      ({{(CACHE_ADDR_WIDTH-23){1'b0}}, snoop_adr_r}),
+  .snoop_dat_w    (snoop_dat_r),
+  .snoop_bs       (snoop_bs_r)
+);
+
+// line fill / write buffer sequencer driving the sdram's second port
+reg  [1:0]  fill_state;     // 0 idle, 1 line read issued, 2 delivering words
+reg  [63:0] fill_line;      // w0..w3 of the aligned 64 bit line
+reg  [1:0]  fill_idx;       // requested (critical) word index
+reg  [1:0]  fill_cnt;
+reg         wbuf_pending;   // a write is in flight on the sdram port
+reg         write_acked;
+reg         wb_req;         // latched pending cache write
+reg         wb_en_d;        // wb_en edge detect
+reg         wr_lock;        // ack delivered, waiting for the cpu to consume it    // current cpu write has been acknowledged
+reg         cache_ack_d;
+reg         fastram_done_d;
+reg         fastram_sel_r;
+reg         fastram_wr_r;
+reg  [CACHE_ADDR_WIDTH-1:1] fastram_addr_r;
+reg  [15:0] fastram_din_r;
+reg         fastram_lds_r;
+reg         fastram_uds_r;
+reg         fastram_ready_d;  // previous state of the port 2 ack toggle
+wire        fastram_done = (fastram_ready != fastram_ready_d);
+wire [1:0]  fill_word = fill_idx + fill_cnt;
+
+always @(posedge clk_sys) begin
+  fastram_ready_d <= fastram_ready;
+  cache_fill_ack  <= 1'b0;
+  ram_write_ready <= 1'b0;
+  cache_ack_d     <= cache_ack;
+
+  if(!cpu_rst) begin
+    fill_state    <= 2'd0;
+    wbuf_pending  <= 1'b0;
+    ram_write_ready <= 1'b0;
+    wb_req        <= 1'b0;
+    wb_en_d       <= 1'b0;
+    wr_lock       <= 1'b0;
+    fastram_sel_r <= 1'b0;
+    fastram_wr_r  <= 1'b0;
+  end else begin
+    // sdram port transaction finished. The read data is sampled one cycle
+    // after the ack has been seen to give the clock domain crossing from
+    // the 85MHz sdram controller a full cycle of settling time.
+    fastram_done_d <= fastram_done;
+    if(fastram_done) begin
+      fastram_sel_r <= 1'b0;
+      wbuf_pending  <= 1'b0;
+    end
+    if(fastram_done_d && (fill_state == 2'd1)) begin
+      fill_line  <= { fastram_dout, fastram_dout48 };
+      fill_cnt   <= 2'd0;
+      fill_state <= 2'd2;
+    end
+
+    case(fill_state)
+      2'd0: if(cache_req && !wbuf_pending && !fastram_sel_r) begin
+              // fetch the aligned 64 bit line containing the requested word
+              fastram_addr_r <= { ram_addr[CACHE_ADDR_WIDTH-1:3], 2'b00 };
+              fill_idx       <= ram_addr[2:1];
+              fastram_wr_r   <= 1'b0;
+              fastram_lds_r  <= 1'b0;
+              fastram_uds_r  <= 1'b0;
+              fastram_sel_r  <= 1'b1;
+              fill_state     <= 2'd1;
+            end
+      2'd1: ;  // waiting for the sdram
+      2'd2: begin
+              // deliver the four words starting with the requested one
+              cache_fill_ack <= 1'b1;
+              case(fill_word)
+                2'd0: cache_fill_dat <= fill_line[63:48];
+                2'd1: cache_fill_dat <= fill_line[47:32];
+                2'd2: cache_fill_dat <= fill_line[31:16];
+                2'd3: cache_fill_dat <= fill_line[15: 0];
+              endcase
+              fill_cnt <= fill_cnt + 2'd1;
+              if(fill_cnt == 2'd3) fill_state <= 2'd0;
+            end
+      default: fill_state <= 2'd0;
+    endcase
+
+    // write buffer: the cache raises wb_en once per write (its fsm cycles
+    // through IDLE/WRITE/WB for every accepted cpu write), so the rising
+    // edge marks a new write even when the tg68k keeps ram_sel asserted
+    // between back to back bus cycles (e.g. the two halves of a move.l).
+    // The request is latched so it survives a busy sdram port or a still
+    // draining line fill.
+    wb_en_d <= cache_wb_en;
+    // wr_lock covers [accept .. consuming clkena]: while the (slowed) cpu
+    // still presents the already acknowledged write, the cache fsm may
+    // recycle through IDLE/WRITE and raise wb_en again; those stale edges
+    // must not produce a second acknowledge for the same bus cycle.
+    if(cpu_clkena)              wr_lock <= 1'b0;
+    if(cpu_state != 2'd3)       wb_req  <= 1'b0;   // stale request dies with the write cycle
+    if(cache_wb_en && !wb_en_d && !wr_lock) wb_req <= 1'b1;
+    if((wb_req || (cache_wb_en && !wb_en_d)) && (cpu_state == 2'd3) && !wr_lock &&
+       !wbuf_pending && !fastram_sel_r && (fill_state == 2'd0)) begin
+      fastram_addr_r <= ram_addr[CACHE_ADDR_WIDTH-1:1];
+      fastram_din_r  <= ram_din;
+      fastram_lds_r  <= ram_lds;
+      fastram_uds_r  <= ram_uds;
+      fastram_wr_r   <= 1'b1;
+      fastram_sel_r  <= 1'b1;
+      wbuf_pending   <= 1'b1;
+      wb_req         <= 1'b0;
+      wr_lock        <= 1'b1;
+      ram_write_ready<= 1'b1;
+    end
+
+  end
+end
+
+assign fastram_sel  = fastram_sel_r;
+assign fastram_addr = {{(24-CACHE_ADDR_WIDTH){1'b0}}, fastram_addr_r};
+assign fastram_lds  = fastram_lds_r;
+assign fastram_uds  = fastram_uds_r;
+assign fastram_din  = fastram_din_r;
+assign fastram_wr   = fastram_wr_r;
+assign ram_dout     = cache_dat_r;
+`else
+assign fastram_addr = ram_addr[23:1];
+assign fastram_lds  = ram_lds;
+assign fastram_uds  = ram_uds;
+assign ram_dout     = fastram_dout;
+assign fastram_din  = ram_din;
+assign fastram_wr   = (cpu_state[1:0]==2'b11) ? 1'b1 : 1'b0;
+`endif
 
 wire [7:0] sdc_byte_out_data_fdc;   
 wire [31:0] sdc_sector_fdc;  // from inside minimig/floppy
@@ -419,112 +664,131 @@ reg [31:0] total_sectors[DRIVES];
 // TODO:
 // - make sure we know which drive we are currently initializing
 // - use seperate state for both disks
-   
 always @(posedge clk_sys) begin
    integer drv;
 
    for(drv = 0; drv < DRIVES; drv = drv+1) begin
       if (sdc_img_mounted[4+drv]) begin
-	 if( !sdc_img_size ) begin
-	    // image has been removed
-	    if(sdc_img_mounted[4+drv]) ide_drv_state[drv] <= IDE_DRV_STATE_NONE;
-	 end else begin  
-	    // image has just been mounted. Examine it further
-	    // by reading first sector.
-	    if(sdc_img_mounted[4+drv] && (ide_drv_state[drv] == IDE_DRV_STATE_NONE)) begin
-	       $display("HDD%0d: Total sector size: %0d", drv, sdc_img_size[40:9]);	       
-	       total_sectors[drv] <= sdc_img_size[40:9];	 
-	       ide_drv_state[drv] <= IDE_DRV_STATE_MNT;
-	    end
-	 end
+         if( !sdc_img_size ) begin
+            // image has been removed
+            if(sdc_img_mounted[4+drv]) ide_drv_state[drv] <= IDE_DRV_STATE_NONE;
+         end else begin
+            // image has just been mounted. Examine it further
+            // by reading first sector.
+            if(sdc_img_mounted[4+drv] && (ide_drv_state[drv] == IDE_DRV_STATE_NONE)) begin
+               $display("HDD%0d: Total sector size: %0d", drv, sdc_img_size[40:9]);
+               total_sectors[drv] <= sdc_img_size[40:9];
+               ide_drv_state[drv] <= IDE_DRV_STATE_MNT;
+            end
+         end
       end
-   
+
       // check if drive is in state IDE_DRV_STATE_MNT and no sd read is in progress
       if(!ide_sdc_rd && !sdc_busy) begin
-	 if(ide_drv_state[drv] == IDE_DRV_STATE_MNT) begin
-	    ide_sdc_sector <= 32'd0;
-	    ide_sdc_rd[drv] <= 1'b1;
-	 end
+         if(ide_drv_state[drv] == IDE_DRV_STATE_MNT) begin
+            ide_sdc_sector <= 32'd0;
+            ide_sdc_rd[drv] <= 1'b1;
+         end
       end
 
       // check if amiga wants to read a sector
       if(!sdc_busy && !ide_sdc_rd && ide_exec == IDE_EXEC_READ_SECTOR ) begin
-	 // this really only works with HW multipliers in the FPGA
-	 ide_sdc_sector <= (ide_cylinder * heads[ide_drv] + ide_head) * sectors[ide_drv] +
-                  ide_sector - 1;
+         // this really only works with HW multipliers in the FPGA
+         ide_sdc_sector <= (ide_cylinder * heads[ide_drv] + ide_head) * sectors[ide_drv] +
+                     ide_sector - 1;
 
-	 // TODO: check why this message comes twice, the test for !ide_sdc_rd
-	 // should prevent that
-	 $display("IDE%0d RD %0d/%0d/%0d -> %0d", ide_drv, 
-		  ide_cylinder, ide_head, ide_sector, 
-		  (ide_cylinder * heads[0] + ide_head) * sectors[0] +
-		  ide_sector - 1);
-	 
-	 ide_sdc_rd[ide_drv] <= 1'b1;
+         // TODO: check why this message comes twice, the test for !ide_sdc_rd
+         // should prevent that
+         $display("IDE%0d RD %0d/%0d/%0d -> %0d", ide_drv,
+                  ide_cylinder, ide_head, ide_sector,
+                  (ide_cylinder * heads[0] + ide_head) * sectors[0] +
+                  ide_sector - 1);
+
+         ide_sdc_rd[ide_drv] <= 1'b1;
       end
 
       // check if amiga wants to write
       if (!sdc_busy && !ide_sdc_wr && ide_exec == IDE_EXEC_WRITE_SECTOR ) begin
-	 // this really only works with HW multipliers in the FPGA
-	 ide_sdc_sector <= (ide_cylinder * heads[ide_drv] + ide_head) * sectors[ide_drv] +
-                  ide_sector - 1;
-	 
-	 $display("IDE%0d WR %0d/%0d/%0d -> %0d", ide_drv, 
-		  ide_cylinder, ide_head, ide_sector, 
-		  (ide_cylinder * heads[0] + ide_head) * sectors[0] +
-		  ide_sector - 1);
-	 
-	 ide_sdc_wr[ide_drv] <= 1'b1;
+         // this really only works with HW multipliers in the FPGA
+         ide_sdc_sector <= (ide_cylinder * heads[ide_drv] + ide_head) * sectors[ide_drv] +
+                     ide_sector - 1;
+
+         $display("IDE%0d WR %0d/%0d/%0d -> %0d", ide_drv,
+                  ide_cylinder, ide_head, ide_sector,
+                  (ide_cylinder * heads[0] + ide_head) * sectors[0] +
+                  ide_sector - 1);
+
+         ide_sdc_wr[ide_drv] <= 1'b1;
       end
-      
+
       // sd card has accepted read request
       if ( ide_sdc_rd && sdc_busy ) begin
-	 ide_sdc_rd <= 2'b00;
+         ide_sdc_rd <= 2'b00;
 
-	 // parse rdb unless the amiga has requested this sector
-	 if( ide_exec != IDE_EXEC_READ_SECTOR )
-	    if( ide_sdc_rd[drv]) ide_drv_state[drv] <= IDE_DRV_STATE_PARSE;	 
+         // parse rdb unless the amiga has requested this sector
+         if( ide_exec != IDE_EXEC_READ_SECTOR )
+            if( ide_sdc_rd[drv]) ide_drv_state[drv] <= IDE_DRV_STATE_PARSE;
       end
 
       // sd card has accepted write request
       if ( ide_sdc_wr && sdc_busy ) begin
-	 ide_sdc_wr <= 2'b00;
+         ide_sdc_wr <= 2'b00;
 
-	 // ...	 
+      // ...
       end
 
       // parsing the rdb in sector 0 of the harddisk image
       // gives the cylinders, heads and sectors to be used
       if ( (ide_drv_state[drv] == IDE_DRV_STATE_PARSE) && sdc_byte_in_strobe ) begin
-	 case ( sdc_byte_addr )
-	   // check for 'RDSK' header and stop parsing if that fails
-	   0: if ( sdc_byte_in_data != "R") ide_drv_state[drv] <= IDE_DRV_STATE_NONE;
-	   1: if ( sdc_byte_in_data != "D") ide_drv_state[drv] <= IDE_DRV_STATE_NONE;
-	   2: if ( sdc_byte_in_data != "S") ide_drv_state[drv] <= IDE_DRV_STATE_NONE;
-	   3: if ( sdc_byte_in_data != "K") ide_drv_state[drv] <= IDE_DRV_STATE_NONE;
-	   
-	   // long word 16 contains cylinders
-	   16*4+2: cylinders[drv][15:8] <= sdc_byte_in_data;
-	   16*4+3: cylinders[drv][ 7:0] <= sdc_byte_in_data;
-	   // long word 17 contains sectors
-	   17*4+2: sectors[drv][15:8] <= sdc_byte_in_data;
-	   17*4+3: sectors[drv][ 7:0] <= sdc_byte_in_data;
-	   // long word 18 contains heads
-	   18*4+2: heads[drv][15:8] <= sdc_byte_in_data;
-	   18*4+3: heads[drv][ 7:0] <= sdc_byte_in_data;
+         case ( sdc_byte_addr )
+            // check for 'RDSK' header and stop parsing if that fails
+            0: if ( sdc_byte_in_data != "R") ide_drv_state[drv] <= IDE_DRV_STATE_NONE;
+            1: if ( sdc_byte_in_data != "D") ide_drv_state[drv] <= IDE_DRV_STATE_NONE;
+            2: if ( sdc_byte_in_data != "S") ide_drv_state[drv] <= IDE_DRV_STATE_NONE;
+            3: if ( sdc_byte_in_data != "K") ide_drv_state[drv] <= IDE_DRV_STATE_NONE;
 
-	   // TODO: emit "drive changed" signal and make sure ide config
-	   // is being updated
-	   511: begin
-	      ide_drv_state[drv] <= IDE_DRV_STATE_PRESENT;	   
-	      $display("IDE%0d CHS %0d/%0d/%0d", drv, cylinders[drv], heads[drv], sectors[drv]);   
-	   end
-	 endcase
+            // long word 16 contains cylinders
+            16*4+2: cylinders[drv][15:8] <= sdc_byte_in_data;
+            16*4+3: cylinders[drv][ 7:0] <= sdc_byte_in_data;
+            // long word 17 contains sectors
+            17*4+2: sectors[drv][15:8] <= sdc_byte_in_data;
+            17*4+3: sectors[drv][ 7:0] <= sdc_byte_in_data;
+            // long word 18 contains heads
+            18*4+2: heads[drv][15:8] <= sdc_byte_in_data;
+            18*4+3: heads[drv][ 7:0] <= sdc_byte_in_data;
+
+            // TODO: emit "drive changed" signal and make sure ide config
+            // is being updated
+            511: begin
+               ide_drv_state[drv] <= IDE_DRV_STATE_PRESENT;
+               $display("IDE%0d CHS %0d/%0d/%0d", drv, cylinders[drv], heads[drv], sectors[drv]);
+            end
+         endcase
+      end
+   end
+
+   // this is a minimal reset to ensure no drive is mounted
+   // on power-up while keeping logic usage low; adding reset logic
+   // to entire block considerably increases logic usage
+   if (por) begin
+      for(drv = 0; drv < DRIVES; drv = drv+1) begin
+          ide_drv_state[drv] <= IDE_DRV_STATE_NONE;
       end
    end
 end
-  
-always @(posedge clk_sys) begin
+
+// ide requests:
+// 110 - reset
+// 000 - write to mgmt address 5
+// 100 - new command
+// 101 - data send/recv
+wire [5:0] ide_request;
+
+// IDE management signals   
+wire [15:0] ide_writedata;   
+wire [15:0] ide_readdata;   
+
+always @(posedge clk_sys, posedge reset) begin
    if(reset) begin
       ide_busy <= 1'b0;      
       ide_exec <= IDE_EXEC_IDLE;
@@ -908,17 +1172,6 @@ always @(posedge clk_sys) begin
    end
 end   
 
-// IDE management signals   
-wire [15:0] ide_writedata;   
-wire [15:0] ide_readdata;   
-
-// ide requests:
-// 110 - reset
-// 000 - write to mgmt address 5
-// 100 - new command
-// 101 - data send/recv
-wire [5:0] ide_request;
-
 // IDE identify device reply
 wire [15:0] ide_identify_data =
 	    (ide_exec_cnt[8:1] ==  8'd0)?16'h0040:  //word 0 -> bit 6 = fixed drive
@@ -1120,8 +1373,9 @@ wire [15:0] JOY2 = 16'h0000;
 wire [15:0] JOY3 = 16'h0000;   
 wire [15:0] JOYA0 = 16'h0000;
 wire [15:0] JOYA1 = 16'h0000;
-wire [63:0] RTC = 64'h0;
 
+/* ======================================================================================== */
+/* =============================== internal ROM and RAM =================================== */
 /* ======================================================================================== */
 /* =============================== internal ROM and RAM =================================== */
 /* ======================================================================================== */
@@ -1133,9 +1387,17 @@ wire [63:0] RTC = 64'h0;
 reg [15:0] rom[1024];  // 2kbytes rom
 
 // here, one of the rom images from the test_roms directory may be selected
-// initial $readmemh("pwr_led_blink.hex", rom);   // pwr_led_blink is a very basic cpu test
-// initial $readmemh("video_init.hex", rom);
+`ifdef ENABLE_INT_ROM_BLINK_LED
+initial $readmemh("pwr_led_blink.hex", rom);   // pwr_led_blink is a very basic cpu test
+`elsif ENABLE_INT_ROM_VIDEO_INIT
+initial $readmemh("video_init.hex", rom);
+`elsif ENABLE_INT_ROM_FLASH_READ
 initial $readmemh("flash_read.hex", rom);
+`elsif ENABLE_INT_ROM_RAM_TEST
+initial $readmemh("ram_test.hex", rom);
+`else
+$error "Please specify a ROM to use internally"
+`endif
 
 reg [15:0] romD;
 always_ff @(posedge clk_sys)
@@ -1153,20 +1415,20 @@ wire int_rom_sel = ram_address[22:11] == 12'hf00;
 reg [7:0] raml[1024];  // 2kbytes ram
 reg [7:0] ramh[1024];
 
+wire int_ram_sel = ram_address[22:11] == 12'h000;
 reg [15:0] ramD;
 always_ff @(posedge clk_sys) begin
 	if(clk7n_en) begin
 		if(!_ram_oe)
 			ramD <= { ramh[ram_address[10:1]], raml[ram_address[10:1]] };
-		
-		if(!_ram_we) begin
+	   end
+   
+           if(!_ram_we && int_ram_sel) begin
 		   if(!_ram_bhe) ramh[ram_address[10:1]] <= ram_data[15:8];
 		   if(!_ram_ble) raml[ram_address[10:1]] <= ram_data[7:0];
-		end	
-	end
+	   end
 end
 
-wire int_ram_sel = ram_address[22:11] == 12'h000;
 wire [15:0] ramdata_in_ext = int_rom_sel?romD:
 						       int_ram_sel?ramD:
 							   ramdata_in;
@@ -1194,6 +1456,7 @@ minimig minimig
 	._cpu_reset   (cpu_rst          ), // M68K reset
 	._cpu_reset_in(cpu_nrst_out     ), // M68K reset out
 	.nmi_addr     (cpu_nmi_addr     ), // M68K NMI address
+	.ovr          (                 ), // M68K NMI address decoding override
 
         .memory_config (memory_config   ), // ram sizes
         .chipset_config(chipset_config  ), 
@@ -1228,12 +1491,12 @@ minimig minimig
 	//rs232 pins
 	.rxd          (uart_rx          ), // RS232 receive
 	.txd          (uart_tx          ), // RS232 send
-	.cts          (uart_cts         ), // RS232 clear to send
-	.rts          (uart_rts         ), // RS232 request to send
-	.dtr          (uart_dtr         ), // RS232 Data Terminal Ready
-	.dsr          (uart_dsr         ), // RS232 Data Set Ready
-	.cd           (uart_dsr         ), // RS232 Carrier Detect
-	.ri           (1                ), // RS232 Ring Indicator
+	.cts          (1'b0             ), // RS232 clear to send (0=ready to receive)
+	.rts          (                 ), // RS232 request to send
+	.dtr          (                 ), // RS232 Data Terminal Ready
+	.dsr          (1'b1             ), // RS232 Data Set Ready (1=ready)
+	.cd           (1'b1             ), // RS232 Carrier Detect (1=carrier detected)
+	.ri           (1'b1             ), // RS232 Ring Indicator (1=idle/not ringing)
 
 	//I/O
 	._joy1        (~JOY0            ), // joystick 1 [fire4,fire3,fire2,fire,up,down,left,right] (default mouse port)
@@ -1248,13 +1511,16 @@ minimig minimig
 	.kms_level    (kbd_mouse_level  ),
 	.pwr_led      (pwr_led_bright   ), // power led
 	.fdd_led      (fdd_led          ),
-	.rtc          (RTC              ),
+`ifdef ENABLE_RTC
+	.rtc          (rtc              ),
+`endif
 
 	//video
 	._hsync       (hs_in            ), // horizontal sync
 	._vsync       (vs_in            ), // vertical sync
-	.field1       (field1           ),
-	.lace         (lace             ),
+	._csync       (                 ), // composite sync
+	.field1       (                 ),
+	.lace         (                 ),
 	.red          (red              ), // red
 	.green        (green            ), // green
 	.blue         (blue             ), // blue
@@ -1262,6 +1528,7 @@ minimig minimig
 	.vblank       (vbl              ),
 	.res          (res              ),
         .htotal       (htotal           ),
+        .ce_pix       (                 ),
 
 	//audio
 	.ldata        (audio_left       ), // left DAC data
@@ -1271,8 +1538,6 @@ minimig minimig
 
 	//user i/o
 	.cpucfg       (cpucfg ), // CPU config
-	.cachecfg     (cachecfg ), // Cache config
-	.memcfg       ( ), // memory config
 
 `ifndef DISABLE_IDE
 	.hdd_led      ( hdd_led         ),
@@ -1323,6 +1588,9 @@ Amber AMBER
  );
     
 endmodule
-`ifndef LATTICE
+`ifndef GATEMATE
+ `ifndef LATTICE
   `default_nettype wire
+ `endif
 `endif
+// vim:ts=3 sw=3 tw=120 et

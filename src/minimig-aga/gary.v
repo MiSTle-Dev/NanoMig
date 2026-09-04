@@ -76,8 +76,10 @@ module gary
 	input         ecs, // ECS chipset enable
 	input         hdc_ena, //enables hdd interface
 
+`ifdef ENABLE_TOCCATA
 	input         toccata_ena,
 	input   [7:0] toccata_base,
+`endif
 
 	output        ram_rd, //bus read
 	output        ram_hwr, //bus high write
@@ -87,18 +89,21 @@ module gary
 	output reg [3:0] sel_chip, //select chip memory
 	output reg [2:0] sel_slow, //select slowfast memory ($C0000)
 	output reg   sel_kick, //select kickstart rom
-	output reg   sel_kick1mb, // 1MB kickstart rom 'upper' half
 	output reg   sel_kick256kmirror, //mirror $fc-$ff to $f8, when rom_readonly and bootrom 
 	output       sel_cia, //select CIA space
 	output       sel_cia_a, //select cia A
 	output       sel_cia_b, //select cia B
 	output       sel_rtg, //select rtg
+`ifdef ENABLE_RTC
 	output       sel_rtc, //select $DCxxxx
+`endif
 `ifndef DISABLE_IDE
 	output       sel_ide, //select $DAxxxx
 	output       sel_gayle, //select $DExxxx
 `endif
+`ifdef ENABLE_TOCCATA
 	output       sel_toccata, //select $E9xxxx (or whatever's specified by toccata_base)
+`endif
 	output reg   rom_readonly //when zero allows to write to $fc-$ff, blocks effect of kick256kmirror.  
 );
 
@@ -147,7 +152,6 @@ begin
 		sel_slow[1] = 0;
 		sel_slow[2] = 0;
 	   sel_kick    = 0;
-	   sel_kick1mb = 0;
 	   sel_kick256kmirror = 0;
 	end
 	else
@@ -160,7 +164,6 @@ begin
 		sel_slow[1] = t_sel_slow[1];
 		sel_slow[2] = t_sel_slow[2];
 		sel_kick    = (cpu_address_in[23:19]==5'b1111_1 && (cpu_rd || cpu_hlt || (!rom_readonly && cpu_address_in[18])))  || (cpu_rd && ovl && cpu_address_in[23:19]==5'b0000_0); //$F80000 - $FFFFFF
-		sel_kick1mb = cpu_address_in[23:19]==5'b1110_0 && (cpu_rd || cpu_hlt); // $E00000 - $E7FFFF
 		sel_kick256kmirror = cpu_address_in[23:19]==5'b1111_1 &&  cpu_rd && rom_readonly && !cpu_hlt && bootrom;
 	end
 end
@@ -173,7 +176,11 @@ assign t_sel_slow[2] = (cpu_address_in[23:19]==5'b1101_0) && &memory_config[3:2]
 assign sel_ide   = hdc_ena && cpu_address_in[23:16]==8'b1101_1010;        //IDE registers at $DA0000 - $DAFFFF	
 assign sel_gayle = hdc_ena && cpu_address_in[23:12]==12'b1101_1110_0001;  //GAYLE registers at $DE1000 - $DE1FFF
 `endif
+`ifdef ENABLE_RTC
 assign sel_rtc   = cpu_address_in[23:16]==8'b1101_1100;                   //RTC registers at $DC0000 - $DCFFFF
+`else
+wire sel_rtc = 1'b0;   // dummy for sel_reg
+`endif
 `ifndef DISABLE_IDE
 assign sel_reg   = cpu_address_in[23:21]==3'b110 ? ~(|t_sel_slow | sel_rtc | sel_ide | sel_gayle) : 1'b0;	//chip registers at $DF0000 - $DFFFFF
 `else
@@ -186,8 +193,10 @@ assign sel_cia_b = sel_cia & ~cpu_address_in[13];
 assign sel_rtg   = cpu_address_in[23:16]==8'hB8; // $B8xxxxx
 assign sel_bank_1 = cpu_address_in[23:21]==3'b001;
 
+`ifdef ENABLE_TOCCATA
 assign sel_toccata = toccata_ena && cpu_address_in[23:16]==toccata_base; // Nominally $e9xxxx
-
+`endif
+   
 //data bus slow down
 assign dbs = cpu_address_in[23:21]==3'b000 || cpu_address_in[23:20]==4'b1100 || cpu_address_in[23:19]==5'b1101_0 || cpu_address_in[23:16]==8'b1101_1111;
 

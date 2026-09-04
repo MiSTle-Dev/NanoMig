@@ -209,8 +209,11 @@ module minimig
 	input [7:0]   kbd_mouse_data,
 	output	      pwr_led, // power led
 	output	      fdd_led, // disk activity LED, active when DMA is on
-	input [64:0]  rtc,
-
+ 
+`ifdef ENABLE_RTC
+	input [11:0]  rtc,
+`endif
+ 
 	input [7:0]   memory_config,
 	input [5:0]   chipset_config,
 	input [3:0]   floppy_config,
@@ -275,12 +278,12 @@ module minimig
 	output [15:0] ide_readdata,
 `endif
 	//user i/o
-	input [1:0]   cpucfg,
-	input [2:0]   cachecfg,
-	output [6:0]  memcfg
+	input [1:0]   cpucfg
 	);
-`ifndef LATTICE
+`ifndef GATEMATE
+ `ifndef LATTICE
   `default_nettype none
+ `endif  
 `endif  
   
 //--------------------------------------------------------------------------------------
@@ -334,11 +337,12 @@ wire        _led;					//power led
 wire  [3:0] sel_chip;			//chip ram select
 wire  [2:0] sel_slow;			//slow ram select
 wire        sel_kick;			//rom select
-wire        sel_kick1mb;      // 1MB upper rom select
 wire        sel_kick256kmirror;// mirror f8-fb to fc-ff in a1k mode    
 wire        sel_cia;				//CIA address space
 wire        sel_reg;				//chip register select
+`ifdef ENABLE_RTC
 wire        sel_rtc;
+`endif
 wire        sel_cia_a;			//cia A select
 wire        sel_cia_b;			//cia B select
 `ifdef ENABLE_TOCCATA
@@ -382,7 +386,7 @@ wire        _change;				//disk has been removed from drive
 wire        _ready;				//disk is ready
 wire        _wprot;				//disk is write-protected
 
-wire  [1:0] blver;
+wire  [1:0] blver = 2'b00;     // part of mister video config, originally set by MCU
 wire        hbl, hde;
 assign      hblank = blver ? ~hde : hbl;
 
@@ -391,14 +395,13 @@ assign      hblank = blver ? ~hde : hbl;
 wire        bls;					//blitter slowdown - required for sharing bus cycles between Blitter and CPU
 
 wire        cpurst = 1'b0;    // TODO: check why this is unused
-wire        cpuhlt;
+wire        cpuhlt = 1'b0;
 
 wire        int7;					//int7 interrupt request from Action Replay
 wire  [2:0] _iplx;			   //interrupt request lines from Paula
 wire        sel_cart;			//Action Replay RAM select
 wire [15:0] cart_data_out;
 
-wire        usrrst;				//user reset from osd interface
 wire        hires;				//hires signal from Denise for interpolation filter enable in Amber
 
 `ifndef DISABLE_IDE
@@ -413,15 +416,6 @@ wire	[7:0] bank;					//memory bank select
 
 reg         ntsc = NTSC;		//PAL/NTSC video mode selection
 
-// host interface
-wire        host_cs;
-wire [23:0] host_adr;
-wire        host_we;
-wire [ 1:0] host_bs;
-wire [15:0] host_wdat;
-wire [15:0] host_rdat;
-wire        host_ack;
-
 wire        sys_reset;    		//reset output from minimig_syscontrol.v
 wire        rom_readonly; 		//writeprotect $f8-ff in gary.v
 
@@ -431,9 +425,6 @@ wire        reset = sys_reset | ~_cpu_reset_in; // both tg68k and minimig_syscon
 //--------------------------------------------------------------------------------------
 
 assign pwr_led = ~_led;
-
-assign memcfg = {memory_config[7],memory_config[5:0]};
-// assign cachecfg = {cachecfg_pre[2], ~ovl, ~ovl};
 
 // NTSC/PAL switching is controlled by OSD menu, change requires reset to take effect
 always @(posedge clk) if (clk7_en && reset) ntsc <= chipset_config[1];
@@ -556,7 +547,6 @@ paula PAULA1
 	.floppy_drives(floppy_config[3:2])
 );
 
-wire [2:0] cachecfg_pre;
 //instantiate user IO
 userio USERIO1 
 (	
@@ -695,16 +685,7 @@ minimig_m68k_bridge CPU1
 	.cpudatain(cpudata_in),
 	.data(cpu_data),
 	.data_out(cpu_data_out),
-	.data_in(cpu_data_in),
-	._cpu_reset (_cpu_reset),
-	.cpu_halt (cpuhlt),
-	.host_cs (host_cs),
-	.host_adr (host_adr[23:1]),
-	.host_we (host_we),
-	.host_bs (host_bs),
-	.host_wdat (host_wdat),
-	.host_rdat (host_rdat),
-	.host_ack (host_ack)
+	.data_in(cpu_data_in)
 );
 
 //instantiate RAM banks mapper
@@ -718,10 +699,8 @@ minimig_bankmapper BMAP1
 	.slow1(sel_slow[1]),
 	.slow2(sel_slow[2]),
 	.kick(sel_kick),
-	.kick1mb(sel_kick1mb),
 	.kick256kmirror(sel_kick256kmirror),
- 	.cart(sel_cart),
-	.memory_config(memory_config[3:0]),
+	.memory_config(memory_config[1:0]),  // chip config
 	.bank(bank)
 );
 
@@ -819,7 +798,6 @@ gary GARY1
 	.sel_chip(sel_chip),
 	.sel_slow(sel_slow),
 	.sel_kick(sel_kick),
-	.sel_kick1mb(sel_kick1mb),
 	.sel_kick256kmirror(sel_kick256kmirror),
 	.sel_cia(sel_cia),
 	.sel_reg(sel_reg),
@@ -829,10 +807,13 @@ gary GARY1
 	.sel_ide(sel_ide),
 	.sel_gayle(sel_gayle),
 `endif
+`ifdef ENABLE_RTC
 	.sel_rtc(sel_rtc),
+`endif
 `ifdef ENABLE_TOCCATA
 	.sel_toccata(sel_toccata),
 `endif
+        .sel_rtg(),
 	.reset(reset),
 	.clk(clk),
 	.rom_readonly(rom_readonly),
@@ -853,6 +834,7 @@ gayle GAYLE1
 	.sel_gayle(sel_gayle),
 	.irq(gayle_irq),
 	.nrdy(gayle_nrdy),
+	.longword(1'b0),
 
 	.ide_req(ide_req),
 	.ide_address(ide_address),
@@ -871,7 +853,7 @@ minimig_syscontrol CONTROL1
 	.clk(clk),
 	.clk7_en(clk7_en),
 	.cnt(sof),
-	.mrst(usrrst | rst_ext),
+	.mrst(rst_ext),
 	.reset(sys_reset)
 );
 
@@ -883,24 +865,134 @@ end
 //-------------------------------------------------------------------------------------
 
 `ifdef ENABLE_RTC
-wire [15:0] rtc_out = (sel_rtc && cpu_rd) ? {12'h000, rtc_reg[{cpu_address_out[5:2], 2'b00} +:4]} : 16'h0000;
 
-reg [63:0] rtc_reg;
+reg [3:0] rtc_reg_0;  // seconds ones
+reg [3:0] rtc_reg_1;  // seconds tens
+reg [3:0] rtc_reg_2;  // minutes ones
+reg [3:0] rtc_reg_3;  // minutes tens
+reg [3:0] rtc_reg_4;  // hours ones
+reg [3:0] rtc_reg_5;  // hours tens
+reg [3:0] rtc_reg_6;  // days ones
+reg [3:0] rtc_reg_7;  // days tens
+reg [3:0] rtc_reg_8;  // months ones
+reg [3:0] rtc_reg_9;  // months tens
+reg [3:0] rtc_reg_A;  // years ones
+reg [3:0] rtc_reg_B;  // years tens
+reg [3:0] rtc_reg_C;  // weekday
+
+wire [15:0] rtc_out = !(sel_rtc && cpu_rd)?16'h0000:{12'h000, 
+	   (cpu_address_out[5:2] == 4'h0)?rtc_reg_0:
+	   (cpu_address_out[5:2] == 4'h1)?rtc_reg_1:
+	   (cpu_address_out[5:2] == 4'h2)?rtc_reg_2:
+	   (cpu_address_out[5:2] == 4'h3)?rtc_reg_3:
+	   (cpu_address_out[5:2] == 4'h4)?rtc_reg_4:
+	   (cpu_address_out[5:2] == 4'h5)?rtc_reg_5:
+	   (cpu_address_out[5:2] == 4'h6)?rtc_reg_6:
+	   (cpu_address_out[5:2] == 4'h7)?rtc_reg_7:
+	   (cpu_address_out[5:2] == 4'h8)?rtc_reg_8:
+	   (cpu_address_out[5:2] == 4'h9)?rtc_reg_9:
+	   (cpu_address_out[5:2] == 4'ha)?rtc_reg_A:
+	   (cpu_address_out[5:2] == 4'hb)?rtc_reg_B:					   
+	   (cpu_address_out[5:2] == 4'hc)?rtc_reg_C:	   
+	   (cpu_address_out[5:2] == 4'hd)?4'h0:
+	   (cpu_address_out[5:2] == 4'he)?4'h0:
+	   4'h4 };
+
+// hours, minutes and seconds are just BCD encoded. But months and days need preprocessing
+// and the years ten digit can be > 9 which the bcd encoder already handles
+wire [7:0] b2c_in = 
+	   (rtc[10:8] == 3'd1)?(rtc[7:0]+1):      // months 0..11 -> 1..12
+	   (rtc[10:8] == 3'd2)?{3'd0,rtc[4:0]}:   // days excl. weekday bits
+	   rtc[7:0];                              // h/m/s
+
+reg [7:0] bcd;  // 2 BCD digits: {tens, ones}
+
+// 8 bit to 2*4 digit double dabble algorithm. The add-5 step
+// is omitted for the tens digit, allowing for the "digits" 10,11,...
+// which is needed for years > 99
+always @(*) begin
+   integer i;   
+   bcd = 8'h00;     // clear result      
+   for (i = 7; i >= 0; i = i - 1) begin
+      // "add 3" step: if any BCD digit >= 5, add 3 to it
+      if (bcd[3:0] >= 5) bcd[3:0] = bcd[3:0] + 4'd3;  // ones
+      // shift-left one bit, bringing in the next binary bit
+      bcd = {bcd[6:0], b2c_in[i]};
+   end
+end
+   
 always @(posedge clk) begin
-	reg old_flg;
-	reg [31:0] cnt;
-	
-	old_flg <= rtc[64];
-	if(old_flg ^ rtc[64]) begin
-		rtc_reg <= {rtc[63:8], 8'd0};
-		cnt <= 0;
-	end
-	else if(cnt < 28375159) cnt <= cnt + 1;
-	else begin
-		cnt <= 0;
-		if(rtc_reg[3:0] < 9) rtc_reg[3:0] <= rtc_reg[3:0] + 1'd1;
-		else if(rtc_reg[7:4] < 5) rtc_reg[7:0] <= {rtc_reg[7:4] + 1'd1, 4'b0000};
-	end
+   static reg old_flg = 1'b0;
+   reg [31:0] cnt;
+
+   // check if new value is being provided externally
+   old_flg <= rtc[11];
+   if(old_flg ^ rtc[11]) begin
+      if(rtc[10:8] == 3'd0) { rtc_reg_B, rtc_reg_A } <= bcd;  // years
+      if(rtc[10:8] == 3'd1) { rtc_reg_9, rtc_reg_8 } <= bcd;  // months
+      if(rtc[10:8] == 3'd2) { rtc_reg_7, rtc_reg_6 } <= bcd;  // days
+      if(rtc[10:8] == 3'd3) { rtc_reg_5, rtc_reg_4 } <= bcd;  // hours
+      if(rtc[10:8] == 3'd4) { rtc_reg_3, rtc_reg_2 } <= bcd;  // minutes
+      if(rtc[10:8] == 3'd5) { rtc_reg_1, rtc_reg_0 } <= bcd;  // seconds
+
+      // weekday is encoded in 3 msb of day
+      if(rtc[10:8] == 3'd2) rtc_reg_C <= { 1'b0, rtc[7:5] };  // weekday
+   end
+   else if(cnt < 32'd28375159) cnt <= cnt + 32'd1;
+   else begin
+      cnt <= 32'd0;
+
+      // the following chain increases the bcd encoded time and
+      // date registers by one second
+      
+      // advance the ones of seconds
+      if(rtc_reg_0 < 9) 
+	rtc_reg_0 <= rtc_reg_0 + 4'd1;
+      else begin
+	 // seconds ones rollover
+	 rtc_reg_0 <= 4'h0;	 
+	 // advance the tens of seconds		   
+	 if(rtc_reg_1 < 5) 
+	   rtc_reg_1 <= rtc_reg_1 + 4'd1;
+	 else begin
+	    // seconds rollover
+	    rtc_reg_1 <= 4'h0;
+	    // advance the ones of minutes
+	    if(rtc_reg_2 < 9) 
+	      rtc_reg_2 <= rtc_reg_2 + 4'd1;
+	    else begin
+	       // minutes ones rollover
+	       rtc_reg_2 <= 4'h0;	 
+	       // advance the tens of minutes
+	       if(rtc_reg_2 < 5) 
+		 rtc_reg_2 <= rtc_reg_2 + 4'd1;
+	       else begin
+		  // minutes rollover
+		  rtc_reg_2 <= 4'h0;
+		  // advance the ones of hours
+		  if(rtc_reg_3 < 9) 
+		    rtc_reg_3 <= rtc_reg_3 + 4'd1;
+		  else begin
+		     // hours ones rollover
+		     rtc_reg_3 <= 4'h0;	 
+		     // advance the tens of hours
+		     if(rtc_reg_4 < 5) 
+		       rtc_reg_4 <= rtc_reg_4 + 4'd1;
+		     else begin
+			// hours rollover
+			rtc_reg_4 <= 4'h0;
+
+			// TODO: Expand this to days, months and years ...
+			// But with NTP as the signal source this is less important
+			// as the periodic updates from NTP will update all
+			// registers.			
+		     end
+		  end
+	       end
+	    end
+	 end
+      end
+   end
 end
 `endif
 
@@ -932,19 +1024,19 @@ assign int6_toccata = 1'b0;
 //-------------------------------------------------------------------------------------
 
 //data multiplexer
-assign cpu_data_in[15:0]= gary_data_out[15:0]
-							 | cia_data_out[15:0]
+assign cpu_data_in = gary_data_out
+		     | cia_data_out
 `ifndef DISABLE_IDE
-							 | gayle_data_out[15:0]
+		     | gayle_data_out
 `endif
 `ifdef ENABLE_CART
-							 | cart_data_out[15:0]
+		     | cart_data_out
 `endif
 `ifdef ENABLE_RTC
-							 | rtc_out
+		     | rtc_out
 `endif
 `ifdef ENABLE_TOCCATA
-							 | toccata_out
+		     | toccata_out
 `endif
 ;
 
@@ -955,9 +1047,9 @@ assign custom_data_out[15:0] = agnus_data_out[15:0]
 
 //--------------------------------------------------------------------------------------
 
+reg _rst;
 assign _cpu_reset = _rst;
 
-reg _rst;
 always @(posedge clk) begin
 	reg r;
 	r <= ~(cpurst || sys_reset);
@@ -972,6 +1064,8 @@ assign rst_out = reset;
 
 endmodule
 
-`ifndef LATTICE
+`ifndef GATEMATE
+ `ifndef LATTICE
   `default_nettype wire
+ `endif
 `endif

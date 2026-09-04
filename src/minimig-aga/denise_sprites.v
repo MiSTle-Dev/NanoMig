@@ -20,6 +20,14 @@
 // This is the sprites part of denise
 // It supports all OCS sprite modes.
 
+`ifdef DENISE_EBR
+// ----------------------------------------------------------------------------
+// Copyright 2026 Mateusz Nalewajski
+//
+// This is EBR refactor of sprites to optimize FF resource usage on
+// ECP5 platform; with a valid BRAM primitive can be adapted to other FPGAs
+// ----------------------------------------------------------------------------
+`endif
 
 module denise_sprites
 (
@@ -32,6 +40,20 @@ module denise_sprites
   input  [8:1] reg_address_in,  // register address input
   input  [8:0] hpos,        // horizontal beam counter
   input   [15:0] data_in,     // bus data in
+`ifdef DENISE_EBR
+  input   [15:0] chip16_r,
+  input   [1:0] chip16_idx,
+  input  sprena,          // sprite enable signal
+  input [3:0] esprm,
+  input [3:0] osprm,
+  input [1:0] spres,
+  output   [7:0] nsprite,        // sprite data valid signals
+  output  reg [7:0] sprdata    // sprite data out
+);
+
+//register names and adresses
+parameter SPRPOSCTLBASE = 9'h140;  //sprite data, position and control register base address
+`else
   input [47:0] chip48,
   input  sprena,          // sprite enable signal
   input [3:0] esprm,
@@ -43,6 +65,7 @@ module denise_sprites
 
 //register names and adresses
 parameter  SPRPOSCTLBASE = 9'h140;  //sprite data, position and control register base address
+`endif
 parameter FMODE         = 9'h1fc;
 
 //local signals
@@ -90,6 +113,33 @@ assign selspr7 = selsprx && reg_address_in[5:3]==3'd7    ? 1'b1 : 1'b0;
 
 //--------------------------------------------------------------------------------------
 
+`ifdef DENISE_EBR
+// fmode reg
+reg  [15:0] fmode;
+
+always @ (posedge clk) begin
+  if (clk7_en) begin
+    if (reset)
+      fmode <= #1 16'h0000;
+    else if (aga && (reg_address_in[8:1] == FMODE[8:1]))
+      fmode <= #1 data_in;
+  end
+end
+
+wire [1:0] spr_bankwr_idx;
+reg  [1:0] spr_bankrd_num;
+
+assign spr_bankwr_idx = chip16_idx;
+
+// set number of banks to be read according to fmode
+always @(*) begin
+  case(fmode[3:2])
+    2'b00   : spr_bankrd_num = 1;
+    2'b11   : spr_bankrd_num = 0;
+    default : spr_bankrd_num = 2;
+  endcase
+end
+`else
 
 // fmode reg
 reg  [16-1:0] fmode;
@@ -103,6 +153,7 @@ always @ (posedge clk) begin
   end
 end
 
+`endif
 
 // shift value
 reg shift;
@@ -114,6 +165,155 @@ always @ (*) begin
   endcase
 end
 
+`ifdef DENISE_EBR
+// instantiate sprite 0
+denise_sprites_shifter sps0
+(
+  .clk(clk),
+  .clk7_en(clk7_en),
+  .reset(reset),
+  .aen(selspr0),
+  .address(reg_address_in[2:1]),
+  .hpos(hpos),
+  .fmode(fmode),
+  .shift(shift),
+  .spr_dat(chip16_r),
+  .spr_bankwr_idx(spr_bankwr_idx),
+  .spr_bankrd_num(spr_bankrd_num),
+  .data_in(data_in),
+  .sprdata(sprdat0),
+  .attach(attach0)
+);
+
+// instantiate sprite 1
+denise_sprites_shifter sps1
+(
+  .clk(clk),
+  .clk7_en(clk7_en),
+  .reset(reset),
+  .aen(selspr1),
+  .address(reg_address_in[2:1]),
+  .hpos(hpos),
+  .fmode(fmode),
+  .shift(shift),
+  .spr_dat(chip16_r),
+  .spr_bankwr_idx(spr_bankwr_idx),
+  .spr_bankrd_num(spr_bankrd_num),
+  .data_in(data_in),
+  .sprdata(sprdat1),
+  .attach(attach1)
+);
+
+// instantiate sprite 2
+denise_sprites_shifter sps2
+(
+  .clk(clk),
+  .clk7_en(clk7_en),
+  .reset(reset),
+  .aen(selspr2),
+  .address(reg_address_in[2:1]),
+  .hpos(hpos),
+  .fmode(fmode),
+  .shift(shift),
+  .spr_dat(chip16_r),
+  .spr_bankwr_idx(spr_bankwr_idx),
+  .spr_bankrd_num(spr_bankrd_num),
+  .data_in(data_in),
+  .sprdata(sprdat2),
+  .attach(attach2)
+);
+
+// instantiate sprite 3
+denise_sprites_shifter sps3
+(
+  .clk(clk),
+  .clk7_en(clk7_en),
+  .reset(reset),
+  .aen(selspr3),
+  .address(reg_address_in[2:1]),
+  .hpos(hpos),
+  .fmode(fmode),
+  .shift(shift),
+  .spr_dat(chip16_r),
+  .spr_bankwr_idx(spr_bankwr_idx),
+  .spr_bankrd_num(spr_bankrd_num),
+  .data_in(data_in),
+  .sprdata(sprdat3),
+  .attach(attach3)
+);
+
+// instantiate sprite 4
+denise_sprites_shifter sps4
+(
+  .clk(clk),
+  .clk7_en(clk7_en),
+  .reset(reset),
+  .aen(selspr4),
+  .address(reg_address_in[2:1]),
+  .hpos(hpos),
+  .fmode(fmode),
+  .shift(shift),
+  .spr_dat(chip16_r),
+  .spr_bankwr_idx(spr_bankwr_idx),
+  .spr_bankrd_num(spr_bankrd_num),
+  .data_in(data_in),
+  .sprdata(sprdat4),
+  .attach(attach4)
+);
+
+// instantiate sprite 5
+denise_sprites_shifter sps5
+(
+  .clk(clk),
+  .clk7_en(clk7_en),
+  .reset(reset),
+  .aen(selspr5),
+  .address(reg_address_in[2:1]),
+  .hpos(hpos),
+  .fmode(fmode),
+  .shift(shift),
+  .spr_dat(chip16_r),
+  .spr_bankwr_idx(spr_bankwr_idx),
+  .spr_bankrd_num(spr_bankrd_num),
+  .data_in(data_in),
+  .sprdata(sprdat5),
+  .attach(attach5)
+);
+
+// instantiate sprite 6
+denise_sprites_shifter sps6
+(
+  .clk(clk),
+  .clk7_en(clk7_en),
+  .reset(reset),
+  .aen(selspr6),
+  .address(reg_address_in[2:1]),
+  .hpos(hpos),
+  .fmode(fmode),
+  .shift(shift),
+  .spr_dat(chip16_r),
+  .spr_bankwr_idx(spr_bankwr_idx),
+  .spr_bankrd_num(spr_bankrd_num),
+  .data_in(data_in),
+  .sprdata(sprdat6),
+  .attach(attach6)
+);
+
+// instantiate sprite 7
+denise_sprites_shifter sps7
+(
+  .clk(clk),
+  .clk7_en(clk7_en),
+  .reset(reset),
+  .aen(selspr7),
+  .address(reg_address_in[2:1]),
+  .hpos(hpos),
+  .fmode(fmode),
+  .shift(shift),
+  .spr_dat(chip16_r),
+  .spr_bankwr_idx(spr_bankwr_idx),
+  .spr_bankrd_num(spr_bankrd_num),
+`else
 wire clk7n_en = c1 & c3;
 
 
@@ -256,6 +456,7 @@ denise_sprites_shifter sps7
   .fmode(fmode),
   .shift(shift),
   .chip48(chip48),
+`endif
   .data_in(data_in),
   .sprdata(sprdat7),
   .attach(attach7)
