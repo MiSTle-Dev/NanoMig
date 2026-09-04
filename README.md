@@ -86,10 +86,9 @@ The necessary binaries can be found in the [project releases](https://github.com
 Windows: Download and install OSS CAD SUITE ([download](https://github.com/YosysHQ/oss-cad-suite-build/releases)) and Zadig ([download](https://zadig.akeo.ie/))
 
 1.) Plug your FPGA board into your computer via USB.  
-Open Zadig.  
-Select Options -> List All Devices in Zadig.  
+Open Zadig and select Options -> List All Devices in Zadig.  
 Choose your FPGA cable or interface from the drop-down menu.  
-Change the target driver to WinUSB and click Replace Driver (or Install Driver). 
+Change the target driver to WinUSB and click Replace Driver (or Install Driver).  
 2.) flash NanoMig to ICEPI  
 ```openFPGALoader -c ft231X --pins=7:3:5:6 -f nanomig_impl.bit```  
 3.) flash Kickstart  
