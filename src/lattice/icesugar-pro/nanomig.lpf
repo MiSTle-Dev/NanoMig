@@ -1,9 +1,5 @@
 SYSCONFIG CONFIG_IOVOLTAGE=3.3 COMPRESS_CONFIG=ON MCCLK_FREQ=62 MASTER_SPI_PORT=DISABLE SLAVE_SPI_PORT=DISABLE SLAVE_PARALLEL_PORT=DISABLE;
 
-# https://www.latticesemi.com/en/Support/AnswerDatabase/1/9/6/1964
-BLOCK RESETPATHS;
-BLOCK ASYNCPATHS;
-
 # Clock
 LOCATE COMP "clk" SITE "P6";
 IOBUF  PORT "clk" IO_TYPE=LVCMOS33 PULLMODE=NONE;
@@ -206,3 +202,30 @@ IOBUF  PORT "mspi_hold" IO_TYPE=LVCMOS33 PULLMODE=UP DRIVE=4;
 LOCATE COMP "mspi_clk_ts" SITE "D12";
 IOBUF  PORT "mspi_clk_ts" IO_TYPE=LVCMOS33 PULLMODE=DOWN;
 
+# https://www.latticesemi.com/en/Support/AnswerDatabase/1/9/6/1964
+BLOCK RESETPATHS;
+BLOCK ASYNCPATHS;
+
+# Period Constraints
+FREQUENCY PORT "clk" 25.0 MHz ;
+FREQUENCY NET "clk_pixel" 28.3 MHz ;
+FREQUENCY NET "clk_pixel_x5" 141.5 MHz ;
+FREQUENCY NET "clk_85m" 85.0 MHz ;
+
+MULTICYCLE FROM CLKNET "clk_pixel" TO CLKNET "clk_85m" 2X ;
+MULTICYCLE FROM CLKNET "clk_85m"  TO CLKNET "clk_pixel"  2X_SOURCE;
+
+BLOCK PATH FROM CELL "nanomig/minimig/AGNUS1/bc1/beamcon0*" ;
+
+BLOCK PATH FROM CELL "sysctrl/system_cpu*" ;
+BLOCK PATH FROM CELL "sysctrl/system_chipset*" ;
+BLOCK PATH FROM CELL "sysctrl/system_video*" ;
+BLOCK PATH FROM CELL "sysctrl/system_chipmem*" ;
+BLOCK PATH FROM CELL "sysctrl/system_slowmem*" ;
+BLOCK PATH FROM CELL "sysctrl/system_fastmem*" ;
+BLOCK PATH FROM CELL "sysctrl/system_turbo*" ;
+BLOCK PATH FROM CELL "sysctrl/system_volume*" ;
+
+BLOCK PATH FROM CELL "*packet_picker/audio_sample_word_transfer*" ;
+
+MULTICYCLE FROM CELL "*PAULA1/pf1/dsklen*" TO CELL "*AGNUS1/bl1/*" 4X ;
