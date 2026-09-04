@@ -83,9 +83,20 @@ The necessary binaries can be found in the [project releases](https://github.com
 * With Disk Flashback you can mount ADF's & HDF's under Windows [Disk Flashback](https://robsmithdev.co.uk/diskflashback)
 
 ## ICEPI-ZERO 
+Windows: Download and install OSS CAD SUITE ([download](https://github.com/YosysHQ/oss-cad-suite-build/releases)) and Zadig ([download](https://zadig.akeo.ie/))
 
+    Plug your FPGA board into your computer via USB.
+    Open Zadig.
+    Select Options -> List All Devices in Zadig.
+    Choose your FPGA cable or interface from the drop-down menu.
+    Change the target driver to WinUSB and click Replace Driver (or Install Driver). 
+
+1.) flash NanoMig to ICEPI  
 ```openFPGALoader -c ft231X --pins=7:3:5:6 -f nanomig_impl.bit```  
-```openFPGALoader -c ft231X --pins=7:3:5:6 -f -o 0x400000 kick31.rom```
+2.) flash Kickstart  
+```openFPGALoader -c ft231X --pins=7:3:5:6 -f -o 0x400000 kick31.rom```   
+3.) connect ICEPI & Carrier  
+4.) push button on Carrier and connect it via USB to your Computer to flash FPGA-Companion ([download](fpga_companion.uf2))
 
 ## Rigid Disk Block Info
 Please make sure to use RDB (Rigid Disk Block) images with a **Start Offset 0**.  
