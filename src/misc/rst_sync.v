@@ -22,14 +22,14 @@ reg [2:0] rst_sync_28m /* synthesis syn_keep=1 */ /* synthesis syn_dont_touch=1 
 reg [2:0] rst_sync_85m /* synthesis syn_keep=1 */ /* synthesis syn_dont_touch=1 */ /* synthesis syn_preserve=1 */;
 reg [2:0] rst_sync_sdram /* synthesis syn_keep=1 */ /* synthesis syn_dont_touch=1 */ /* synthesis syn_preserve=1 */;
 
-always @(posedge clk_28m or negedge pll_lock) begin
+always @(posedge clk_28m or negedge pll_lock or negedge sdram_ready) begin
   if (!pll_lock || !sdram_ready)
     rst_sync_28m <= 3'b000;
   else
     rst_sync_28m <= {rst_sync_28m[1:0], 1'b1};
 end
 
-always @(posedge clk_85m or negedge pll_lock) begin
+always @(posedge clk_85m or negedge pll_lock or negedge sdram_ready) begin
   if (!pll_lock || !sdram_ready)
     rst_sync_85m <= 3'b000;
   else
