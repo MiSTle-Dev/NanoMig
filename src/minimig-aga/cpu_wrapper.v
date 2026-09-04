@@ -653,7 +653,7 @@ wire chipreq = cpu_req & ~ramsel
 ;
 
 reg [15:0] chipdout_i;
-reg        c_as,c_rw,c_uds,c_lds;
+reg        c_as, c_rw, c_uds, c_lds;
 
 always @(posedge clk, negedge reset) begin
 	reg [1:0] stage;
@@ -667,37 +667,43 @@ always @(posedge clk, negedge reset) begin
 		c_uds <= 1;
 		c_lds <= 1;
 		chipready <= 0;
-		ready <= 0;
 	end else begin
-		if (ph2) begin
-			waitm <= chip_dtack;
-			if(~stage[0]) cpu_ipl <= chip_ipl;
-		end
 		chipready <= 0;
+		if (ph2) begin
+			case (stage)
+				0: cpu_ipl <= chip_ipl;
+				1: ;
+				2: begin
+					cpu_ipl <= chip_ipl;
+					waitm <= chip_dtack;
+				end
+				3: begin
+					c_as <= 1;
+					c_rw <= 1;
+					c_uds <= 1;
+					c_lds <= 1;
+					ready <= 0;
+					chipdout_i <= chip_dout;
+					if (!ready)
+						chipready <= 1;
+					else
+						stage <= 0;
+				end
+				default: ;
+			endcase
+		end
 		if (ph1) begin
-			chipready <= ready;
-			ready <= 0;
 			case (stage)
 				0: if (chipreq) begin
-						c_as <= 0;
-						c_rw <= wr;
-						c_uds <= uds_in;
-						c_lds <= lds_in;
-						stage <= 1;
-					end
+					c_as <= 0;
+					c_rw <= wr;
+					c_uds <= uds_in;
+					c_lds <= lds_in;
+					stage <= 1;
+				end
 				1: stage <= 2;
-				2: begin
-						chipdout_i <= chip_dout;
-						if (~waitm) begin
-							c_as <= 1;
-							c_rw <= 1;
-							c_uds <= 1;
-							c_lds <= 1;
-							ready <= 1;
-							stage <= 3;
-						end
-					end
-				3: stage <= 0;
+				2: if (~waitm) stage <= 3;
+				3: ready <= 1;
 			endcase
 		end
 	end
