@@ -1,0 +1,302 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<BaliProject version="3.2" title="nanomig" device="LFE5U-25F-6BG256C" default_implementation="impl">
+    <Options/>
+    <Implementation title="impl" dir="impl" description="impl" synthesis="synplify" default_strategy="Strategy1">
+        <Options VerilogStandard="System Verilog" def_top="TG68K">
+            <Option name="include path" value="../../fx68k;.;../../test_roms"/>
+            <Option name="top" value="top"/>
+        </Options>
+        <Source name="top.sv" type="Verilog" type_short="Verilog">
+            <Options VerilogStandard="System Verilog" top_module="top"/>
+        </Source>
+        <Source name="../../nanomig.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../misc/mcu_spi.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../misc/hid.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../misc/sysctrl.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../misc/ws2812.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../misc/amiga_keymap.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../misc/flash_dspi.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../misc/osd_u8g2.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../misc/sd_card.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="sector_dpram.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="ide_dpram.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../misc/sd_rw.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../misc/sdcmd_ctrl.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../misc/sdram.sv" type="Verilog" type_short="Verilog">
+            <Options VerilogStandard="System Verilog"/>
+        </Source>
+        <Source name="../../misc/video_analyzer.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../misc/rst_sync.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../hdmi/audio_clock_regeneration_packet.sv" type="Verilog" type_short="Verilog">
+            <Options VerilogStandard="System Verilog"/>
+        </Source>
+        <Source name="../../hdmi/audio_info_frame.sv" type="Verilog" type_short="Verilog">
+            <Options VerilogStandard="System Verilog"/>
+        </Source>
+        <Source name="../../hdmi/audio_sample_packet.sv" type="Verilog" type_short="Verilog">
+            <Options VerilogStandard="System Verilog"/>
+        </Source>
+        <Source name="../../hdmi/auxiliary_video_information_info_frame.sv" type="Verilog" type_short="Verilog">
+            <Options VerilogStandard="System Verilog"/>
+        </Source>
+        <Source name="../../hdmi/hdmi.sv" type="Verilog" type_short="Verilog">
+            <Options VerilogStandard="System Verilog"/>
+        </Source>
+        <Source name="../../hdmi/packet_assembler.sv" type="Verilog" type_short="Verilog">
+            <Options VerilogStandard="System Verilog"/>
+        </Source>
+        <Source name="../../hdmi/packet_picker.sv" type="Verilog" type_short="Verilog">
+            <Options VerilogStandard="System Verilog"/>
+        </Source>
+        <Source name="serializer.sv" type="Verilog" type_short="Verilog">
+            <Options VerilogStandard="System Verilog"/>
+        </Source>
+        <Source name="../../hdmi/source_product_description_info_frame.sv" type="Verilog" type_short="Verilog">
+            <Options VerilogStandard="System Verilog"/>
+        </Source>
+        <Source name="../../hdmi/tmds_channel.sv" type="Verilog" type_short="Verilog">
+            <Options VerilogStandard="System Verilog"/>
+        </Source>
+        <Source name="../../minimig/Amber.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../minimig-aga/agnus.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../minimig-aga/agnus_audiodma.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../minimig-aga/agnus_beamcounter.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../minimig-aga/agnus_bitplanedma.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../minimig-aga/agnus_blitter.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../minimig-aga/agnus_blitter_adrgen.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../minimig-aga/agnus_blitter_barrelshifter.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../minimig-aga/agnus_blitter_fill.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../minimig-aga/agnus_blitter_minterm.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../minimig-aga/agnus_copper.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../minimig-aga/agnus_diskdma.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../minimig-aga/agnus_refresh.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../minimig-aga/agnus_spritedma.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../minimig-aga/amiga_clk.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../minimig-aga/cia_int.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../minimig-aga/cia_timera.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../minimig-aga/cia_timerb.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../minimig-aga/cia_timerd.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../minimig-aga/ciaa.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../minimig-aga/ciab.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../minimig-aga/cpu_wrapper.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../minimig-aga/cpu_cache_new.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../minimig-aga/dpram.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../minimig-aga/denise_collision.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../minimig-aga/denise_colortable.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../minimig-aga/denise_colortable_ram_mf.v" type="Verilog" type_short="Verilog" excluded="TRUE">
+            <Options/>
+        </Source>
+        <Source name="../../minimig-aga/denise_hamgenerator.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../minimig-aga/denise_playfields.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../minimig-aga/denise_spritepriority.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../minimig-aga/gary.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../minimig-aga/gayle.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../minimig-aga/ide.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../minimig-aga/minimig.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../minimig-aga/minimig_bankmapper.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../minimig-aga/minimig_m68k_bridge.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../minimig-aga/minimig_sram_bridge.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../minimig-aga/minimig_syscontrol.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../minimig-aga/paula.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../minimig-aga/paula_audio.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../minimig-aga/paula_audio_channel.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../minimig-aga/paula_audio_mixer.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../minimig-aga/paula_audio_volume.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../minimig-aga/paula_floppy.v" type="Verilog" type_short="Verilog" excluded="TRUE">
+            <Options/>
+        </Source>
+        <Source name="../../minimig-aga/paula_floppy_ebr.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../minimig-aga/paula_floppy_fifo.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../minimig-aga/paula_intcontroller.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../minimig-aga/paula_uart.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../minimig-aga/userio.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../fx68k/fx68k.sv" type="Verilog" type_short="Verilog">
+            <Options VerilogStandard="System Verilog"/>
+        </Source>
+        <Source name="../../fx68k/fx68kAlu.sv" type="Verilog" type_short="Verilog">
+            <Options VerilogStandard="System Verilog"/>
+        </Source>
+        <Source name="../../fx68k/uaddrPla.sv" type="Verilog" type_short="Verilog">
+            <Options VerilogStandard="System Verilog"/>
+        </Source>
+        <Source name="pll_142m/pll_142m.sbx" type="sbx" type_short="SBX">
+            <Options/>
+        </Source>
+        <Source name="../../tg68k/TG68K.vhd" type="VHDL" type_short="VHDL">
+            <Options/>
+        </Source>
+        <Source name="../../tg68k/TG68K_ALU.vhd" type="VHDL" type_short="VHDL">
+            <Options/>
+        </Source>
+        <Source name="../../tg68k/TG68K_Pack.vhd" type="VHDL" type_short="VHDL">
+            <Options/>
+        </Source>
+        <Source name="../../tg68k/TG68KdotC_Kernel.vhd" type="VHDL" type_short="VHDL">
+            <Options/>
+        </Source>
+        <Source name="../denise_colortable_ram_mf.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../colortable_ram.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../paula_floppy_dma_buf.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../minimig-aga/denise.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../minimig-aga/denise_bitplane_shifter.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../minimig-aga/denise_bitplanes.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../minimig-aga/denise_sprites.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../minimig-aga/denise_sprites_shifter.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../bitplane_ram.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../sprite_ram.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../dpram_be_1024x16.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="nanomig.lpf" type="Logic Preference" type_short="LPF">
+            <Options/>
+        </Source>
+        <Source name="nanomig.sdc" type="Synplify Design Constraints File" type_short="SDC">
+            <Options/>
+        </Source>
+    </Implementation>
+    <Strategy name="Strategy1" file="nanomig1.sty"/>
+</BaliProject>
