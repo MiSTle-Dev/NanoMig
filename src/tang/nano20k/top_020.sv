@@ -153,7 +153,7 @@ wire	clk7n_en;
 wire 	   osd_reset;   
 wire [1:0] osd_chipmem;         // 0=512k, 1=1M, 2=1.5M, 3=2M
 wire [1:0] osd_slowmem;         // 0=None, 1=512k, 2=1M, 3=1.5M
-wire [1:0] osd_fastmem;         // 0=None, 1=2M, 2=4M
+wire [1:0] osd_fastmem;         // 0=None, 1=2M, 2=4M, 3=5M
 wire [1:0] osd_floppy_drives;
 wire       osd_floppy_turbo;
 wire       osd_floppy_wrprot;
@@ -619,7 +619,8 @@ assign ram_din = sdram_dout;
 // pack config values into minimig config
 wire [5:0] chipset_config = { 1'b0,osd_chipset,osd_video_mode,1'b0 };
 wire [1:0] cpu_config = { osd_cpu };
-wire [7:0] memory_config = { 4'b0_000, osd_slowmem, osd_chipmem };   
+// steal 1MiB SlowRAM when FastRAM is set to 2'b11
+wire [7:0] memory_config = { 4'b0_000, (osd_fastmem != 2'b11) ? osd_slowmem : 2'b00, osd_chipmem };   
 wire [2:0] fastram_config = { 1'b0, osd_fastmem };   
 wire [2:0] turbo_config = { osd_turbo };
 wire [3:0] floppy_config = { osd_floppy_drives, osd_floppy_wrprot, osd_floppy_turbo };

@@ -213,7 +213,8 @@ assign ramaddr[23:21] = (cpu_addr[23:21] == 3'b011) ? 3'b101 :	// $600000-$7FFFF
 			{1'b0, cpu_addr[22], cpu_addr[21] | cpu_addr[23]};	// $000000-$FFFFFF -> $000000-$7FFFFF
 `else
 // save logic for devices without 32MiB RAM
-assign ramaddr[23:21] = {1'b0, cpu_addr[22], cpu_addr[21] | cpu_addr[23]};
+assign ramaddr[23:21] = (cpu_addr[23:21] == 3'b011) ? 3'b011 :	// $600000-$7FFFFF -> $600000-$7F0000 (stolen SlowRAM)
+			{1'b0, cpu_addr[22], cpu_addr[21] | cpu_addr[23]};
 `endif
 
 assign ramaddr[20:1] = cpu_addr[20:1];
@@ -531,7 +532,13 @@ always @(posedge clk) begin
 	end
 end
 
+`ifdef ENABLE_RAM32
 wire cfg_z3 = fastramcfg_d[2] & cpucfg[1];
+`else
+// Zorro III does not make sense for devices with 8MiB of SDRAM
+wire cfg_z3 = 0;
+`endif
+
 `ifdef ENABLE_TOCCATA
 reg       ac_toccata;
 `endif
@@ -555,19 +562,20 @@ always @(*) begin
 		endcase
 	end else
 `endif
-	if (autocfg_card) begin
+	if (|autocfg_card) begin
 		if (~cfg_z3) begin
 			// Zorro II RAM (Up to 8 meg at 0x200000)
 			case (chip_addr[6:1])
 				6'b000000: autocfg_data = 4'b1110;	// Zorro-II card, add mem, no ROM
 				6'b000001:
-					case (fastramcfg_d)
-							   1: autocfg_data = 4'b0110; // 2MB
-							   2: autocfg_data = 4'b0111; // 4MB
+					casez ({autocfg_card, fastramcfg_d})
+						5'b01001: autocfg_data = 4'b0110; // 2MB
+						5'b01010: autocfg_data = 4'b0111; // 4MB
 `ifdef ENABLE_RAM32
-						default: autocfg_data = 4'b0000; // 8MB
+						default: autocfg_data = 4'b0000;  // 8MB
 `else
-						default: autocfg_data = 4'b0111; // 4MB
+						5'b01011: autocfg_data = 4'b0111; // 4MB
+						default: autocfg_data = 4'b0101;  // 1MB extra stolen from SlowRAM
 `endif
 					endcase
 				6'b001000: autocfg_data = 4'b1110;	// Manufacturer ID: 0x139c
@@ -575,7 +583,7 @@ always @(*) begin
 				6'b001010: autocfg_data = 4'b0110;
 				6'b001011: autocfg_data = 4'b0011;
 				6'b010011: autocfg_data = 4'b1110; //serial=1
-				  default:;
+				default: ;
 			endcase
 		end
 		else begin
@@ -591,20 +599,20 @@ always @(*) begin
 				6'b001010: autocfg_data = 4'b0110;
 				6'b001011: autocfg_data = 4'b0011;
 				6'b010011: autocfg_data = {2'b11, ~autocfg_card};	// serial=1/2
-				  default:;
+				default: ;
 			endcase
 		end
 	end
 end
 
-assign sel_autoconfig = fastramcfg_d && chip_addr[23:16] == 8'b11101000 && autocfg_card; //$E80000 - $E8FFFF
+assign sel_autoconfig = |fastramcfg_d && chip_addr[23:16] == 8'b11101000 && |autocfg_card; //$E80000 - $E8FFFF
 
 always @(posedge clk) begin
 	reg old_uds;
 	old_uds <= chip_uds;
 
 	if (~reset | ~reset_out) begin
-		autocfg_card <= 1;		//autoconfig on
+		autocfg_card <= 2'b01;	//autoconfig on
 		z2ram_ena <= 0;
 		z3ram_ena0 <= 0;
 		z3ram_ena1 <= 0;
@@ -621,17 +629,22 @@ always @(posedge clk) begin
 			if (chip_addr[6:1] == 6'b100100) begin // Register 0x48 - config, Toccata card in ZII io space ($E90000)
 				toccata_ena <= 1;
 				toccata_base <= cpu_dout[7:0];
-				ac_toccata<=1'b1;
+				ac_toccata <= 1'b1;
 			end
 		end else
 `endif
-	if (~cfg_z3) begin
+		if (~cfg_z3) begin
 			if (chip_addr[6:1] == 6'b100100) begin // Register 0x48 - config, ZII RAM
 				z2ram_ena <= 1;
-				autocfg_card <= 0;
+				autocfg_card <= 2'b00;
+`ifndef ENABLE_RAM32
+				if (fastramcfg_d[1:0] == 2'b11 && autocfg_card == 2'b01) begin
+					autocfg_card <= 2'b10;  // Extra 1MiB of RAM stolen from SlowRAM
+				end
+`endif
 			end
-		end else if (chip_addr[6:1] == 6'b100010)	begin // Register 0x44, assign base address to ZIII RAM.
-			if (autocfg_card == 1) begin
+		end else if (chip_addr[6:1] == 6'b100010) begin // Register 0x44, assign base address to ZIII RAM.
+			if (autocfg_card == 2'b01) begin
 				z3ram_base1 <= cpu_dout[15:12];
 				z3ram_ena1 <= 1;
 				autocfg_card <= {fastramcfg_d[0], 1'b0};
@@ -639,7 +652,7 @@ always @(posedge clk) begin
 			else begin
 				z3ram_base0 <= cpu_dout[15:11];
 				z3ram_ena0 <= 1;
-				autocfg_card <= 0;
+				autocfg_card <= 2'b00;
 			end
 		end
 	end

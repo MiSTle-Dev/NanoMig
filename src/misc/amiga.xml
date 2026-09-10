@@ -80,6 +80,9 @@
 	<!--IS mistle_gw3a_20 mistle_gw5a_25 -->
 	<listentry label="8MB" value="3"/>
 	<!--END-->
+	<!--IS tang_nano20k_020 -->
+	<listentry label="5MB" value="3"/>
+	<!--END-->
       </list>	
       <list label="Turbo:" id="Z" default="3">
     <listentry label="None" value="0"/>
