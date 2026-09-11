@@ -618,7 +618,7 @@ assign ram_din = sdram_dout;
 
 // pack config values into minimig config
 wire [5:0] chipset_config = { 1'b0,osd_chipset,osd_video_mode,1'b0 };
-wire [1:0] cpu_config = { osd_cpu };
+wire [1:0] cpu_config = { |osd_cpu ? 2'b11 : 2'b00 };
 wire [7:0] memory_config = { 4'b0_000, osd_slowmem, osd_chipmem };   
 wire [2:0] fastram_config = { 1'b0, osd_fastmem };   
 wire [2:0] turbo_config = { osd_turbo };

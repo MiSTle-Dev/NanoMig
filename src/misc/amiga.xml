@@ -46,10 +46,9 @@
 	</list>
 	<!--END-->
 	<!--IS tang_nano20k_020 -->
-	<list label="CPU:" id="T" default="2" action="reset">
+	<list label="CPU:" id="T" default="1" action="reset">
 	<listentry label="68000" value="0"/>
-	<listentry label="68010" value="1"/>
-	<listentry label="68020" value="2"/>
+	<listentry label="68020" value="1"/>
       </list>
 	<!--END-->
       <list label="Chipset:" id="C" default="2" action="reset">
