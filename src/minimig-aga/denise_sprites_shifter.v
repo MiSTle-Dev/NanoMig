@@ -53,7 +53,6 @@ module denise_sprites_shifter
 (
   input   clk,          // 28MHz clock
   input clk7_en,
-  input clk7n_en,  // 7MHz clock enable
   input   reset,            // reset
   input  aen,          // address enable
   input  [1:0] address,         // register address input
@@ -259,24 +258,18 @@ endmodule
 
 `else
 // data register A
-always @(posedge clk) begin
-	reg st;
-	if(clk7_en && aen && address==DATA) st <= 1;
-	if(st & clk7n_en) begin
-		st <= 0;
-		datla <= spr_fmode_dat;
-	end
-end
+always @(posedge clk)
+  if (clk7_en) begin
+    if (aen && address==DATA)
+      datla[63:0] <= spr_fmode_dat;
+  end
 
 // data register B
-always @(posedge clk) begin
-	reg st;
-	if(clk7_en && aen && address==DATB) st <= 1;
-	if(st & clk7n_en) begin
-		st <= 0;
-		datlb <= spr_fmode_dat;
-	end
-end
+always @(posedge clk)
+  if (clk7_en) begin
+    if (aen && address==DATB)
+      datlb[63:0] <= spr_fmode_dat;
+  end
 
 //--------------------------------------------------------------------------------------
 

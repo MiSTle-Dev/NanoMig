@@ -378,93 +378,67 @@ end
 
 //--------------------------------------------------------------------------------------
 
-wire clk7n_en = c1 & c3;
-
-reg [15:0] data16;
-always @(posedge clk) if (clk7_en) data16 <= data_in;
-
 //bitplane buffer register for plane 1
-always @(posedge clk) begin
-	reg st;
-	if(clk7_en && reg_address_in[8:1] == BPL1DAT[8:1]) st <= 1;
-	if(st & clk7n_en) begin
-		st <= 0;
-		bpl1dat <= {data16,chip48_fmode};
-	end
-end
+always @(posedge clk)
+  if (clk7_en) begin
+    if (reg_address_in[8:1] == BPL1DAT[8:1])
+      bpl1dat <= {data_in,chip48_fmode};
+  end
 
 //bitplane buffer register for plane 2
-always @(posedge clk) begin
-	reg st;
-	if(clk7_en && reg_address_in[8:1] == BPL2DAT[8:1]) st <= 1;
-	if(st & clk7n_en) begin
-		st <= 0;
-		bpl2dat <= {data16,chip48_fmode};
-	end
-end
+always @(posedge clk)
+  if (clk7_en) begin
+    if (reg_address_in[8:1] == BPL2DAT[8:1])
+      bpl2dat <= {data_in,chip48_fmode};
+  end
 
 //bitplane buffer register for plane 3
-always @(posedge clk) begin
-	reg st;
-	if(clk7_en && reg_address_in[8:1] == BPL3DAT[8:1]) st <= 1;
-	if(st & clk7n_en) begin
-		st <= 0;
-		bpl3dat <= {data16,chip48_fmode};
-	end
-end
+always @(posedge clk)
+  if (clk7_en) begin
+    if (reg_address_in[8:1] == BPL3DAT[8:1])
+      bpl3dat <= {data_in,chip48_fmode};
+  end
 
 //bitplane buffer register for plane 4
-always @(posedge clk) begin
-	reg st;
-	if(clk7_en && reg_address_in[8:1] == BPL4DAT[8:1]) st <= 1;
-	if(st & clk7n_en) begin
-		st <= 0;
-		bpl4dat <= {data16,chip48_fmode};
-	end
-end
+always @(posedge clk)
+  if (clk7_en) begin
+    if (reg_address_in[8:1] == BPL4DAT[8:1])
+      bpl4dat <= {data_in,chip48_fmode};
+  end
 
 //bitplane buffer register for plane 5
-always @(posedge clk) begin
-	reg st;
-	if(clk7_en && reg_address_in[8:1] == BPL5DAT[8:1]) st <= 1;
-	if(st & clk7n_en) begin
-		st <= 0;
-		bpl5dat <= {data16,chip48_fmode};
-	end
-end
+always @(posedge clk)
+  if (clk7_en) begin
+    if (reg_address_in[8:1] == BPL5DAT[8:1])
+      bpl5dat <= {data_in,chip48_fmode};
+  end
 
 //bitplane buffer register for plane 6
-always @(posedge clk) begin
-	reg st;
-	if(clk7_en && reg_address_in[8:1] == BPL6DAT[8:1]) st <= 1;
-	if(st & clk7n_en) begin
-		st <= 0;
-		bpl6dat <= {data16,chip48_fmode};
-	end
-end
+always @(posedge clk)
+  if (clk7_en) begin
+    if (reg_address_in[8:1] == BPL6DAT[8:1])
+      bpl6dat <= {data_in,chip48_fmode};
+  end
 
 //bitplane buffer register for plane 7
-always @(posedge clk) begin
-	reg st;
-	if(clk7_en && reg_address_in[8:1] == BPL7DAT[8:1]) st <= 1;
-	if(st & clk7n_en) begin
-		st <= 0;
-		bpl7dat <= {data16,chip48_fmode};
-	end
-end
+always @(posedge clk)
+  if (clk7_en) begin
+    if (reg_address_in[8:1] == BPL7DAT[8:1])
+      bpl7dat <= {data_in,chip48_fmode};
+  end
 
 //bitplane buffer register for plane 8
-always @(posedge clk) begin
-	reg st;
-	if(clk7_en && reg_address_in[8:1] == BPL8DAT[8:1]) st <= 1;
-	if(st & clk7n_en) begin
-		st <= 0;
-		bpl8dat <= {data16,chip48_fmode};
-	end
-end
+always @(posedge clk)
+  if (clk7_en) begin
+    if (reg_address_in[8:1] == BPL8DAT[8:1])
+      bpl8dat <= {data_in,chip48_fmode};
+  end
 
 //generate load signal when plane 1 is written
-always @(posedge clk) if (clk7_en) load <= reg_address_in[8:1] == BPL1DAT[8:1];
+always @(posedge clk)
+  if (clk7_en) begin
+    load <= reg_address_in[8:1] == BPL1DAT[8:1] ? 1'b1 : 1'b0;
+  end
 
 //--------------------------------------------------------------------------------------
 
