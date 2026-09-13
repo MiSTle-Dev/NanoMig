@@ -16,8 +16,8 @@ create_clock -name clk_audio -period 20833 -waveform {0 10416} [get_nets {clk_au
 // domains and reports thousands of meaningless violations
 set_multicycle_path -from [get_clocks {clk28}] -to [get_clocks {clk85}] 2
 set_multicycle_path -from [get_clocks {clk28}] -to [get_clocks {clk85}] -hold 1
-set_multicycle_path -from [get_clocks {clk85}] -to [get_clocks {clk28}] -start 2
-set_multicycle_path -from [get_clocks {clk85}] -to [get_clocks {clk28}] -hold -start 1
+set_multicycle_path -from [get_clocks {clk85}] -to [get_clocks {clk28}] 2
+set_multicycle_path -from [get_clocks {clk85}] -to [get_clocks {clk28}] -hold 1
 
 // set_false_path -from [get_cells {sysctrl/system_cpu*}]
 set_false_path -from [get_cells {sysctrl/system_chipset*}]

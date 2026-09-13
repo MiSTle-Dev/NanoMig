@@ -52,7 +52,7 @@ module sdram #(
   parameter SYNC_CLOCK_SPEED =  7_080_000,
   parameter CHIP48_BURST = 0,
   parameter SYNC_DELAY = 4,
-  parameter ACK_DELAY = 1
+  parameter ACK_DELAY = 0
 ) (
   input  wire clk,
   input  wire reset_n,  // init signal after FPGA config to initialize RAM
@@ -83,15 +83,15 @@ module sdram #(
   input wire        we,    // chipset requests write
 
   // cpu interface
-  input  wire [15:0] p2_din,   // data input from cpu
-  output reg  [15:0] p2_dout,  // data output to cpu
+  input  wire [15:0] p2_din,    // data input from cpu
+  output reg  [15:0] p2_dout,   // data output to cpu
   output reg  [47:0] p2_dout48, // upper 48 bits of a 64 bit aligned cpu read
 
   input  wire [22:0] p2_addr,  // 23 bit word address
   input  wire  [1:0] p2_ds,    // upper/lower data strobe
   input  wire        p2_cs,    // cpu requests read/wrie
   input  wire        p2_we,    // cpu requests write
-  output wire        p2_ack
+  output wire        p2_ack    // cpu ack
 );
 
 localparam WIDTH32 = (DATA_WIDTH == 32);
@@ -482,19 +482,16 @@ generate
           case (sdram_port)
             PORT_1: if (ram_we) sd_dqm <= ram_ds;
             PORT_2: if (ram_we) begin
-              p2_ack_i <= ~p2_ack_i;
               sd_dqm <= ram_ds;
+              p2_ack_i <= ~p2_ack_i;
             end
             default: ;
           endcase
         end
         STATE_READ_0: begin
           case (sdram_port)
-            PORT_1: dout48[47:32] <= ram_dout;
-            PORT_2: begin
-              if (!ram_we && !CHIP48_BURST) p2_ack_i <= ~p2_ack_i;
-              p2_dout48[47:32] <= ram_dout;
-            end
+            PORT_1: ;
+            PORT_2: if (!ram_we && !CHIP48_BURST) p2_ack_i <= ~p2_ack_i;
             default: ;
           endcase
         end
@@ -540,9 +537,8 @@ generate
   end else if (ACK_DELAY > 1) begin
     reg [ACK_DELAY-1:0] p2_ack_d;
 
-    always @(posedge clk) begin
+    always @(posedge clk)
       p2_ack_d <= {p2_ack_d[ACK_DELAY-2:0], p2_ack_i};
-    end
 
     assign p2_ack = p2_ack_d[ACK_DELAY-1];
 

@@ -456,12 +456,12 @@ reg  [CACHE_ADDR_WIDTH-1:1] fastram_addr_r;
 reg  [15:0] fastram_din_r;
 reg         fastram_lds_r;
 reg         fastram_uds_r;
-reg         fastram_ready_d;  // previous state of the port 2 ack toggle
-wire        fastram_done = (fastram_ready != fastram_ready_d);
-wire [1:0]  fill_word = fill_idx + fill_cnt;
+reg   [1:0] fastram_ready_d;
+wire        fastram_done = (fastram_ready_d[0] != fastram_ready_d[1]);
+wire  [1:0] fill_word = fill_idx + fill_cnt;
 
 always @(posedge clk_sys) begin
-  fastram_ready_d <= fastram_ready;
+  fastram_ready_d <= {fastram_ready_d[0], fastram_ready};
   cache_ack_d     <= cache_ack;
 
   cache_fill_ack  <= 1'b0;
