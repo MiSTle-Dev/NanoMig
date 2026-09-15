@@ -25,8 +25,8 @@
      inkscape:document-units="mm"
      showgrid="true"
      inkscape:zoom="0.84096522"
-     inkscape:cx="478.6167"
-     inkscape:cy="632.01187"
+     inkscape:cx="470.29293"
+     inkscape:cy="633.20098"
      inkscape:window-width="1828"
      inkscape:window-height="1180"
      inkscape:window-x="11"
@@ -1008,7 +1008,7 @@
          id="tspan423-7-5-3"
          style="font-size:7.76111px;text-align:end;text-anchor:end;fill:#ff0000;fill-opacity:1;stroke:none;stroke-width:0.264583px"
          x="45.963432"
-         y="68.201866">DOWN-1</tspan></text><path
+         y="68.201866">UP-1</tspan></text><path
        style="fill:#ff0000;fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:0.264583px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
        d="m 51.203763,65.726542 -3.96875,-2.64583 v 5.29166 z"
        id="path3959-9-5-6-6" /><text
@@ -1107,4 +1107,4 @@
          id="tspan1626"
          style="stroke-width:0.264583px"
          x="168.2749"
-         y="170.65625"></tspan></text></g></svg>
+         y="170.65625" /></text></g></svg>
