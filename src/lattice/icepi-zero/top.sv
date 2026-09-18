@@ -690,7 +690,11 @@ nanomig nanomig
  ._ram_ble(ram_be[0]),      // sram lower byte select
  ._ram_we(ram_we_n),        // sram write enable
  ._ram_oe(ram_oe_n),        // sram output enable
- .chip48(chip48_din),       // 64-bit chipram read data bus
+`ifdef ENABLE_AGA
+ .chip48(chip48_din),       // 64-bit chipram read data bus (AGA-only)
+`else
+ .chip48(48'b0),
+`endif
  .refresh(ram_refresh),
 
  .fastram_sel(fastram_sel),
@@ -892,14 +896,14 @@ sdram #(
 	.cs         ( sdram_cs      ), // cpu/chipset requests read/wrie
 	.we         ( sdram_we      ), // cpu/chipset requests write
 
-	.p2_din        ( fastram_din     ), // data input from cpu
-	.p2_dout       ( fastram_dout    ),
-	.p2_dout48     ( fastram_dout48  ), // wide read data for the cache line fills
-	.p2_addr       ( fastram_addr    ), // 23 bit word address
-	.p2_ds         ( fastram_be      ), // upper/lower data strobe
-	.p2_cs         ( fastram_sel     ), // cpu requests read/wrie
-	.p2_we         ( fastram_wr      ), // cpu requests write
-	.p2_ack        ( fastram_ready   )
+	.p2_din     ( fastram_din    ), // data input from cpu
+	.p2_dout    ( fastram_dout   ),
+	.p2_dout48  ( fastram_dout48 ), // wide read data for the cache line fills
+	.p2_addr    ( fastram_addr   ), // 23 bit word address
+	.p2_ds      ( fastram_be     ), // upper/lower data strobe
+	.p2_cs      ( fastram_sel    ), // cpu requests read/wrie
+	.p2_we      ( fastram_wr     ), // cpu requests write
+	.p2_ack     ( fastram_ready  )
 );
 
 // run the flash a 85MHz. This is only used at power-up to copy kickstart
