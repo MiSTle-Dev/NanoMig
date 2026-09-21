@@ -197,7 +197,12 @@ wire	    ovl;
    
 wire [1:0] cpucfg = cpu_config; // CPU-Type: 00 = 68000, 01 = 68010, 11 = 68020
 wire [1:0] chipram_config = memory_config[1:0];
+`ifndef ENABLE_RAM32
+// steal 1.5MiB SlowRAM when FastRAM is set to 2'b11
+wire [1:0] slowram_config = (fastram_config[1:0] != 2'b11 ? memory_config[3:2] : 2'b00);
+`else
 wire [1:0] slowram_config = memory_config[3:2];
+`endif
 
 // cache bits: data, kick, chip
 wire [2:0] turbocfg = turbo_config & { 1'b1, 1'b1, ~ovl };  // turbo data, turbo kick, turbo chip when no overlay

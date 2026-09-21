@@ -153,7 +153,7 @@ wire	clk7n_en;
 wire 	   osd_reset;   
 wire [1:0] osd_chipmem;         // 0=512k, 1=1M, 2=1.5M, 3=2M
 wire [1:0] osd_slowmem;         // 0=None, 1=512k, 2=1M, 3=1.5M
-wire [1:0] osd_fastmem;         // 0=None, 1=2M, 2=4M
+wire [1:0] osd_fastmem;         // 0=None, 1=2M, 2=4M, 3=5.5M (stolen from SlowRAM)
 wire [1:0] osd_floppy_drives;
 wire       osd_floppy_turbo;
 wire       osd_floppy_wrprot;
