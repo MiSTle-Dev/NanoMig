@@ -175,7 +175,9 @@ wire [2:0] osd_volume;          // Mute=0, 1=25%, 2=50%, 3=75%, 4=100%
 wire       osd_stereo_mix;      // 0=off, 1=on
 wire [1:0] osd_kickstart;       // 1=1.3, 2=3.1, 3=3.2
 
+`ifndef DISABLE_ROM_LOADER
 wire	   rom_download_in_progress;
+`endif
 
 // this is the reset that goes into the nanomig itself
 reg nanomig_reset = 1;
@@ -298,14 +300,10 @@ wire [7:0]  sd_img_mounted;
 reg         sd_ready;
 
 `ifndef DISABLE_ROM_LOADER
-
 // state machine handling kickstart upload from Companion
 reg [2:0]	 kick_upload_state = 3'd0;
-`endif // DISABLE_ROM_LOADER
-
 reg		     kick_is_256k; 
 
-`ifndef DISABLE_ROM_LOADER
 assign	     rom_download_in_progress = kick_upload_state >= 3'd1 && kick_upload_state <= 3'd3;
    
 wire		 rom_data_available;   
@@ -871,7 +869,11 @@ wire [1:0]  sdram_be      =
       // check if the sdram access goes into the ram segments used to store kickrom and if
       // a 256k kick has been downloaded
       wire		 minimig_is_accessing_rom = ram_a[22:19] == 4'b1111;
+      `ifndef DISABLE_ROM_LOADER
       wire		 minimig_is_accessing_256k_rom = kick_is_256k && minimig_is_accessing_rom;  
+      `else
+      wire		 minimig_is_accessing_256k_rom = minimig_is_accessing_rom;   
+      `endif // DISABLE_ROM_LOADER
 
 wire		sdram_we      = 
 			!rom_done?flash_ram_write:               // flash download write enable			
