@@ -186,7 +186,11 @@ always @(posedge clk_28m, posedge rst_28m) begin
     if (rst_28m)
         nanomig_reset <= 1'b1;
     else
+    `ifndef DISABLE_ROM_LOADER
         nanomig_reset <= !rom_done || reset || osd_reset || kbd_reset || rom_download_in_progress;
+    `else
+        nanomig_reset <= !rom_done || reset || osd_reset || kbd_reset;
+    `endif
 end
 
 // -------------------------- M0S MCU interface -----------------------
@@ -765,7 +769,11 @@ reg         flash_ram_write;
 // once the copy counter has run to zero, all rom has been copied
 wire        rom_done = (word_count == 0);
 
+`ifndef DISABLE_ROM_LOADER
 assign leds[3] = !rom_done || rom_download_in_progress;
+`else
+assign leds[3] = !rom_done; 
+`endif
 
 localparam FLASH_STATE_INIT  = 0;
 localparam FLASH_STATE_READ  = 1;
@@ -851,7 +859,9 @@ wire        sdram_sync    = clk7_en;
    
 wire		sdram_refresh = 
 			!rom_done?1'b0:
-			rom_download_in_progress?1'b0:
+      `ifndef DISABLE_ROM_LOADER
+			  rom_download_in_progress?1'b0:
+      `endif // DISABLE_ROM_LOADER
 			ram_refresh;
 
 wire [15:0] sdram_din     =
@@ -863,7 +873,9 @@ wire [15:0] sdram_din     =
    
 wire [1:0]  sdram_be      =
 			!rom_done?2'b00:                         // flash download always does word access
-			rom_download_in_progress?2'b00:          //          -"-
+			`ifndef DISABLE_ROM_LOADER
+        rom_download_in_progress?2'b00:          //          -"-
+      `endif // DISABLE_ROM_LOADER
 			ram_be;                                  // byte enable during regular operation is via ds[1:0]
 
       // check if the sdram access goes into the ram segments used to store kickrom and if
