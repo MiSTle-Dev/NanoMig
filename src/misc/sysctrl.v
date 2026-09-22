@@ -54,6 +54,7 @@ module sysctrl #(
   output reg [2:0]  system_volume,
   output reg	    system_stereo_mix,
   output reg [1:0]  system_kickstart,
+  output reg 		system_drive_sounds,
   output reg [7:0]  system_lcd_v_pos
 );
 
@@ -134,8 +135,9 @@ always @(posedge clk) begin
       system_ide_enable <= 1'b0;
       system_joy_swap <= 1'b1;
       system_volume <= 3'b010;
-	   system_stereo_mix <= 1'b1;
+	  system_stereo_mix <= 1'b1;
       system_kickstart <= 2'b01;
+	  system_drive_sounds <= 1'b0;
    end
    else
    begin // if (reset)
@@ -257,10 +259,12 @@ always @(posedge clk) begin
 		   if(id == "A") system_volume <= data_in[2:0];
 		   // value "M": Stereo Mix disabled(0) or enabled(1)
 		   if(id == "M") system_stereo_mix <= data_in[0];
-         // Value "K": Kickstart 1.3(0), 3.1(1), 3.2(2)
+           // Value "K": Kickstart 1.3(0), 3.1(1), 3.2(2)
 		   if(id == "K") system_kickstart <= data_in[1:0];
 		   // value "B": lcd vertical position (used in lcd variant, only)
 		   if(id == "B") system_lcd_v_pos <= data_in;
+	       // Value "Z": Drive Sounds disabled(0) or enabled(1)
+		   if(id == "Z") system_drive_sounds <= data_in[0];
                 end
             end
 
