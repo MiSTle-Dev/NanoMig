@@ -175,9 +175,7 @@ wire [2:0] osd_volume;          // Mute=0, 1=25%, 2=50%, 3=75%, 4=100%
 wire       osd_stereo_mix;      // 0=off, 1=on
 wire [1:0] osd_kickstart;       // 1=1.3, 2=3.1, 3=3.2
 
-`ifndef DISABLE_ROM_LOADER
 wire	   rom_download_in_progress;
-`endif
 
 // this is the reset that goes into the nanomig itself
 reg nanomig_reset = 1;
@@ -186,11 +184,7 @@ always @(posedge clk_28m, posedge rst_28m) begin
     if (rst_28m)
         nanomig_reset <= 1'b1;
     else
-    `ifndef DISABLE_ROM_LOADER
         nanomig_reset <= !rom_done || reset || osd_reset || kbd_reset || rom_download_in_progress;
-    `else
-        nanomig_reset <= !rom_done || reset || osd_reset || kbd_reset;
-    `endif
 end
 
 // -------------------------- M0S MCU interface -----------------------
@@ -307,9 +301,11 @@ reg         sd_ready;
 // state machine handling kickstart upload from Companion
 reg [2:0]	 kick_upload_state = 3'd0;
 reg		     kick_is_256k; 
+`endif // DISABLE_ROM_LOADER
 
 assign	     rom_download_in_progress = kick_upload_state >= 3'd1 && kick_upload_state <= 3'd3;
-   
+
+`ifndef DISABLE_ROM_LOADER 
 wire		 rom_data_available;   
 wire [7:0]	 rom_data;
 reg		     rom_data_strobe;
@@ -769,11 +765,7 @@ reg         flash_ram_write;
 // once the copy counter has run to zero, all rom has been copied
 wire        rom_done = (word_count == 0);
 
-`ifndef DISABLE_ROM_LOADER
 assign leds[3] = !rom_done || rom_download_in_progress;
-`else
-assign leds[3] = !rom_done; 
-`endif
 
 localparam FLASH_STATE_INIT  = 0;
 localparam FLASH_STATE_READ  = 1;
@@ -850,32 +842,24 @@ wire	    sdram_rw      = !ram_we_n;
 
 wire		sdram_cs      =
 			!rom_done?flash_ram_write:
-      `ifndef DISABLE_ROM_LOADER
 			    rom_download_in_progress?rom_data_word_we:
-      `endif // DISABLE_ROM_LOADER
 			sdram_access;
 
 wire        sdram_sync    = clk7_en;
    
 wire		sdram_refresh = 
 			!rom_done?1'b0:
-      `ifndef DISABLE_ROM_LOADER
 			  rom_download_in_progress?1'b0:
-      `endif // DISABLE_ROM_LOADER
 			ram_refresh;
 
 wire [15:0] sdram_din     =
 			!rom_done?flash_dout:                    // initial rom download from flash
-      `ifndef DISABLE_ROM_LOADER
 			      rom_download_in_progress?rom_data_word:  // rom download from sd card
-      `endif // DISABLE_ROM_LOADER
 			ram_dout;                                // regular operation
    
 wire [1:0]  sdram_be      =
 			!rom_done?2'b00:                         // flash download always does word access
-			`ifndef DISABLE_ROM_LOADER
         rom_download_in_progress?2'b00:          //          -"-
-      `endif // DISABLE_ROM_LOADER
 			ram_be;                                  // byte enable during regular operation is via ds[1:0]
 
       // check if the sdram access goes into the ram segments used to store kickrom and if
@@ -889,19 +873,15 @@ wire [1:0]  sdram_be      =
 
 wire		sdram_we      = 
 			!rom_done?flash_ram_write:               // flash download write enable			
-			`ifndef DISABLE_ROM_LOADER
           rom_download_in_progress?rom_data_word_we:
-			`endif // DISABLE_ROM_LOADER
       // the following test is needed as the rom kick area is also accessible to the
 			// minimig through the fastram area at $780000
 			(sdram_rw && !minimig_is_accessing_rom); // regular ram write as requested by the cpu or chipset
 
 wire [21:0] sdram_addr    = 
-      `ifndef DISABLE_ROM_LOADER
             !rom_done?{4'b1111, flash_ram_addr}:                // initial rom download from flash
             rom_download_in_progress?{4'b1111, rom_data_addr}:  // rom download from sd card
             minimig_is_accessing_256k_rom?{ram_a[22:19],1'b0,ram_a[17:1]}:  // regular rom access into 256k kickstart
-      `endif // DISABLE_ROM_LOADER
 			ram_a[22:1];                                        // regular operation
 
 assign O_sdram_clk = clk_85m_shifted;
