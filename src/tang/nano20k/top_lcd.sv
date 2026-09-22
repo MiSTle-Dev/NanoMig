@@ -1,13 +1,17 @@
-/*
-    top_lcd.sv - Minimig on tang nano 20k toplevel
-*/ 
 
-/* we need two copies in case of 256k kickroms
-     openFPGALoader --external-flash -o 0x400000 kick13.rom
-     openFPGALoader --external-flash -o 0x440000 kick13.rom
-   or a single copy of e.g. a 512k diag rom
-     openFPGALoader --external-flash -o 0x400000 DiagROM
-*/
+//     top_lcd.sv - Minimig on tang nano 20k toplevel
+
+// =========================================================================
+// To use Kick Switch Lite, the ROMs must be flashed like this:
+//
+// 0x400000 Kickstart 3.1 / 512k (default)
+// 0x700000 Kickstart 1.3 / 256k 
+// 0x740000 Kickstart 1.3 / 256k 
+// 0x780000 Kickstart 3.2 / 512k 
+//
+// for example:
+// openFPGALoader --external-flash -o 0x400000 kick31.rom
+// =========================================================================
  
 module top(
   input			clk,
