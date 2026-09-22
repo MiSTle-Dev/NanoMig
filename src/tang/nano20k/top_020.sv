@@ -301,7 +301,11 @@ reg         sd_ready;
 
 // state machine handling kickstart upload from Companion
 reg [2:0]	 kick_upload_state = 3'd0;
+`endif // DISABLE_ROM_LOADER
+
 reg		     kick_is_256k; 
+
+`ifndef DISABLE_ROM_LOADER
 assign	     rom_download_in_progress = kick_upload_state >= 3'd1 && kick_upload_state <= 3'd3;
    
 wire		 rom_data_available;   
@@ -840,7 +844,9 @@ wire	    sdram_rw      = !ram_we_n;
 
 wire		sdram_cs      =
 			!rom_done?flash_ram_write:
-			rom_download_in_progress?rom_data_word_we:
+      `ifndef DISABLE_ROM_LOADER
+			    rom_download_in_progress?rom_data_word_we:
+      `endif // DISABLE_ROM_LOADER
 			sdram_access;
 
 wire        sdram_sync    = clk7_en;
@@ -852,7 +858,9 @@ wire		sdram_refresh =
 
 wire [15:0] sdram_din     =
 			!rom_done?flash_dout:                    // initial rom download from flash
-			rom_download_in_progress?rom_data_word:  // rom download from sd card
+      `ifndef DISABLE_ROM_LOADER
+			      rom_download_in_progress?rom_data_word:  // rom download from sd card
+      `endif // DISABLE_ROM_LOADER
 			ram_dout;                                // regular operation
    
 wire [1:0]  sdram_be      =
@@ -860,12 +868,10 @@ wire [1:0]  sdram_be      =
 			rom_download_in_progress?2'b00:          //          -"-
 			ram_be;                                  // byte enable during regular operation is via ds[1:0]
 
-`ifndef DISABLE_ROM_LOADER
       // check if the sdram access goes into the ram segments used to store kickrom and if
       // a 256k kick has been downloaded
       wire		 minimig_is_accessing_rom = ram_a[22:19] == 4'b1111;
       wire		 minimig_is_accessing_256k_rom = kick_is_256k && minimig_is_accessing_rom;  
-`endif // DISABLE_ROM_LOADER 
 
 wire		sdram_we      = 
 			!rom_done?flash_ram_write:               // flash download write enable			
