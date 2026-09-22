@@ -297,15 +297,12 @@ wire [63:0] sd_img_size;
 wire [7:0]  sd_img_mounted;
 reg         sd_ready;
 
-`ifndef DISABLE_ROM_LOADER
 // state machine handling kickstart upload from Companion
 reg [2:0]	 kick_upload_state = 3'd0;
 reg		     kick_is_256k; 
-`endif // DISABLE_ROM_LOADER
 
 assign	     rom_download_in_progress = kick_upload_state >= 3'd1 && kick_upload_state <= 3'd3;
 
-`ifndef DISABLE_ROM_LOADER 
 wire		 rom_data_available;   
 wire [7:0]	 rom_data;
 reg		     rom_data_strobe;
@@ -323,6 +320,7 @@ wire		 rom_accepted = (rom_selection_strobe && rom_selected == 3'd0) && kickrom_
 
 wire [18:1]	 rom_data_addr_max = ((kick_is_256k?'d262144:'d524288)/2)-1;
 
+`ifndef DISABLE_ROM_LOADER 
 // The ROM uploader receives ROM data from the Companion and writes it into
 // the area of sdram that is reserved for kickstart rom  
 always @(posedge clk_28m, posedge rst_28m) begin
