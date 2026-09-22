@@ -21,6 +21,7 @@
 // `define DISABLE_IDE  // v32 experiment: cache + ide together
 `define NO_WS2812   // drop the rgb status led to make room for cache + ide
 `define DENISE_EBR   // block ram based bitplane and sprite buffers, saves logic
+`define DISABLE_ROM_LOADER // drop the rom loader to make room 
 
 module top(
   input			clk,
@@ -296,6 +297,8 @@ wire [63:0] sd_img_size;
 wire [7:0]  sd_img_mounted;
 reg         sd_ready;
 
+`ifndef DISABLE_ROM_LOADER
+
 // state machine handling kickstart upload from Companion
 reg [2:0]	 kick_upload_state = 3'd0;
 reg		     kick_is_256k; 
@@ -392,7 +395,8 @@ always @(posedge clk_28m, posedge rst_28m) begin
 		
       endcase	 
    end   
-end   
+end  
+`endif // DISABLE_ROM_LOADER 
 
 sd_card #(
     .CLK_DIV(3'd0),                  // for 28 Mhz clock
@@ -417,6 +421,7 @@ sd_card #(
     .image_mounted(sd_img_mounted),
     .image_size(sd_img_size),           // length of image file
 
+`ifndef DISABLE_ROM_LOADER
     // rom download interface
     .rom_image_selected(rom_selected),  // image_size is valid for this
     .rom_image_selection_strobe(rom_selection_strobe),
@@ -424,6 +429,7 @@ sd_card #(
     .rom_image_data_available(rom_data_available),
     .rom_image_data(rom_data),
     .rom_image_data_strobe(rom_data_strobe),
+`endif // DISABLE_ROM_LOADER
 		   
     // interrupt to signal communication request
     .irq(sdc_int),
@@ -854,22 +860,28 @@ wire [1:0]  sdram_be      =
 			rom_download_in_progress?2'b00:          //          -"-
 			ram_be;                                  // byte enable during regular operation is via ds[1:0]
 
-// check if the sdram access goes into the ram segments used to store kickrom and if
-// a 256k kick has been downloaded
-wire		 minimig_is_accessing_rom = ram_a[22:19] == 4'b1111;
-wire		 minimig_is_accessing_256k_rom = kick_is_256k && minimig_is_accessing_rom;   
+`ifndef DISABLE_ROM_LOADER
+      // check if the sdram access goes into the ram segments used to store kickrom and if
+      // a 256k kick has been downloaded
+      wire		 minimig_is_accessing_rom = ram_a[22:19] == 4'b1111;
+      wire		 minimig_is_accessing_256k_rom = kick_is_256k && minimig_is_accessing_rom;  
+`endif // DISABLE_ROM_LOADER 
 
 wire		sdram_we      = 
 			!rom_done?flash_ram_write:               // flash download write enable			
-			rom_download_in_progress?rom_data_word_we:
-			// the following test is needed as the rom kick area is also accessible to the
+			`ifndef DISABLE_ROM_LOADER
+          rom_download_in_progress?rom_data_word_we:
+			`endif // DISABLE_ROM_LOADER
+      // the following test is needed as the rom kick area is also accessible to the
 			// minimig through the fastram area at $780000
 			(sdram_rw && !minimig_is_accessing_rom); // regular ram write as requested by the cpu or chipset
 
 wire [21:0] sdram_addr    = 
-			!rom_done?{4'b1111, flash_ram_addr}:                // initial rom download from flash
-			rom_download_in_progress?{4'b1111, rom_data_addr}:  // rom download from sd card
-			minimig_is_accessing_256k_rom?{ram_a[22:19],1'b0,ram_a[17:1]}:  // regular rom access into 256k kickstart
+      `ifndef DISABLE_ROM_LOADER
+            !rom_done?{4'b1111, flash_ram_addr}:                // initial rom download from flash
+            rom_download_in_progress?{4'b1111, rom_data_addr}:  // rom download from sd card
+            minimig_is_accessing_256k_rom?{ram_a[22:19],1'b0,ram_a[17:1]}:  // regular rom access into 256k kickstart
+      `endif // DISABLE_ROM_LOADER
 			ram_a[22:1];                                        // regular operation
 
 assign O_sdram_clk = clk_85m_shifted;
