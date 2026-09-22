@@ -119,6 +119,7 @@ wire [1:0] osd_video_scanlines;
 wire       osd_joy_swap;        // 0=off, 1=on
 wire [2:0] osd_volume;          // Mute=0, 1=25%, 2=50%, 3=75%, 4=100%
 wire [7:0] osd_lcd_v_pos;       // -20 .. 20 vertical offset for lcd adjustment
+wire [1:0] osd_kickstart;       // 1=1.3, 2=3.1, 3=3.2
 
 wire	   rom_download_in_progress;
 
@@ -412,7 +413,8 @@ sysctrl sysctrl (
         .system_joy_swap(osd_joy_swap),
     	.system_volume(osd_volume),
         .system_lcd_v_pos(osd_lcd_v_pos),
-				 // 				 
+		.system_kickstart(osd_kickstart),
+        
         .int_out_n(spi_irqn),
         .int_in( { 4'b0000, sdc_int, 1'b0, hid_int, 1'b0 }),
         .int_ack( int_ack ),

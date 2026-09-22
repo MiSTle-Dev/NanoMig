@@ -59,6 +59,11 @@
 	<listentry label="AGA" value="3"/>
 	<!--END-->
       </list>
+      <list label="Kickstart:" id="K" default="1" action="reset">
+	<listentry label="1.3" value="0"/>
+	<listentry label="3.1" value="1"/>
+	<listentry label="3.2" value="2"/>
+	    </list>
       <list label="Chipmem:" id="Y" default="0" action="reset">
 	<listentry label="512kB" value="0"/>
 	<listentry label="1MB" value="1"/>
