@@ -148,6 +148,10 @@
 		<listentry label="Disabled" value="0"/>
         <listentry label="Enabled" value="1"/>
     </list>
+	<list label="Drive Sounds:" id="Z" default="0">
+		<listentry label="Disabled" value="0"/>
+		<listentry label="Enabled" value="1"/>
+	</list>
     <list label="Scanlines:" id="L" default="0">
 		<listentry label="None" value="0"/>
 		<listentry label="Dim" value="1"/>
