@@ -1,4 +1,4 @@
-// drive_sounds.sv
+// drive_sounds.v
 // Generates drive activity sounds as a PWM tone on the buzzer output.
 //
 // FDD : 250 Hz tone,  10 ms burst / 200 ms gap  (head step click)
@@ -9,7 +9,7 @@
 
 `default_nettype none
 
-module drive_sound (
+module drive_sounds (
     input  wire clk,        // 28,375,160 MHz
     input  wire enable,     // 1 = drive sounds enabled, 0 = disabled
     // input  wire fdd_led,    // high = FDD active
