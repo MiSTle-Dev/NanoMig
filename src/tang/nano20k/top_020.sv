@@ -453,7 +453,7 @@ sd_card #(
 
 // keyboard and mouse interface to Minimig
 wire [2:0] mouse_buttons; // mouse buttons
-wire	   kbd_mouse_level;  
+wire	     kbd_mouse_level;  
 wire [1:0] kbd_mouse_type;  
 wire [7:0] kbd_mouse_data;  
 wire       kbd_reset;      // keyboard reset (Ctrl+LAmiga+RAmiga)
