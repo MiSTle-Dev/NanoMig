@@ -87,6 +87,7 @@
         <File path="tang/nano20k/gowin_dpb/ide_dpram.v" type="file.verilog" enable="1"/>
         <File path="tang/nano20k/gowin_dpb/sector_dpram.v" type="file.verilog" enable="1"/>
         <File path="misc/sdram.sv" type="file.verilog" enable="1"/>
+        <File path="misc/rst_sync.v" type="file.verilog" enable="1"/>
         <File path="tg68k/TG68K.vhd" type="file.vhdl" enable="1"/>
         <File path="tg68k/TG68K_ALU.vhd" type="file.vhdl" enable="1"/>
         <File path="tg68k/TG68K_Pack.vhd" type="file.vhdl" enable="1"/>
