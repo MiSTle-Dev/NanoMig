@@ -22,6 +22,7 @@
 `define NO_WS2812   // drop the rgb status led to make room for cache + ide
 `define DENISE_EBR   // block ram based bitplane and sprite buffers, saves logic
 `define DISABLE_ROM_LOADER // drop the rom loader to make room 
+`define ENABLE_DRIVE_SOUNDS
 
 module top(
   input			clk,
@@ -1106,7 +1107,8 @@ ELVDS_OBUF tmds_bufds [3:0] (
         .OB({tmds_clk_n, tmds_d_n})
 );
 
-// ========================= Drive Sound =========================
+// ========================= Drive Sounds =========================
+`ifdef ENABLE_DRIVESOUNDS	
 drive_sound drive_sound_inst (
     .clk     (clk_28m),
 	.enable  (osd_drive_sounds),
@@ -1114,6 +1116,7 @@ drive_sound drive_sound_inst (
     .hdd_led (leds[2]),
     .buzzer  (buzzer)
 );
+`endif
 	
 endmodule
 
