@@ -45,7 +45,7 @@
 	  <listentry label="68020" value="2"/>
 	</list>
 	<!--END-->
-	<!--IS tang_nano20k_020 -->
+	<!--IS tang_nano20k_020 tang_nano20k_lcd -->
 	<list label="CPU:" id="T" default="1" action="reset">
 	<listentry label="68000" value="0"/>
 	<listentry label="68020" value="1"/>
@@ -55,7 +55,7 @@
 	<listentry label="OCS-A500" value="0"/>
 	<listentry label="OCS-A1000" value="1"/>
 	<listentry label="ECS" value="2"/>
-	<!--IS mistle_gw5a_25 tang_nano20k_020 -->
+	<!--IS mistle_gw5a_25 tang_nano20k_020 tang_nano20k_lcd -->
 	<listentry label="AGA" value="3"/>
 	<!--END-->
       </list>
@@ -144,10 +144,12 @@
         <listentry label="75%" value="3"/>
         <listentry label="100%" value="4"/>
       </list>	
+      <!--NOT tang_nano20k_lcd -->
 	<list label="Stereo Mix:" id="M" default="1">
 		<listentry label="Disabled" value="0"/>
         <listentry label="Enabled" value="1"/>
     </list>
+    <!--END-->
 	<list label="Drive Sounds:" id="Z" default="0">
 		<listentry label="Disabled" value="0"/>
 		<listentry label="Enabled" value="1"/>
