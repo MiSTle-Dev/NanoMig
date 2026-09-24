@@ -4,9 +4,13 @@ source scripts/update_xml.tcl
 
 set_device GW2AR-LV18QN88C8/I7 -name GW2AR-18C
 
+add_file tang/nano20k/top_lcd.sv
 add_file nanomig.v
 add_file minimig-aga/amiga_clk.v
 add_file minimig-aga/cpu_wrapper.v
+add_file minimig-aga/cpu_cache_new.v
+add_file minimig-aga/dpram.v
+add_file minimig-aga/dpram_be_1024x16.v
 add_file minimig-aga/minimig.v 
 add_file minimig-aga/ciaa.v
 add_file minimig-aga/ciab.v
@@ -38,6 +42,8 @@ add_file minimig-aga/agnus_copper.v
 add_file minimig-aga/agnus_spritedma.v
 add_file minimig-aga/denise.v
 add_file minimig-aga/denise_bitplane_shifter.v
+add_file minimig-aga/bitplane_ram.v
+add_file minimig-aga/sprite_ram.v
 add_file minimig-aga/denise_collision.v
 add_file minimig-aga/denise_colortable.v
 add_file minimig-aga/denise_playfields.v
@@ -73,8 +79,8 @@ add_file misc/flash_dspi.v
 add_file tang/nano20k/amigaclks.v
 add_file tang/nano20k/gowin_dpb/sector_dpram.v
 add_file tang/nano20k/gowin_dpb/ide_dpram.v
-add_file tang/nano20k/top_lcd.sv
 add_file misc/sdram.sv
+add_file misc/rst_sync.v
 add_file tang/nano20k/nanomig_lcd.cst
 add_file tang/nano20k/nanomig_lcd.sdc
 add_file fx68k/microrom.mem
@@ -91,8 +97,11 @@ set_option -verilog_std sysv2017
 set_option -top_module top
 set_option -use_mspi_as_gpio 1
 set_option -use_sspi_as_gpio 1
+set_option -use_jtag_as_gpio 0
+set_option -cst_warn_to_error 1
 set_option -multi_boot 0
 set_option -mspi_jump 0
 set_option -loading_rate 25.000
 
+set_option -place_option 1
 run all

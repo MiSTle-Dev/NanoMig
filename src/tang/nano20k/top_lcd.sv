@@ -1,23 +1,28 @@
+/*
+    top.sv - Minimig on tang nano 20k toplevel
+*/ 
 
-//     top_lcd.sv - Minimig on tang nano 20k toplevel
+/* we need two copies in case of 256k kickroms
+     openFPGALoader --external-flash -o 0x400000 kick13.rom
+     openFPGALoader --external-flash -o 0x440000 kick13.rom
+   or a single copy of e.g. a 512k diag rom
+     openFPGALoader --external-flash -o 0x400000 DiagROM
+*/
 
-// =========================================================================
-// To use Kick Switch Lite, the ROMs must be flashed like this:
-//
-// 0x400000 Kickstart 3.1 / 512k (default)
-// 0x700000 Kickstart 1.3 / 256k 
-// 0x740000 Kickstart 1.3 / 256k 
-// 0x780000 Kickstart 3.2 / 512k 
-//
-// for example:
-// openFPGALoader --external-flash -o 0x400000 kick31.rom
-// =========================================================================
- 
+`define ENABLE_TG68K
+`define ENABLE_AGA   // offer the AGA chipset in the menu
+`define CPU_SLOW14   // run TG68K at 14MHz effective (A1200 speed) for timing closure
+`define ENABLE_CACHE // MiSTer cpu cache between the cpu and the sdram (cached kickstart + fast ram)
+`define CHIPRAM_CACHE
+// `define DISABLE_IDE  // v32 experiment: cache + ide together
+// `define NO_WS2812   // drop the rgb status led to make room for cache + ide
+`define DENISE_EBR   // block ram based bitplane and sprite buffers, saves logic
+
 module top(
   input			clk,
 
   input			reset, // button S2
-  input			user, // button S1
+  input			user,  // button S1
 
   output [5:0]	leds_n,
   output		ws2812,
@@ -37,50 +42,59 @@ module top(
   output		O_sdram_cas_n, // columns address select
   output		O_sdram_ras_n, // row address select
   output		O_sdram_wen_n, // write enable
-  inout [31:0]	IO_sdram_dq,   // 32 bit bidirectional data bus
-  output [10:0]	O_sdram_addr,  // 11 bit multiplexed address bus
-  output [1:0]	O_sdram_ba,    // two banks
-  output [3:0]	O_sdram_dqm,   // 32/4
+  inout [31:0]	IO_sdram_dq, // 32 bit bidirectional data bus
+  output [10:0]	O_sdram_addr, // 11 bit multiplexed address bus
+  output [1:0]	O_sdram_ba, // two banks
+  output [3:0]	O_sdram_dqm, // 32/4
 
   // internal lcd
-  output		lcd_dclk,
-  output		lcd_hs, // lcd horizontal synchronization
-  output		lcd_vs, // lcd vertical synchronization        
-  output		lcd_bl, // lcd backlight enable
-  output		lcd_de, // lcd data enable     
-  output [4:0]	lcd_r,  // lcd red
-  output [5:0]	lcd_g,  // lcd green
-  output [4:0]	lcd_b,  // lcd blue
+  output                lcd_dclk,
+  output                lcd_hs, // lcd horizontal synchronization
+  output                lcd_vs, // lcd vertical synchronization        
+  output                lcd_bl, // lcd backlight enable
+  output                lcd_de, // lcd data enable     
+  output [4:0]  lcd_r,  // lcd red
+  output [5:0]  lcd_g,  // lcd green
+  output [4:0]  lcd_b,  // lcd blue
 
   // SD card slot
   output		sd_clk,
   inout			sd_cmd, // MOSI
   inout [3:0]	sd_dat, // 0: MISO
-
-  // SPI connection to on-board BL616 for 3921 assemblies 
-  // By default an external connection is used with a M0S Dock
-  input                 spi_sclk,// in 
-  input                 spi_csn, // in
-  output                spi_dir, // out
-  input                 spi_dat, // in
-  output                spi_irqn,// out
 	   
-  // audio
-  output		hp_bck,
-  output		hp_ws,
-  output		hp_din,
-  output		pa_en
-);
+  // SPI connection to ob-board BL616. By default an external
+  // connection is used with a M0S Dock
+  input			spi_sclk,
+  input			spi_csn,
+  output		spi_dir,
+  input			spi_dat,
+  output		spi_irqn,
 
+  // audio
+  output                hp_bck,
+  output                hp_ws,
+  output                hp_din,
+  output                pa_en		   
+);
+`default_nettype none
+  
 wire [5:0]	leds;
-   
 assign leds[5] = |sd_wr;
 assign leds[4] = |sd_rd;
-assign leds_n = ~leds;  
+assign leds_n = ~leds;
+
 
 // ============================== clock generation ===========================
    
-`define PIXEL_CLOCK 28375160
+// HDMI clock:  141.8758 MHz
+// Pixel clock: 28.37516 MHz (HDMI/5)
+// SDRAM and flash clock: 85 MHz
+// Amiga clock: 7.09379 (Pixel/4)
+   
+// 27MHz crystal * 19/6 = 85.5MHz, divided by 3. The nominal PAL clock would
+// be 28.37516MHz, but this is the one the hardware actually runs at, and the
+// audio rate below is derived from it.
+`define PIXEL_CLOCK 28500000
 
 wire clk_pixel_x5;   
 wire pll_lock;   
@@ -103,52 +117,72 @@ amigaclks amigaclks (
 	.video_locked()
 );
 
-wire	clk_28m = clk_pixel;
-wire	clk7_en;   
-wire	clk7n_en;   
+wire rst_28m, rst_28m_n;
+wire rst_85m, rst_85m_n;
+wire rst_sdram, rst_sdram_n;
+
+wire sdram_ready;
+
+rst_sync rst_sync (
+  .clk_28m(clk_28m),
+  .clk_85m(clk_85m),
+  .pll_lock(pll_lock),
+  .sdram_ready(sdram_ready),
+  .rst_28m(rst_28m),
+  .rst_28m_n(rst_28m_n),
+  .rst_85m(rst_85m),
+  .rst_85m_n(rst_85m_n),
+  .rst_sdram(rst_sdram),
+  .rst_sdram_n(rst_sdram_n)
+);
+
+wire	clk7_en;
+wire	clk7n_en;
 
 // control signals generated by the user via the OSD
 wire 	   osd_reset;   
 wire [1:0] osd_chipmem;         // 0=512k, 1=1M, 2=1.5M, 3=2M
 wire [1:0] osd_slowmem;         // 0=None, 1=512k, 2=1M, 3=1.5M
-wire [1:0] osd_fastmem;         // 0=None, 1=2M, 2=4M
+wire [1:0] osd_fastmem;         // 0=None, 1=2M, 2=4M, 3=5.5M (stolen from SlowRAM)
 wire [1:0] osd_floppy_drives;
 wire       osd_floppy_turbo;
 wire       osd_floppy_wrprot;
 wire       osd_ide_enable;
-wire [1:0] osd_chipset;         // 0=OCS-A500, 1=OCS-A1000, 2=ECS
+wire [2:0] osd_chipset;         // 0=OCS-A500, 1=OCS-A1000, 2=ECS, 6=AGA
+wire [1:0] osd_cpu;             // 00=68000, 01=68010, 11=68020
 wire       osd_video_mode;      // PAL (0=PAL, 1=NTSC)
 wire [1:0] osd_video_filter;
 wire [1:0] osd_video_scanlines;
+wire [2:0] osd_turbo;           // 001=turbochip, 010=turbokick, 100=chipcache
 wire       osd_joy_swap;        // 0=off, 1=on
 wire [2:0] osd_volume;          // Mute=0, 1=25%, 2=50%, 3=75%, 4=100%
 wire [7:0] osd_lcd_v_pos;       // -20 .. 20 vertical offset for lcd adjustment
-wire [1:0] osd_kickstart;       // 1=1.3, 2=3.1, 3=3.2
 
 wire	   rom_download_in_progress;
 
-// generate a reset for some time after rom has been initialized
-reg [15:0] reset_cnt;
-always @(negedge clk_28m) begin
-    if(!pll_lock || !rom_done || reset || osd_reset || kbd_reset || rom_download_in_progress)
-        reset_cnt <= 16'hffff;
-    else if(reset_cnt != 0)
-        reset_cnt = reset_cnt - 16'd1;
+// this is the reset that goes into the nanomig itself
+reg nanomig_reset = 1;
+
+always @(posedge clk_28m, posedge rst_28m) begin
+    if (rst_28m)
+        nanomig_reset <= 1'b1;
+    else
+        nanomig_reset <= !rom_done || reset || osd_reset || kbd_reset || rom_download_in_progress;
 end
 
-wire cpu_reset = |reset_cnt;
-wire sdram_ready;
-
-// -------------------------- M0S MCU interface -----------------------
-
-// connect to ws2812 led
+// connect to ws2812 led. The rgb status led costs ~150 luts which the cache
+// plus ide combination needs, so it is dropped when space is tight.
 wire [23:0] ws2812_color;
+`ifdef NO_WS2812
+assign ws2812 = 1'b0;
+`else
 ws2812 ws2812_inst (
     .clk(clk_28m),
-	.reset(!pll_lock),
+	.reset(rst_28m),
     .color(ws2812_color),
     .data(ws2812)
 );
+`endif
 
 // interface to M0S MCU
 wire       mcu_sys_strobe;        // mcu message byte valid for sysctrl
@@ -166,12 +200,12 @@ wire [7:0] sdc_data_out;
 
 mcu_spi mcu (
 	 .clk(clk_28m),
-	 .reset(!pll_lock),
+	 .reset(rst_28m),
 
-     // SPI interface to FPGA Companion
-     .spi_io_ss ( spi_csn  ),
-     .spi_io_clk( spi_sclk ),
-     .spi_io_din( spi_dat  ),
+	 // SPI interface to FPGA Companion
+     .spi_io_ss ( spi_csn ),
+     .spi_io_clk( spi_sclk  ),
+     .spi_io_din( spi_dat ),
      .spi_io_dout( spi_dir ),
 
 	 // byte wide data in/out to the submodules
@@ -234,8 +268,8 @@ wire [18:1]	 rom_data_addr_max = ((kick_is_256k?'d262144:'d524288)/2)-1;
 
 // The ROM uploader receives ROM data from the Companion and writes it into
 // the area of sdram that is reserved for kickstart rom  
-always @(posedge clk_28m, negedge pll_lock) begin
-   if(!pll_lock) begin
+always @(posedge clk_28m, posedge rst_28m) begin
+   if(rst_28m) begin
       kick_upload_state <= 3'd0;
       rom_data_word_we <= 1'b0;
 	  kick_is_256k <= 1'b0;	  
@@ -307,12 +341,12 @@ always @(posedge clk_28m, negedge pll_lock) begin
       endcase	 
    end   
 end   
-   
+
 sd_card #(
     .CLK_DIV(3'd0),                  // for 28 Mhz clock
     .IMAGE_FIFO_BITS(9)              // ROM transfer fifo size = 512
 ) sd_card (
-    .rstn(pll_lock),                 // rstn active-low, 1:working, 0:reset
+    .rstn(rst_28m_n),               // rstn active-low, 1:working, 0:reset
     .clk(clk_28m),                   // clock
   
     // SD card signals
@@ -337,8 +371,8 @@ sd_card #(
     .rom_image_accepted(rom_accepted),
     .rom_image_data_available(rom_data_available),
     .rom_image_data(rom_data),
-    .rom_image_data_strobe(rom_data_strobe),		   
-
+    .rom_image_data_strobe(rom_data_strobe),
+		   
     // interrupt to signal communication request
     .irq(sdc_int),
     .iack(sdc_iack),
@@ -366,7 +400,7 @@ wire       kbd_reset;      // keyboard reset (Ctrl+LAmiga+RAmiga)
 
 hid hid (
         .clk(clk_28m),
-        .reset(!pll_lock),
+        .reset(rst_28m),
 
          // interface to receive user data from MCU (mouse, kbd, ...)
         .data_in_strobe(mcu_hid_strobe),
@@ -376,7 +410,7 @@ hid hid (
 
         // input local db9 port events to be sent to MCU. Changes also trigger
         // an interrupt, so the MCU doesn't have to poll for joystick events
-        .db9_port( 6'd0 ),
+        .db9_port( 6'b000000 ),
         .irq( hid_int ),
         .iack( hid_iack ),
 
@@ -391,9 +425,13 @@ hid hid (
         .joystick1(hid_joy1)
          );   
 
-sysctrl sysctrl (
+sysctrl #(
+`ifdef ENABLE_AGA
+        .AGA(1)
+`endif
+        ) sysctrl (
         .clk(clk_28m),
-        .reset(!pll_lock),
+        .reset(rst_28m),
 
          // interface to send and receive generic system control
         .data_in_strobe(mcu_sys_strobe),
@@ -402,28 +440,29 @@ sysctrl sysctrl (
         .data_out(sys_data_out),
 
         // values controlled by the OSD
-		.system_reset(osd_reset),
-		.system_floppy_drives(osd_floppy_drives),
-		.system_floppy_turbo(osd_floppy_turbo),
-		.system_floppy_wrprot(osd_floppy_wrprot),
-		.system_ide_enable(osd_ide_enable),
-	    .system_chipset(osd_chipset),
-		.system_video_mode(osd_video_mode),
-		.system_video_filter(osd_video_filter),
-		.system_video_scanlines(osd_video_scanlines),
-		.system_chipmem(osd_chipmem),
-		.system_fastmem(osd_fastmem),
-		.system_slowmem(osd_slowmem),
-        .system_joy_swap(osd_joy_swap),
-    	.system_volume(osd_volume),
+	.system_reset(osd_reset),
+	.system_floppy_drives(osd_floppy_drives),
+	.system_floppy_turbo(osd_floppy_turbo),
+	.system_floppy_wrprot(osd_floppy_wrprot),
+	.system_ide_enable(osd_ide_enable),
+	.system_chipset(osd_chipset),
+	.system_cpu(osd_cpu),
+	.system_video_mode(osd_video_mode),
+	.system_video_filter(osd_video_filter),
+	.system_video_scanlines(osd_video_scanlines),
+	.system_chipmem(osd_chipmem),
+	.system_slowmem(osd_slowmem),
+	.system_fastmem(osd_fastmem),
+	.system_turbo(osd_turbo),
+	.system_joy_swap(osd_joy_swap),
+	.system_volume(osd_volume),
         .system_lcd_v_pos(osd_lcd_v_pos),
-		.system_kickstart(osd_kickstart),
-        
+
         .int_out_n(spi_irqn),
         .int_in( { 4'b0000, sdc_int, 1'b0, hid_int, 1'b0 }),
         .int_ack( int_ack ),
 
-        .buttons( {reset, user} ),
+        .buttons( {user, reset} ),
         .leds(),
         .color(ws2812_color)
 );
@@ -433,19 +472,19 @@ wire hs_n, vs_n;
 wire [3:0] red;
 wire [3:0] green;
 wire [3:0] blue;
-
-wire [5:0] osd_r;
-wire [5:0] osd_g;
-wire [5:0] osd_b;
+   
+wire [5:0] video_red;
+wire [5:0] video_green;
+wire [5:0] video_blue;   
 
 // map to rgb565
-assign lcd_r = osd_r[5:1];
-assign lcd_g = osd_g;
-assign lcd_b = osd_b[5:1];  
-   
+assign lcd_r = video_red[5:1];
+assign lcd_g = video_green;
+assign lcd_b = video_blue[5:1];  
+
 osd_u8g2 osd_u8g2 (
         .clk(clk_28m),
-        .reset(!pll_lock),
+        .reset(rst_28m),
 
         .data_in_strobe(mcu_osd_strobe),
         .data_in_start(mcu_start),
@@ -458,9 +497,9 @@ osd_u8g2 osd_u8g2 (
         .g_in({green, 2'b00}),
         .b_in({blue,  2'b00}),
 
-        .r_out(osd_r),
-        .g_out(osd_g),
-        .b_out(osd_b)
+        .r_out(video_red),
+        .g_out(video_green),
+        .b_out(video_blue)
 );   
 
 /* ---------------------- Minimig chipset ----------------------- */
@@ -469,18 +508,24 @@ osd_u8g2 osd_u8g2 (
 wire [14:0] audio_left;
 wire [14:0] audio_right;   
 
-// map first HID/USB joystick into second amiga joystick port
-// wire in db9 joystick
-wire [7:0] joystick = { 
-	  (hid_joy0[7] | hid_joy1[7]), 
-	  (hid_joy0[6] | hid_joy1[6]), 
-	  (hid_joy0[5] | hid_joy1[5]), 
-	  (hid_joy0[4] | hid_joy1[4]),
-	  (hid_joy0[3] | hid_joy1[3]), 
-	  (hid_joy0[2] | hid_joy1[2]),
-	  (hid_joy0[1] | hid_joy1[1]),
-	  (hid_joy0[0] | hid_joy1[0]) };   
-   
+// Map Joysticks 
+
+            // map first HID/USB joystick into first amiga joystick port
+            // wire in db9 joystick & mouse
+wire [7:0] physical_port_1 = hid_joy0;
+
+            // map second HID/USB joystick into second amiga joystick port
+            // wire in db9 joystick
+wire [7:0] physical_port_2 = hid_joy1;
+              
+wire [7:0] joystick0;
+wire [7:0] joystick1;
+
+// Swap Joysticks 
+
+assign joystick0 = osd_joy_swap ? physical_port_1 : physical_port_2;
+assign joystick1 = osd_joy_swap ? physical_port_2 : physical_port_1;
+
 wire [23:1] cpu_a;
 wire cpu_as_n, cpu_lds_n, cpu_uds_n;
 wire cpu_rw, cpu_dtack_n;
@@ -502,41 +547,55 @@ wire fastram_lds;
 wire fastram_uds;
 wire [15:0] fastram_dout;
 wire [15:0] fastram_din;
-wire [1:0] fastram_be = {fastram_uds,fastram_lds};
+wire [1:0] fastram_be = {fastram_uds,fastram_lds};  
 wire fastram_wr;
 wire fastram_ready;
-
+   
 wire [15:0] sdram_dout;
+wire [47:0] chip48;         // upper 48 bits of 64 bit aligned chipram reads (AGA fmode>0)
+wire [47:0] fastram_dout48; // wide read data of the cpu cache port
 
 assign ram_din = sdram_dout;
 
 // pack config values into minimig config
 wire [5:0] chipset_config = { 1'b0,osd_chipset,osd_video_mode,1'b0 };
+wire [1:0] cpu_config = { |osd_cpu ? 2'b11 : 2'b00 };
 wire [7:0] memory_config = { 4'b0_000, osd_slowmem, osd_chipmem };   
 wire [2:0] fastram_config = { 1'b0, osd_fastmem };   
+wire [2:0] turbo_config = { osd_turbo };
 wire [3:0] floppy_config = { osd_floppy_drives, osd_floppy_wrprot, osd_floppy_turbo };
 wire [3:0] video_config = { osd_video_filter, osd_video_scanlines };   
-wire [5:0] ide_config = { 5'b00000, osd_ide_enable };   
+// FIXME - setting ide_config[5] prevents minimig from using
+// fast chipset bus for GAYLE, which is by default in use
+// when 68020 CPU is selected; we may connect fast chip bus
+// to GAYLE and set ide_config[5] to 0 to improve performance
+wire [5:0] ide_config = { 5'b10000, osd_ide_enable };   
    
 nanomig nanomig
 (
  .clk_sys(clk_28m),
- .reset(cpu_reset),
- .por(!pll_lock),
+ .reset(nanomig_reset),
+ .por(rst_28m),
 
  .clk7_en(clk7_en),
  .clk7n_en(clk7n_en),
 
  .pwr_led(leds[0]),
  .fdd_led(leds[1]),
+`ifndef DISABLE_IDE
  .hdd_led(leds[2]),
+`endif
  
  .memory_config(memory_config),
  .fastram_config(fastram_config),
+ .cpu_config(cpu_config),
  .chipset_config(chipset_config),
  .floppy_config(floppy_config),
  .video_config(video_config),
+ .turbo_config(turbo_config),
+`ifndef DISABLE_IDE
  .ide_config(ide_config),
+`endif
 
  // video
  .hs(hs_n), // horizontal sync
@@ -549,18 +608,18 @@ nanomig nanomig
  .audio_right(audio_right),
 
  // uart interface 
- .uart_rx(midi_in),
- .uart_tx(midi_out),
+ .uart_rx(1'b1),
+ .uart_tx(),
  
  // keyboard & mouse				 
  .mouse_buttons(mouse_buttons), // mouse buttons
  .kbd_mouse_level(kbd_mouse_level),  
  .kbd_mouse_type(kbd_mouse_type),  
  .kbd_mouse_data(kbd_mouse_data),
- .joystick0(joystick),
- .joystick1(8'h00),
+ .joystick0(joystick0),
+ .joystick1(joystick1),
 				 
- // sd card interface for floppy disk emulation
+ // sd card interface for floppy disk and hdd emulation
  .sdc_img_size(sd_img_size),
  .sdc_img_mounted(sd_img_mounted), 
  .sdc_rd(sd_rd),
@@ -581,7 +640,11 @@ nanomig nanomig
  ._ram_ble(ram_be[0]),      // sram lower byte select
  ._ram_we(ram_we_n),        // sram write enable
  ._ram_oe(ram_oe_n),        // sram output enable
- .chip48(48'd0),
+`ifdef ENABLE_AGA
+ .chip48(chip48),
+`else
+ .chip48(48'b0),
+`endif
  .refresh(ram_refresh),
  
  .fastram_sel(fastram_sel),
@@ -589,92 +652,105 @@ nanomig nanomig
  .fastram_lds(fastram_lds),
  .fastram_uds(fastram_uds),
  .fastram_dout(fastram_dout),
+`ifdef ENABLE_CACHE
+ .fastram_dout48(fastram_dout48),
+`else
+ .fastram_dout48(48'b0),
+`endif
  .fastram_din(fastram_din),
  .fastram_wr(fastram_wr),
- .fastram_ready(fastram_ready));
+ .fastram_ready(fastram_ready)
+);
 
-wire           flash_ready;  
-wire           mem_ready = sdram_ready && flash_ready && pll_lock;  
-   
-reg            start_rom_copy;
-reg            mem_ready_D;
+wire flash_ready;
 
-// geneate a start_rom_copy signal once flash and SDRAM are initialized
-always @(posedge clk_28m or negedge pll_lock) begin
-   if(!pll_lock) begin
-      start_rom_copy <= 1'b0;
-      mem_ready_D <= 1'b0;
-         
+reg flash_ready_d1;
+reg flash_ready_d2;
+
+// synchronize flash_ready signal to 28MHz clock domain
+always @(posedge clk_28m, posedge rst_28m) begin
+   if (rst_28m) begin
+      flash_ready_d1 <= 1'b0;
+      flash_ready_d2 <= 1'b0;
    end else begin
-      mem_ready_D <= mem_ready;  
-      start_rom_copy <= 1'b0;         
-
-      if(mem_ready && !mem_ready_D)
-          start_rom_copy <= 1'b1;     
+      flash_ready_d1 <= flash_ready;
+      flash_ready_d2 <= flash_ready_d1;
    end
 end
 
 /* -------------- state machine copying data from flash to sdram ---------------- */
-reg [21:0]  flash_addr;  
+reg  [21:0] flash_addr = 22'h200000;
+reg  [17:0] flash_ram_addr = 18'h0;
+reg  [31:0] word_count = 32'h40000;
+
 wire [15:0] flash_dout;
-reg [15:0]  flash_doutD;
-reg		    flash_cs;  
-reg [31:0]  word_count;
-reg [4:0]   state;
+reg         flash_cs;
 wire        flash_data_strobe;
-wire        flash_busy;   
+wire        flash_busy;
+reg         flash_ram_write;
 
 // once the copy counter has run to zero, all rom has been copied
-wire		rom_done = (word_count == 0);
+wire        rom_done = (word_count == 0);
 
-assign leds[3] = !rom_done || rom_download_in_progress;  
-   
-reg [17:0]  flash_ram_addr;   
-reg         flash_ram_write;
-reg [5:0]   flash_cnt;  
+assign leds[3] = !rom_done || rom_download_in_progress;
 
-always @(posedge clk_28m or negedge mem_ready) begin
-    if(!mem_ready) begin
-       flash_addr <= 22'h200000;          // 4MB flash offset (word address)
-       flash_ram_addr <= 18'h0;           // write into 512k sdram segment used for kick rom
-       word_count <= 22'h40001;           // 512k bytes ROM data = 256k words
+localparam FLASH_STATE_INIT  = 0;
+localparam FLASH_STATE_READ  = 1;
+localparam FLASH_STATE_WAIT  = 2;
+localparam FLASH_STATE_WRITE = 3;
+localparam FLASH_STATE_NEXT  = 4;
 
-       state <= 5'h0;
-       flash_ram_write <= 1'b0;
-       flash_cs <= 1'b0;        
-       flash_cnt <= 6'd0;
-    end else begin
-        if((start_rom_copy || state == 23) && (word_count != 0)) begin
-            flash_cs <= 1'b1;
-            flash_cnt <= 6'd45; // >= 45 @ 85MHz
-        end else begin
-            if(flash_cnt != 0) flash_cnt <= flash_cnt - 6'd1;
-            if(flash_busy)     flash_cs <= 1'b0;
+reg [2:0] flash_state;
 
-            // ... static timing with fixed counter
-            if(flash_cnt == 6'd1) begin
-               state <= 1;
-               flash_addr <= flash_addr + 22'd1;
-               word_count <= word_count - 22'd1;
-			   
-               if ((flash_addr == 22'h2000aa || flash_addr == 22'h2200aa) && flash_dout == 16'h6678)
-				 // transform bne.b to bra.b in Kickstart ROM 1.2/1.3 @ $f80154 (mirror) and $fc0154
-				 // this forces memory detection on every reset
-				 flash_doutD <= flash_dout & 16'hf0ff;
-               else
-                 // we don't necessarily need to latch the data. But latching it here
-                 // allows to exactly determine the real access time by adjusting flash_cnt
-                 // to the lowest value that gives a stable image
-                 flash_doutD <= flash_dout;
-            end
+always @(posedge clk_28m, posedge rst_28m, posedge reset) begin
+  if (rst_28m || reset) begin
+    flash_state <= FLASH_STATE_INIT;
+
+  end else begin
+    case (flash_state)
+      FLASH_STATE_INIT: begin
+        if (clk7n_en && flash_ready_d2) begin
+          flash_addr     <= 22'h200000;
+          flash_ram_addr <= 18'h0;
+          word_count     <= 32'h40000;
+
+          flash_cs        <= 0;
+          flash_ram_write <= 0;
+          flash_state     <= FLASH_STATE_READ;
         end
-
-        // advance ram write state
-        if(state != 0)  state <= state + 3'd1;
-        if(state == 3)  flash_ram_write <= 1'b1;
-        if(state == 18) flash_ram_write <= 1'b0;
-        if(state == 21) flash_ram_addr <= flash_ram_addr + 18'd1;
-    end
+      end
+      FLASH_STATE_READ: begin
+        if (word_count != 0) begin
+          flash_cs    <= 1;
+          flash_state <= FLASH_STATE_WAIT;
+        end
+      end
+      FLASH_STATE_WAIT: begin
+        if (flash_busy) begin
+          flash_cs    <= 0;
+          flash_state <= FLASH_STATE_WRITE;
+        end
+      end
+      FLASH_STATE_WRITE: begin
+        if (!flash_busy && clk7_en) begin
+          flash_ram_write <= 1;
+          flash_state     <= FLASH_STATE_NEXT;
+        end
+      end
+      FLASH_STATE_NEXT: begin
+        if (clk7n_en) begin
+          flash_ram_write <= 0;
+          flash_ram_addr  <= flash_ram_addr + 1;
+          flash_addr      <= flash_addr + 1;
+          flash_state     <= FLASH_STATE_READ;
+          word_count      <= word_count - 1;
+        end
+      end
+      default: begin
+        flash_state <= FLASH_STATE_INIT;
+      end
+    endcase
+  end
 end
 
 // ----------------------------- SDRAM ---------------------------------
@@ -682,36 +758,29 @@ end
 // there's a total of 16 sdram segments of 512kBytes. The last
 // one is being used to store the kick romm
 
-// run a counter at 28Mhz synchonous to the 7Mhz bus cycle
-reg	    [1:0] cyc;   
-always @(posedge clk_28m)
-  if(clk7_en) cyc <= 2'd0;
-  else        cyc <= cyc + 2'd1;
-
-wire        sdram_access  = (!ram_oe_n || !ram_we_n);  
+wire        sdram_access  = (!ram_oe_n || !ram_we_n);
 wire	    sdram_rw      = !ram_we_n;
-   
+
+
 // multiplex ram input to the three sources
-//  1. the minimig addressing ram during regular operation 
+//  1. the minimig addressing ram during regular operation
 //  2. flash rom being copied to ram after core load
-//  3. flash rom download to ram initiated by the companion    
-   
-wire		sdram_cs      = 
+//  3. flash rom download to ram initiated by the companion
+
+wire		sdram_cs      =
 			!rom_done?flash_ram_write:
 			rom_download_in_progress?rom_data_word_we:
-			sdram_access;   
+			sdram_access;
 
-wire        sdram_sync    = 
-			!rom_done?flash_ram_write:
-			!cyc;  // rom_download also runs in sync with clk7/cyc
+wire        sdram_sync    = clk7_en;
    
 wire		sdram_refresh = 
 			!rom_done?1'b0:
 			rom_download_in_progress?1'b0:
 			ram_refresh;
 
-wire [15:0] sdram_din     = 
-			!rom_done?flash_doutD:                   // initial rom download from flash
+wire [15:0] sdram_din     =
+			!rom_done?flash_dout:                    // initial rom download from flash
 			rom_download_in_progress?rom_data_word:  // rom download from sd card
 			ram_dout;                                // regular operation
    
@@ -737,11 +806,24 @@ wire [21:0] sdram_addr    =
 			rom_download_in_progress?{4'b1111, rom_data_addr}:  // rom download from sd card
 			minimig_is_accessing_256k_rom?{ram_a[22:19],1'b0,ram_a[17:1]}:  // regular rom access into 256k kickstart
 			ram_a[22:1];                                        // regular operation
-   
-assign O_sdram_clk = clk_85m_shifted;   
-assign O_sdram_cke = 1'b1;  // clock enable
-   
-sdram #(.DATA_WIDTH(32), .RASCAS_DELAY(2), .RAS_WIDTH(11), .CAS_WIDTH(8) ) sdram (
+
+assign O_sdram_clk = clk_85m_shifted;
+
+localparam CHIP48_BURST = 0
+`ifdef ENABLE_AGA
+    | 1
+`endif
+`ifdef ENABLE_CACHE
+    | 1
+`endif
+;
+
+sdram #(
+    .DATA_WIDTH(32),
+    .RAS_WIDTH(11),
+    .CAS_WIDTH(8),
+    .CHIP48_BURST(CHIP48_BURST)   // the wide 64 bit fetch AGA or cache needs
+) sdram (
 	.sd_data    ( IO_sdram_dq   ), // 32 bit bidirectional data bus
 	.sd_addr    ( O_sdram_addr  ), // 11 bit multiplexed address bus
 	.sd_dqm     ( O_sdram_dqm   ), // two byte masks
@@ -750,23 +832,27 @@ sdram #(.DATA_WIDTH(32), .RASCAS_DELAY(2), .RAS_WIDTH(11), .CAS_WIDTH(8) ) sdram
 	.sd_we      ( O_sdram_wen_n ), // write enable
 	.sd_ras     ( O_sdram_ras_n ), // row address select
 	.sd_cas     ( O_sdram_cas_n ), // columns address select
+	.sd_cke     ( O_sdram_cke   ), // SDRAM clock enable
 
 	// cpu/chipset interface
 	.clk        ( clk_85m       ), // sdram is accessed at 85MHz
-	.reset_n    ( pll_lock      ), // init signal after FPGA config to initialize RAM
+	.reset_n    ( rst_sdram_n   ), // init signal after FPGA config to initialize RAM
 
 	.ready      ( sdram_ready   ), // ram is ready and has been initialized
 	.sync       ( sdram_sync    ), // rising edge of sync is begin of a memory cycle
 	.refresh    ( sdram_refresh ), // refresh cycle
+
 	.din        ( sdram_din     ), // data input from chipset/cpu
 	.dout       ( sdram_dout    ),
+	.dout48     ( chip48        ), // wide fetch data for AGA fmode>0
 	.addr       ( sdram_addr    ), // 22 bit word address
 	.ds         ( sdram_be      ), // upper/lower data strobe
 	.cs         ( sdram_cs      ), // cpu/chipset requests read/wrie
-	.we         ( sdram_we      ), // cpu/chipset requests write
-			 
+	.we         ( sdram_we      ),  // cpu/chipset requests write
+
 	.p2_din        ( fastram_din     ), // data input from chipset/cpu
 	.p2_dout       ( fastram_dout    ),
+	.p2_dout48     ( fastram_dout48  ), // wide read data for the cache line fills
 	.p2_addr       ( fastram_addr    ), // 22 bit word address
 	.p2_ds         ( fastram_be      ), // upper/lower data strobe
 	.p2_cs         ( fastram_sel     ), // cpu/chipset requests read/wrie
@@ -779,7 +865,7 @@ sdram #(.DATA_WIDTH(32), .RASCAS_DELAY(2), .RAS_WIDTH(11), .CAS_WIDTH(8) ) sdram
 assign mspi_clk = clk_85m_shifted;   
 flash flash (
     .clk       ( clk_85m     ),
-    .resetn    ( pll_lock    ),
+    .resetn    ( rst_85m_n   ),
     .ready     ( flash_ready ),
 
     .address   ( flash_addr  ),
@@ -802,7 +888,7 @@ video_analyzer video_analyzer (
     .hs        ( hs_n      ),
     .vs        ( vs_n      ),
     .pal       ( vpal      ),
-    .short_frame ( short_frame ),
+    .short_frame ( ),
     .screen    ( 2'd1 ),
     .interlace ( interlace ),
     .vreset    ( vreset    )
@@ -811,7 +897,7 @@ video_analyzer video_analyzer (
 assign lcd_dclk = clk_pixel;
 assign lcd_hs = hs_n;
 assign lcd_vs = vs_n;
-assign lcd_bl = !cpu_reset;   // enable display backlight once cpu is out of reset
+assign lcd_bl = !nanomig_reset;   // enable display backlight once cpu is out of reset
 
 reg [9:0] hcnt;   // max 1023
 reg [9:0] vcnt;   // max 626
@@ -836,7 +922,7 @@ always @(posedge clk_pixel) begin
    end else
       hcnt <= hcnt + 10'd1;    
 end
-   
+
 /* ------------------- audio processing --------------- */
 
 // MAX98357A
@@ -845,7 +931,7 @@ end
 // left channel only. For stereo mixing there would have to be a "large" 
 // resistor as a pullup which isn't there on the TN20k
 
-assign pa_en = !cpu_reset;   // simply enable amplifier with left channel
+assign pa_en = !nanomig_reset;   // simply enable amplifier with left channel
 
 // latch audio, so it's stable during 48khz transfer
 reg [14:0] scaled_audio_left;
@@ -902,8 +988,8 @@ wire [15:0] audio_scaled = { { AUDIO_SHIFT+1{audio_mix[15]}}, audio_mix[14:AUDIO
 reg [15:0] audio;
 reg [4:0] audio_bit_cnt;
 always @(posedge clk_audio) begin
-   if(cpu_reset) audio_bit_cnt <= 5'd0;
-   else          audio_bit_cnt <= audio_bit_cnt + 5'd1;
+   if(nanomig_reset) audio_bit_cnt <= 5'd0;
+   else              audio_bit_cnt <= audio_bit_cnt + 5'd1;
 
    // latch data so it's stable during transmission
    if(audio_bit_cnt == 5'd31)
@@ -912,12 +998,13 @@ end
 
 // generate i2s signals
 assign hp_bck = !clk_audio;
-assign hp_ws = cpu_reset?1'b0:audio_bit_cnt[4];
-assign hp_din = cpu_reset?1'b0:audio[15-audio_bit_cnt[3:0]];
-
+assign hp_ws = nanomig_reset?1'b0:audio_bit_cnt[4];
+assign hp_din = nanomig_reset?1'b0:audio[15-audio_bit_cnt[3:0]];
+   
 endmodule
 
 // To match emacs with gw_ide default
 // Local Variables:
 // tab-width: 4
 // End:
+`default_nettype wire
