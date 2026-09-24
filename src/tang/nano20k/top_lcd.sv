@@ -1,13 +1,16 @@
-/*
-    top.sv - Minimig on tang nano 20k toplevel
-*/ 
+//    top.sv - Minimig on tang nano 20k toplevel
 
-/* we need two copies in case of 256k kickroms
-     openFPGALoader --external-flash -o 0x400000 kick13.rom
-     openFPGALoader --external-flash -o 0x440000 kick13.rom
-   or a single copy of e.g. a 512k diag rom
-     openFPGALoader --external-flash -o 0x400000 DiagROM
-*/
+// =========================================================================
+// To use Kick Switch Lite, the ROMs must be flashed like this:
+//
+// 0x400000 Kickstart 3.1 / 512k (default)
+// 0x700000 Kickstart 1.3 / 256k 
+// 0x740000 Kickstart 1.3 / 256k 
+// 0x780000 Kickstart 3.2 / 512k 
+//
+// for example:
+// openFPGALoader --external-flash -o 0x400000 kick31.rom
+// =========================================================================
 
 `define ENABLE_TG68K
 `define ENABLE_AGA   // offer the AGA chipset in the menu
@@ -17,6 +20,8 @@
 // `define DISABLE_IDE  // v32 experiment: cache + ide together
 // `define NO_WS2812   // drop the rgb status led to make room for cache + ide
 `define DENISE_EBR   // block ram based bitplane and sprite buffers, saves logic
+`define DISABLE_ROM_LOADER // drop the rom loader to make room 
+// `define ENABLE_DRIVE_SOUNDS
 
 module top(
   input			clk,
@@ -157,6 +162,8 @@ wire [2:0] osd_turbo;           // 001=turbochip, 010=turbokick, 100=chipcache
 wire       osd_joy_swap;        // 0=off, 1=on
 wire [2:0] osd_volume;          // Mute=0, 1=25%, 2=50%, 3=75%, 4=100%
 wire [7:0] osd_lcd_v_pos;       // -20 .. 20 vertical offset for lcd adjustment
+wire [1:0] osd_kickstart;       // 1=1.3, 2=3.1, 3=3.2
+// wire 	   osd_drive_sounds;   	// 0 = disabled, 1 = enabled
 
 wire	   rom_download_in_progress;
 
@@ -266,6 +273,7 @@ wire		 rom_accepted = (rom_selection_strobe && rom_selected == 3'd0) && kickrom_
 
 wire [18:1]	 rom_data_addr_max = ((kick_is_256k?'d262144:'d524288)/2)-1;
 
+`ifndef DISABLE_ROM_LOADER 
 // The ROM uploader receives ROM data from the Companion and writes it into
 // the area of sdram that is reserved for kickstart rom  
 always @(posedge clk_28m, posedge rst_28m) begin
@@ -340,7 +348,8 @@ always @(posedge clk_28m, posedge rst_28m) begin
 		
       endcase	 
    end   
-end   
+end
+`endif // DISABLE_ROM_LOADER
 
 sd_card #(
     .CLK_DIV(3'd0),                  // for 28 Mhz clock
@@ -365,6 +374,7 @@ sd_card #(
     .image_mounted(sd_img_mounted),
     .image_size(sd_img_size),           // length of image file
 
+    `ifndef DISABLE_ROM_LOADER 
     // rom download interface
     .rom_image_selected(rom_selected),  // image_size is valid for this
     .rom_image_selection_strobe(rom_selection_strobe),
@@ -372,7 +382,8 @@ sd_card #(
     .rom_image_data_available(rom_data_available),
     .rom_image_data(rom_data),
     .rom_image_data_strobe(rom_data_strobe),
-		   
+		`endif // DISABLE_ROM_LOADER
+
     // interrupt to signal communication request
     .irq(sdc_int),
     .iack(sdc_iack),
@@ -694,6 +705,15 @@ wire        rom_done = (word_count == 0);
 
 assign leds[3] = !rom_done || rom_download_in_progress;
 
+/* -------------- detect osd_kickstart change and trigger reload ---------------- */
+reg [1:0] osd_kickstart_last = 2'b00;
+reg       kickstart_reload   = 1'b0;
+
+always @(posedge clk_28m) begin
+  osd_kickstart_last <= osd_kickstart;
+  kickstart_reload   <= (osd_kickstart != osd_kickstart_last);
+end
+
 localparam FLASH_STATE_INIT  = 0;
 localparam FLASH_STATE_READ  = 1;
 localparam FLASH_STATE_WAIT  = 2;
@@ -703,14 +723,19 @@ localparam FLASH_STATE_NEXT  = 4;
 reg [2:0] flash_state;
 
 always @(posedge clk_28m, posedge rst_28m, posedge reset) begin
-  if (rst_28m || reset) begin
+  if (rst_28m || reset || kickstart_reload) begin
     flash_state <= FLASH_STATE_INIT;
 
   end else begin
     case (flash_state)
       FLASH_STATE_INIT: begin
         if (clk7n_en && flash_ready_d2) begin
-          flash_addr     <= 22'h200000;
+          case(osd_kickstart)
+                  2'b00: flash_addr <= 22'h380000; // Kickstart 1.3 (at 7,0 MB)
+                  2'b01: flash_addr <= 22'h200000; // Kickstart 3.1 (at 4,0 MB)
+                  2'b10: flash_addr <= 22'h3C0000; // Kickstart 3.2 (at 7,5 MB)
+                  default: flash_addr <= 22'h200000;
+          endcase
           flash_ram_addr <= 18'h0;
           word_count     <= 32'h40000;
 
@@ -1000,6 +1025,17 @@ end
 assign hp_bck = !clk_audio;
 assign hp_ws = nanomig_reset?1'b0:audio_bit_cnt[4];
 assign hp_din = nanomig_reset?1'b0:audio[15-audio_bit_cnt[3:0]];
+
+// ========================= Drive Sounds =========================
+`ifdef ENABLE_DRIVE_SOUNDS	
+drive_sounds drive_sounds_inst (
+    .clk     (clk_28m),
+	.enable  (osd_drive_sounds),
+    //.fdd_led (leds[1]),
+    .hdd_led (leds[2]),
+    .buzzer  (buzzer)
+);
+`endif
    
 endmodule
 
