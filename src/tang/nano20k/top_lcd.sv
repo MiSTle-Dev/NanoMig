@@ -163,7 +163,7 @@ wire       osd_joy_swap;        // 0=off, 1=on
 wire [2:0] osd_volume;          // Mute=0, 1=25%, 2=50%, 3=75%, 4=100%
 wire [7:0] osd_lcd_v_pos;       // -20 .. 20 vertical offset for lcd adjustment
 wire [1:0] osd_kickstart;       // 1=1.3, 2=3.1, 3=3.2
-// wire 	   osd_drive_sounds;   	// 0 = disabled, 1 = enabled
+wire 	   osd_drive_sounds;   	// 0 = disabled, 1 = enabled
 
 wire	   rom_download_in_progress;
 
@@ -467,7 +467,8 @@ sysctrl #(
 	.system_turbo(osd_turbo),
 	.system_joy_swap(osd_joy_swap),
 	.system_volume(osd_volume),
-        .system_lcd_v_pos(osd_lcd_v_pos),
+  	.system_kickstart(osd_kickstart),
+    .system_lcd_v_pos(osd_lcd_v_pos),
 
         .int_out_n(spi_irqn),
         .int_in( { 4'b0000, sdc_int, 1'b0, hid_int, 1'b0 }),
