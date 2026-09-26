@@ -59,6 +59,11 @@
 	<listentry label="AGA" value="3"/>
 	<!--END-->
       </list>
+      <list label="Kickstart:" id="K" default="1" action="reset">
+	<listentry label="1.3" value="0"/>
+	<listentry label="3.1" value="1"/>
+	<listentry label="3.2" value="2"/>
+	    </list>
       <list label="Chipmem:" id="Y" default="0" action="reset">
 	<listentry label="512kB" value="0"/>
 	<listentry label="1MB" value="1"/>
@@ -101,7 +106,9 @@
 	<listentry label="Off" value="0"/>
 	<listentry label="On" value="1"/>
       </list>
+      <!--IS ENABLE_ROM_LOADER -->
       <image label="Kickstart" index="0" none_str="&lt;flash&gt;" none_icn="003c7e3c7e3c7e3c" ext="rom" default="kick.rom" action="reset_hide"/>
+      <!--END-->
     </menu>
     <menu label="Storage">
       <list label="Drives:" id="D" default="0">
@@ -142,6 +149,12 @@
 		<listentry label="Disabled" value="0"/>
         <listentry label="Enabled" value="1"/>
     </list>
+      <!--END-->
+      <!--IS tang_nano20k_020_drv_snd --> 
+      <list label="Drive Sounds:" id="Z" default="0">
+		<listentry label="Disabled" value="0"/>
+		<listentry label="Enabled" value="1"/>
+	    </list>
       <!--END-->
     <list label="Scanlines:" id="L" default="0">
 		<listentry label="None" value="0"/>
