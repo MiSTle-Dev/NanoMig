@@ -104,12 +104,12 @@ If unallocated space is present before the RDB, the HDF image won't be recognize
 
 The NanoMig contains code written by:
 
-Till Harbaum
-Alastair M. Robinson
-Mateusz Nalewajski
-Tobias Gubener
-Rok Krajnc
-Dennis van Weeren
+Till Harbaum  
+Alastair M. Robinson  
+Mateusz Nalewajski  
+Tobias Gubener  
+Rok Krajnc  
+Dennis van Weeren  
 
 Special thanks to **Till Harbaum** for the invention of the **NanoMig**!
 Many thanks to **Alastair M. Robinson** ([robinsonb5](https://github.com/robinsonb5)) for his contributions to the **NanoMig**, in particular **Fastram** and **68020** cpu!
