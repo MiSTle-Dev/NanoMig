@@ -101,6 +101,17 @@ Please make sure to use RDB (Rigid Disk Block) images with a **Start Offset 0**.
 If unallocated space is present before the RDB, the HDF image won't be recognized.
 
 ## Credits
+
+The NanoMig contains code written by:
+
+Till Harbaum
+Alastair M. Robinson
+Mateusz Nalewajski
+Tobias Gubener
+Rok Krajnc
+Dennis van Weeren
+
+Special thanks to **Till Harbaum** for the invention of the **NanoMig**!
 Many thanks to **Alastair M. Robinson** ([robinsonb5](https://github.com/robinsonb5)) for his contributions to the **NanoMig**, in particular **Fastram** and **68020** cpu!
 Many thanks to **Mateusz Nalewajski** ([m1nl](https://github.com/m1nl)) and **djnice** ([djnice](https://github.com/djnice)) for the implementation of the **AGA chipset** with Embedded Block Ram and many more contributions!
 
