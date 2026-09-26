@@ -14,7 +14,7 @@ Current state:
   * Amiga 500, 1000 and Amiga 1200 modes
   * Kick ROM stored in flash ROM
   * 2MB chip, 4MB fast and 1.5MB slow RAM on Tang Nano
-  * 2MB chip, 28MB fast and 1.5MB slow RAM on ICEPI-ZERO
+  * 2MB chip, 24MB fast and 1.5MB slow RAM on ICEPI-ZERO
   * Accelerated 68020 support + CPU cache
   * OCS, ECS, AGA chipset 
   * ROM loader (Kickstart 1.3 / 3.1 / 3.2 / DiagRom)
