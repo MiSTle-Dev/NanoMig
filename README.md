@@ -111,7 +111,7 @@ Tobias Gubener
 Rok Krajnc  
 Dennis van Weeren  
 
-Special thanks to **Till Harbaum** for the invention of the **NanoMig**!  
+Special thanks to **Till Harbaum** ([harbaum](https://github.com/harbaum))for the invention of the **NanoMig**!  
 Many thanks to **Alastair M. Robinson** ([robinsonb5](https://github.com/robinsonb5)) for his contributions to the **NanoMig**, in particular **Fastram** and **68020** cpu!  
 Many thanks to **Mateusz Nalewajski** ([m1nl](https://github.com/m1nl)) and **djnice** ([djnice](https://github.com/djnice)) for the implementation of the **AGA chipset** with Embedded Block Ram and many more contributions!
 
