@@ -256,7 +256,9 @@ wire ram_ready = cpu_ph1 && (fastram_ready != fastram_ready_d);
 // avoid selecting fastram when we didn't handle
 // ready signal yet (shouldn't happen but just
 // in case, it's better to keep it)
-assign fastram_sel = ram_sel && (fastram_ready == fastram_ready_d);
+wire write_strobes_valid = !(ram_uds && ram_lds);
+assign fastram_sel = ram_sel && (fastram_ready == fastram_ready_d) &&
+                     (cpu_state != 2'b11 || write_strobes_valid);
 
 always @(posedge clk_sys) begin
   if (!cpu_rst || cpu_ph1)
