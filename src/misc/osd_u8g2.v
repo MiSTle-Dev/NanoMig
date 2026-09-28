@@ -26,7 +26,8 @@ module osd_u8g2 (
 
 // the OSD is inserted behind the scan doubler and thus deals with
 // the higher pixel clock and twice the lines
-localparam HCNT_BITS = 12;   
+// The same HS/VS stream reaches video_analyzer (up to 2047 pixels/line).
+localparam HCNT_BITS = 11;
 localparam VCNT_BITS = 10;      
 
 // OSD is enabled and visible
@@ -74,25 +75,30 @@ assign b_out = !enabled?b_in:active?osd_b:sactive?{1'b0, b_in[5:1]}:b_in;
 wire [HCNT_BITS-1:0] hstart = {1'b0, scr_width[HCNT_BITS-1:1]}-8*`WIDTH*`SCALE/2;
 wire [VCNT_BITS-1:0] vstart = {1'b0, scr_height[VCNT_BITS-1:1]}-8*`HEIGHT*`SCALE/2;
 
+// Share one position subtraction per axis between the OSD windows and
+// the bitmap address calculation. Window limits are constant offsets.
+wire signed [HCNT_BITS:0] hpos = $signed({1'b0, hcnt}) - $signed({1'b0, hstart});
+wire signed [VCNT_BITS:0] vpos = $signed({1'b0, vcnt}) - $signed({1'b0, vstart});
+
 always @(posedge clk) begin
    // entire OSD area incl border
-   active <= hcnt >= hstart-`SCALE*`BORDER-1 && 
-	     hcnt < hstart+`SCALE*`BORDER+8*`WIDTH*`SCALE-1 &&
-	     vcnt >= vstart-`SCALE*`BORDER && 
-	     vcnt < vstart+`SCALE*`BORDER+8*`HEIGHT*`SCALE;
+   active <= hpos >= -(`SCALE*`BORDER+1) &&
+             hpos < `SCALE*`BORDER+8*`WIDTH*`SCALE-1 &&
+             vpos >= -(`SCALE*`BORDER) &&
+             vpos < `SCALE*`BORDER+8*`HEIGHT*`SCALE;
    
    // text area of OSD
-   tactive <= hcnt >= hstart-1 && 
-	      hcnt < hstart+8*`WIDTH*`SCALE-1 &&
-	      vcnt >= vstart && 
-	      vcnt < vstart+8*`HEIGHT*`SCALE;
+   tactive <= hpos >= -1 &&
+              hpos < 8*`WIDTH*`SCALE-1 &&
+              vpos >= 0 &&
+              vpos < 8*`HEIGHT*`SCALE;
 
 `ifndef OSD_NO_SHADOW   
    // shadow area of OSD
-   sactive <= hcnt >= hstart-`SCALE*`BORDER+`SCALE*`SHADOW-1 &&
-	      hcnt < hstart+`SCALE*`BORDER+`SCALE*`SHADOW+8*`WIDTH*`SCALE-1 &&
-	      vcnt >= vstart-`SCALE*`BORDER+`SCALE*`SHADOW &&
-	      vcnt < vstart+`SCALE*`BORDER+`SCALE*`SHADOW+8*`HEIGHT*`SCALE;
+   sactive <= hpos >= -`SCALE*`BORDER+`SCALE*`SHADOW-1 &&
+              hpos < `SCALE*`BORDER+`SCALE*`SHADOW+8*`WIDTH*`SCALE-1 &&
+              vpos >= -`SCALE*`BORDER+`SCALE*`SHADOW &&
+              vpos < `SCALE*`BORDER+`SCALE*`SHADOW+8*`HEIGHT*`SCALE;
 `endif
 end
    
@@ -136,9 +142,9 @@ always @(posedge clk) begin
    end
 end
    
-wire [7:0] hpix  = hcnt-hstart;  // horizontal pixel position inside OSD   
+wire [7:0] hpix  = hpos[7:0];  // horizontal pixel position inside OSD
 wire [7:0] hpixD = hpix+1;       // latch byte one pixel in advance
-wire [6:0] vpix  = vcnt-vstart;  // vertical pixel position inside OSD   
+wire [6:0] vpix  = vpos[6:0];  // vertical pixel position inside OSD
 
 reg [7:0] buffer_byte;
 assign osd_pix = buffer_byte[vpix[3:1]];
