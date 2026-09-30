@@ -246,9 +246,12 @@ end
 //    (writing incoming sector data during reads, reading it back during writes)
 //  - port B is addressed with fd_dma_wr_ptr (while writing) or fd_dma_rd_ptr
 //    (while reading) and used by the fifo/cpu side
+
+reg [7:0] fd_dma_rd_ptr;
+
 always @(*) begin
    // read pointer into the sector buffer while filling the fifo
-   logic [7:0] fd_dma_rd_ptr = fifo_word_counter - 10'd32;
+   fd_dma_rd_ptr = fifo_word_counter - 10'd32;
 
    // ---- port A : sd card side ----
    fd_dma_addra = sdc_byte_addr[8:1];
@@ -814,6 +817,8 @@ assign fifo_wr = (trackrdok && fifo_reading_sector & !fifo_full & ~lenzero) | (b
 reg [15:0] wr_sector_csum;   
 wire	   fifo_out_sync = fifo_out == dsksync[15:0];   
 
+reg [7:0] dbyte;
+
 // this state machine receives floppy data written by the CPU from the fifo and parses
 // it, verifies the checksum etc.
 always @(posedge clk) begin
@@ -828,8 +833,8 @@ always @(posedge clk) begin
 	 
       else if(stbdat) begin
 	 // seperate data and ignore clock bits
-	 logic [7:0] dbyte = { fifo_out[14], fifo_out[12], fifo_out[10], fifo_out[8],
-			        fifo_out[6],  fifo_out[4],  fifo_out[2], fifo_out[0] };
+	 dbyte = { fifo_out[14], fifo_out[12], fifo_out[10], fifo_out[8],
+	           fifo_out[6],  fifo_out[4],  fifo_out[2], fifo_out[0] };
 	 
 	 case(cpu_wr_state)
 	   4'd0:
