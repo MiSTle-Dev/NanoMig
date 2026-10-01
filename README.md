@@ -62,6 +62,7 @@ These youtube shorts mainly document the progress:
 
 The necessary binaries can be found in the [project releases](https://github.com/MiSTle-Dev/NanoMig/releases).
 
+## TANG NANO 20K
   * ```nanomig.fs``` needs to be flashed to the FPGA's flash memory
     * ```openFPGALoader -f nanomig.fs```
     * Currently supported are Tang Nano 20k with HDMI (```nanomig.fs```), Tang Nano 20k with RGB LCD (```nanomig_lcd.fs```), Tang Primer 25k (```nanomig_tp25k.fs```), Tang Mega 138k Pro (```nanomig_tm128k.fs```), Tang Console 60k (```nanomig_tc60k.fs```) and Tang Console 138k (```nanomig_tc128k_bl616.fs```)
