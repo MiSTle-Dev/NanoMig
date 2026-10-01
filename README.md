@@ -105,21 +105,6 @@ Change the target driver to WinUSB and click Replace Driver (or Install Driver).
 Please make sure to use RDB (Rigid Disk Block) images with a **Start Offset 0**.  
 If unallocated space is present before the RDB, the HDF image won't be recognized.
 
-## Credits
-
-The **NanoMig** contains code written by:
-
-Till Harbaum  
-Alastair M. Robinson  
-Mateusz Nalewajski  
-Tobias Gubener  
-Rok Krajnc  
-Dennis van Weeren  
-
-Special thanks to **Till Harbaum** ([harbaum](https://github.com/harbaum)) for the invention of the **NanoMig**!  
-Many thanks to **Alastair M. Robinson** ([robinsonb5](https://github.com/robinsonb5)) for his contributions to the **NanoMig**, in particular **Fastram** and **68020** cpu!  
-Many thanks to **Mateusz Nalewajski** ([m1nl](https://github.com/m1nl)) and **djnice** ([djnice](https://github.com/djnice)) for the implementation of the **AGA chipset** with Embedded Block Ram and many more contributions!
-
 ## Build setting (Tang Nano 20K only!)
 The core needs to be able to react on bl616 jtagsel Signal (all boards except tn20k).  
 Only for the TN20K: **Use JTAG as regular IO** must be unselected in Gowin EDA Configuration!
@@ -147,3 +132,19 @@ Only for the TN20K: **Use JTAG as regular IO** must be unselected in Gowin EDA C
 | Left Amiga | Left meta (Windows) key |
 | Right Amiga | Right meta / Page Down |
 | Help | End / Insert |
+
+## Credits
+
+The **NanoMig** contains code written by:
+
+Till Harbaum  
+Alastair M. Robinson  
+Mateusz Nalewajski  
+Tobias Gubener  
+Rok Krajnc  
+Dennis van Weeren  
+
+Special thanks to **Till Harbaum** ([harbaum](https://github.com/harbaum)) for the invention of the **NanoMig**!  
+Many thanks to **Alastair M. Robinson** ([robinsonb5](https://github.com/robinsonb5)) for his contributions to the **NanoMig**, in particular **Fastram** and **68020** cpu!  
+Many thanks to **Mateusz Nalewajski** ([m1nl](https://github.com/m1nl)) and **djnice** ([djnice](https://github.com/djnice)) for the implementation of the **AGA chipset** with Embedded Block Ram and many more contributions!
+
