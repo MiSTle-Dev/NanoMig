@@ -112,7 +112,8 @@ localparam [3:0] RWAIT    = 4'd0,
 
 reg [3:0] sddat_stat = RWAIT;
 
-reg [31:0] ridx   = 0;
+// Largest timeout is 10,000,000 SD clock edges, which fits in 24 bits.
+reg [23:0] ridx   = 0;
 reg [15:0] data_crc[4];     // crc's calculated from data
 reg [15:0] read_crc[4];     // crc's received from card
 reg [3:0] wdata;   
