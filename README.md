@@ -23,10 +23,22 @@ Current state:
   * Keyboard and mouse via USB
   * Joysticks via USB or DB9 ports 
   * Up to two virtual IDE hard disks, read and write support
-  * FTP access to SD-Card via Wifi (optional)
-  * NTP time synchronisation via Wifi (optional)
-  * Runs on [Tang Nano 20k](https://wiki.sipeed.com/hardware/en/tang/tang-nano-20k/nano-20k.html), [Primer 25K](https://wiki.sipeed.com/hardware/en/tang/tang-primer-25k/primer-25k.html), [Mega 138K Pro](https://wiki.sipeed.com/hardware/en/tang/tang-mega-138k/mega-138k-pro.html) and [Tang Console with Mega 60k / 138k module],(https://wiki.sipeed.com/hardware/en/tang/tang-console/mega-console.html), ICEPI-ZERO (25K) and ICEPI-ZERO XL (45K)
-  * [Fully simulated](sim)
+  * FTP access to SD-Card via Network (optional)
+  * NTP time synchronisation via Network (optional)
+  * Runs on
+     - [Tang Nano 20k](https://wiki.sipeed.com/hardware/en/tang/tang-nano-20k/nano-20k.html)  
+     - [Primer 25K](https://wiki.sipeed.com/hardware/en/tang/tang-primer-25k/primer-25k.html)  
+     - [Mega 138K Pro](https://wiki.sipeed.com/hardware/en/tang/tang-mega-138k/mega-138k-pro.html)
+     - [Tang Console with Mega 60k / 138k module](https://wiki.sipeed.com/hardware/en/tang/tang-console/mega-console.html)
+     - ICEPI-ZERO (25K) and ICEPI-ZERO XL (45K)
+     - [Fully simulated](sim)
+
+Network options:
+
+  * Pi-Pico W and Pi-Pico 2 W as MCU  
+  * USB 2 Ethernet adapter  
+  * ESP Wifi Stick  
+
 
 Planned features:
 
