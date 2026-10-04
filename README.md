@@ -47,6 +47,7 @@ Planned features:
   * RTG - Retargetable Graphics
   * Toccata - Sound Card
   * virtual AT modem via MCU / FPGA-Companion (optional)
+  * virtual SANA II network via MCU / FPGA-Companion (optional)
 
 ## Videos
 
