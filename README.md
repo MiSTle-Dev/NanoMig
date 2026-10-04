@@ -46,7 +46,7 @@ Planned features:
   * Drive Sounds for FDD & HDD (hardware addon / buzzer)
   * RTG - Retargetable Graphics
   * Toccata - Sound Card
-  * AT modem connection via WIFI (optional)
+  * virtual AT modem via MCU / FPGA-Companion (optional)
 
 ## Videos
 
