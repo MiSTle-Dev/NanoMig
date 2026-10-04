@@ -6,24 +6,25 @@ NanoMig is a port of the [Minimig](https://en.wikipedia.org/wiki/Minimig) Commod
 
 This is based on the [MiSTeryNano project](https://github.com/harbaum/MiSTeryNano/) and also relies on a [FPGA companion](http://github.com/harbaum/FPGA-Companion) to be connected to the FPGA board for USB support and on-screen-display control.
 
-This is still a work in progress. The current version is based on the [MiSTer Minimig AGA code](https://github.com/MiSTer-devel/Minimig-AGA_MiSTer) and runs many Amiga games and demos.
+This is still a work in progress. The current version is based on the [MiSTer Minimig AGA code](https://github.com/MiSTer-devel/Minimig-AGA_MiSTer) and runs all Amiga apps, games and demos.
 
 Current state:
 
   * Minimig based on [MiSTer Minimig AGA](https://github.com/MiSTer-devel/Minimig-AGA_MiSTer)
   * Amiga 500, 1000 and Amiga 1200 modes
-  * Kick ROM stored in flash ROM
-  * 2MB chip, 4MB fast and 1.5MB slow RAM on Tang Nano
-  * 2MB chip, 24MB fast and 1.5MB slow RAM on ICEPI-ZERO
+  * Kick ROMs stored in flash ROM
+  * 2MB chip, 4 MB fast + 1.5MB slow or 5,5 MB fast RAM on Tang Nano
   * Accelerated 68020 support + CPU cache
   * OCS, ECS, AGA chipset 
-  * ROM loader (Kickstart 1.3 / 3.1 / 3.2 / DiagRom)
+  * Kick Switch (Kickstart 1.3 / 3.1 / 3.2)
   * Up to four virtual floppy drives
   * Floppy disk write support
   * HDMI video and audio, PAL and NTSC
   * Keyboard and mouse via USB
   * Joysticks via USB or DB9 ports 
   * Up to two virtual IDE hard disks, read and write support
+  * FTP access to SD-Card via Wifi (optional)
+  * NTP time synchronisation via Wifi (optional)
   * Runs on [Tang Nano 20k](https://wiki.sipeed.com/hardware/en/tang/tang-nano-20k/nano-20k.html), [Primer 25K](https://wiki.sipeed.com/hardware/en/tang/tang-primer-25k/primer-25k.html), [Mega 138K Pro](https://wiki.sipeed.com/hardware/en/tang/tang-mega-138k/mega-138k-pro.html) and [Tang Console with Mega 60k / 138k module],(https://wiki.sipeed.com/hardware/en/tang/tang-console/mega-console.html), ICEPI-ZERO (25K) and ICEPI-ZERO XL (45K)
   * [Fully simulated](sim)
 
@@ -32,7 +33,7 @@ Planned features:
   * Drive Sounds for FDD & HDD (hardware addon / buzzer)
   * RTG - Retargetable Graphics
   * Toccata - Sound Card
-  * WIFI support
+  * AT modem connection via WIFI (optional)
 
 ## Videos
 
