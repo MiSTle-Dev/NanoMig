@@ -30,14 +30,15 @@ Current state:
      - [Primer 25K](https://wiki.sipeed.com/hardware/en/tang/tang-primer-25k/primer-25k.html)  
      - [Mega 138K Pro](https://wiki.sipeed.com/hardware/en/tang/tang-mega-138k/mega-138k-pro.html)
      - [Tang Console with Mega 60k / 138k module](https://wiki.sipeed.com/hardware/en/tang/tang-console/mega-console.html)
-     - ICEPI-ZERO (25K) and ICEPI-ZERO XL (45K)
+     - [ICEPI-ZERO (25K) and ICEPI-ZERO XL (45K)](https://github.com/cheyao/icepi-zero)
      - [Fully simulated](sim)
 
 Network options:
 
-  * Pi-Pico W and Pi-Pico 2 W as MCU  
-  * USB 2 Ethernet adapter  
-  * ESP Wifi Stick  
+  * Pi-Pico W and Pi-Pico 2 W
+  * BL616 WIFI (M0S Dock / Console 60k/138k)
+  * USB Ethernet LAN dongle (ASIX AX88772 and RTL8152 support)
+  * ESP32-Key (WIFI Stick)  
 
 
 Planned features:
