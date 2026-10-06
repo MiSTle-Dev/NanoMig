@@ -37,8 +37,8 @@ Network options:
 
   * Pi-Pico W and Pi-Pico 2 W
   * BL616 WIFI (M0S Dock / Console 60k/138k)
-  * USB Ethernet LAN dongle (ASIX AX88772 and RTL8152 support)
-  * ESP32-Key (WIFI Stick)  
+  * USB Ethernet LAN dongle (ASIX AX88772 & RTL8152)
+  * ESP32-Key (USB WIFI Stick)  
 
 
 Planned features:
