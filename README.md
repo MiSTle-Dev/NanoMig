@@ -92,7 +92,7 @@ The necessary binaries can be found in the [project releases](https://github.com
 ## ICEPI-ZERO 
 Windows: Download and install OSS CAD SUITE ([download](https://github.com/YosysHQ/oss-cad-suite-build/releases)) and Zadig ([download](https://zadig.akeo.ie/))
 
-1.) Connect your FPGA board with your computer via USB.  
+1.) Connect your FPGA board with your computer via USB. We use the USB port next to the HDMI.   
 Open Zadig and select Options -> List All Devices in Zadig.  
 Choose your FPGA cable or interface from the drop-down menu.  
 Change the target driver to WinUSB and click Replace Driver (or Install Driver).  
