@@ -139,6 +139,8 @@ localparam [2:0] MCU_REQ_IDLE       = 3'd0,   // waitring for mcu requests
 				 MCU_WRITING        = 3'd7;   // MCU is writing to SD card
    
 reg [31:0] mcu_sector;   // sector requested by MCU
+reg        mcu_wr_err;   // last MCU sector write failed (reported in status byte bit 0)
+wire       wr_err_int;   // sd_rw: the write that just ended has failed (valid with done_int)
 
 // ===== keep track of Core requesting sector IO ======
 reg [2:0]  core_request;
@@ -367,6 +369,7 @@ always @(posedge clk, negedge rstn) begin
 	  // no MCU or core request by now
 	  mcu_request <= MCU_REQ_IDLE;	  
 	  core_request <= CORE_REQ_IDLE;	  
+	  mcu_wr_err <= 1'b0;
    end else begin
       image_mounted <= 8'b00000000;
       direct_start_we <= 1'b0;
@@ -480,8 +483,9 @@ always @(posedge clk, negedge rstn) begin
 		 end
 		 
 		 else if(mcu_request == MCU_WRITING) begin
-			$display("sd_card.v: MCU SD write done");
+			$display("sd_card.v: MCU SD write done, err=%0d", wr_err_int);
 			mcu_request <= MCU_REQ_IDLE;
+			mcu_wr_err <= wr_err_int;
 		 end
 `ifndef YOSYS  // yosys does not like $error's
 		 else
@@ -536,7 +540,7 @@ always @(posedge clk, negedge rstn) begin
 			// $display("sd_card.v: MCU start byte received: %0d", data_in);
 			
 			byte_cnt <= 4'd0;	    
-			data_out <= { card_stat, card_type, 2'b0 };
+			data_out <= { card_stat, card_type, 1'b0, mcu_wr_err };
 		 end else begin
 			// SDC CMD 1: STATUS
 			if(command == 8'd1) begin
@@ -637,6 +641,7 @@ always @(posedge clk, negedge rstn) begin
                   mcu_sector[ 7: 0] <= data_in;
 				  $display("sd_card.v: MCU write request sector %0d/%8x", {mcu_sector[31:8], data_in}, {mcu_sector[31:8], data_in});
 				  mcu_request <= MCU_REQ_WRITE;				  
+				  mcu_wr_err <= 1'b0;
 				  mcu_tx_cnt <= 9'd0;
                end
 			   
@@ -803,7 +808,8 @@ sd_rw #(.CLK_DIV(CLK_DIV), .SIMULATE(SIMULATE)) sd_rw (
    .inbyte((core_request == CORE_WRITING)?inbyte:inbyte_int),
    .outen(louten),
    .outaddr(outaddr),
-   .outbyte(outbyte)
+   .outbyte(outbyte),
+   .wr_err(wr_err_int)
 );
 
 endmodule // sd_card

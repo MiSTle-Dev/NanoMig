@@ -8,7 +8,14 @@
 
 module sd_rw # (
     parameter [2:0] CLK_DIV = 3'd2,
-    parameter       SIMULATE = 0
+    parameter       SIMULATE = 0,
+    // write busy timeout in SD clocks (~1 s; adjust to the real sdclk). Spec: 250 ms, Linux uses 3 s
+    parameter [25:0] WBUSY_TMO = 26'd12500000,
+    // after a failed write the card state is unknown -> re-initialise it
+    parameter       REINIT_ON_WERR = 1,
+    // R1 status bits of CMD24 that abort the write (OUT_OF_RANGE, ADDRESS_ERROR, WP_VIOLATION,
+    // CARD_IS_LOCKED, COM_CRC_ERROR, ILLEGAL_COMMAND, ERROR). 0 disables the check
+    parameter [31:0] R1_ERR_MASK = 32'hC6C80000
 ) (
     // rstn active-low, 1:working, 0:reset
     input wire	       rstn,
@@ -39,7 +46,10 @@ module sd_rw # (
     output reg	       outen,    // when outen=1, a byte of sector content is read out from outbyte
     output reg [ 8:0]  outaddr,  // outaddr from 0 to 511, because the sector size is 512
     input  [ 7:0]      inbyte,   // a byte to write sector content
-    output reg [ 7:0]  outbyte   // a byte of read sector content
+    output reg [ 7:0]  outbyte,  // a byte of read sector content
+    // write failed (refused, no/negative CRC status, timeout). Valid when rbusy=0,
+    // cleared by the next rstart/wstart
+    output reg         wr_err
 );
 
 reg sddatoe;
@@ -112,16 +122,18 @@ localparam [3:0] RWAIT    = 4'd0,
 
 reg [3:0] sddat_stat = RWAIT;
 
-// Largest timeout is 10,000,000 SD clock edges, which fits in 24 bits.
-reg [23:0] ridx   = 0;
+// Largest timeout is WBUSY_TMO SD clock edges (26 bits).
+reg [25:0] ridx   = 0;
 reg [15:0] data_crc[4];     // crc's calculated from data
 reg [15:0] read_crc[4];     // crc's received from card
 reg [3:0] wdata;   
 reg [3:0] wack;
+reg       wfail;      // card reported CRC/write error in its CRC status token
+reg       werr_done;  // one clk pulse: a failed write also ends with rdone (wr_err tells which)
    
    
 assign     rbusy  = (sdcmd_stat != READY) ;
-assign     rdone  = ((sdcmd_stat == READING) || (sdcmd_stat == WRITING)) && (sddat_stat==DONE);
+assign     rdone  = (((sdcmd_stat == READING) || (sdcmd_stat == WRITING)) && (sddat_stat==DONE)) || werr_done;
 
 assign card_stat = sdcmd_stat;
 
@@ -173,6 +185,20 @@ begin
 end
 endtask
 
+// write failed: flag it and bring the card back to a known state
+task write_failed;
+begin
+    wr_err <= 1'b1;
+    werr_done <= 1'b1;
+    if(REINIT_ON_WERR) begin
+        clkdiv <= SLOWCLKDIV; card_type <= UNKNOWN; sdv1_maybe <= 1'b0;
+        cmd8_cnt <= 0; rca <= 0;
+        sdcmd_stat <= CMD0;
+    end else
+        sdcmd_stat <= READY;
+end
+endtask
+
 always @ (posedge clk or negedge rstn)
     if(~rstn) begin
         set_cmd(0,0,0,0);
@@ -183,8 +209,11 @@ always @ (posedge clk or negedge rstn)
         card_type   <= UNKNOWN;
         sdcmd_stat  <= CMD0;
         cmd8_cnt    <= 0;
+        wr_err      <= 1'b0;
+        werr_done   <= 1'b0;
     end else begin
         set_cmd(0,0,0,0);
+        werr_done   <= 1'b0;
         if(sdcmd_stat == READING || sdcmd_stat == WRITING) begin
 	    // the question is: Do we also want to retry a failed
 	    // write? If this happens repeatedly it may wear out the
@@ -195,7 +224,7 @@ always @ (posedge clk or negedge rstn)
             end else if(sddat_stat==DONE)
                 sdcmd_stat <= READY;
             else if(sddat_stat==WERR)             // don't retry write
-                sdcmd_stat <= READY;
+                write_failed;
         end else if(~busy) begin
             case(sdcmd_stat)
                 CMD0    :   set_cmd(1, (SIMULATE?512:64000),  0,  'h00000000);
@@ -212,6 +241,7 @@ always @ (posedge clk or negedge rstn)
                                 set_cmd(1, 96, rstart?17:24, (card_type==SDHCv2) ? sector : (sector<<9) );
                                 sectoraddr <= (card_type==SDHCv2) ? sector : (sector<<9);
                                 sdcmd_stat <= rstart?CMD17:CMD24;
+                                wr_err <= 1'b0;
 		            end
             endcase
         end else if(done) begin
@@ -252,8 +282,10 @@ always @ (posedge clk or negedge rstn)
                                 sdcmd_stat <= CMD55_6;
                 CMD16   :   if(~timeout && ~syntaxe)
                                 sdcmd_stat <= READY;
-                CMD24   :   if(~timeout && ~syntaxe)
+                CMD24   :   if(~timeout && ~syntaxe && !(resparg & R1_ERR_MASK))
                                 sdcmd_stat <= WRITING;
+                            else
+                                write_failed;   // was: stuck in CMD24 forever
                 CMD17   :   if(~timeout && ~syntaxe)
                                 sdcmd_stat <= READING;
                             else
@@ -275,6 +307,7 @@ always @ (posedge clk or negedge rstn)
         ridx    <= 0;
         sddatoe <= 0;
         sddatout <= 4'd15;       
+        wfail   <= 1'b0;
     end else begin
         outen   <= 1'b0;
         if(sdcmd_stat!=WRITING && sdcmd_stat!=CMD17 && sdcmd_stat!=READING ) begin
@@ -287,8 +320,11 @@ always @ (posedge clk or negedge rstn)
 		    // received a write command
 		    if(sdcmd_stat == WRITING) begin
 		        // data is written on the falling sd clock
-		        if(ena_n) begin
+		        if(ena_n && ridx < 8)
+		           ridx <= ridx + 1;   // Nwr: pause after the response (spec: >= 2 SD clocks)
+		        else if(ena_n) begin
                            sddat_stat <= WDATA;
+                           wfail  <= 1'b0;
 		       
                            for(i=0;i<4;i=i+1) data_crc[i] <= 16'h0000;
                            ridx   <= 0;
@@ -365,8 +401,8 @@ always @ (posedge clk or negedge rstn)
 		   if(sddatin[0] == 0) begin
 		      sddat_stat <= WACK;
                       ridx   <= 0; 
-		   end else if(ridx > 10000000) begin
-		      sddat_stat <= WERR;   // write timeout
+		   end else if(ridx > 4096) begin
+		      sddat_stat <= WERR;   // no CRC status token
 		      ridx   <= 0; 
 		   end else begin
                       ridx   <= ridx + 1;
@@ -378,6 +414,7 @@ always @ (posedge clk or negedge rstn)
                     wack[ridx[1:0]] <= sddatin[0];
                     if(ridx >= 4-1) begin
                         sddat_stat <= WWAIT;
+                        wfail  <= (wack[2:0] != 3'b010);   // 010 = data accepted
                         ridx   <= 0; 
                     end else begin
                         ridx   <= ridx + 1;
@@ -386,13 +423,11 @@ always @ (posedge clk or negedge rstn)
 
 	        // wait for not busy on rising sd clock edge
 	        WWAIT : if(ena_p) begin
-		   // TODO: This is the place to check wack
-		   
 		   // wait for not being busy anymore
 		   if(sddatin[0] == 1) begin
-		      sddat_stat <= RTAIL;
+		      sddat_stat <= wfail ? WERR : RTAIL;   // wfail: card rejected the block
                       ridx   <= 0; 
-		   end else if(ridx > 1000000) begin
+		   end else if(ridx > WBUSY_TMO) begin
 		      sddat_stat <= WERR;   // busy timeout
 		      ridx   <= 0; 
 		   end else begin
