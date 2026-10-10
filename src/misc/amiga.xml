@@ -35,7 +35,7 @@
     </action>      
   </actions>
   
-  <menu label="NanoMig">
+  <menu label="NanoMig (v0.16-beta)">
     <fileselector label="Floppy DF0:" ext="adf" index="0"/>
     <menu label="System">
         <!--IS mistle_gw5a_25 -->
