@@ -84,6 +84,7 @@ module top(
 `default_nettype none
   
 wire [5:0]	leds;
+wire		fdd_step_n;
 assign leds[5] = |sd_wr;
 assign leds[4] = |sd_rd;
 assign leds_n = ~leds;
@@ -595,6 +596,7 @@ nanomig nanomig
 
  .pwr_led(leds[0]),
  .fdd_led(leds[1]),
+ .fdd_step_n(fdd_step_n),
 `ifndef DISABLE_IDE
  .hdd_led(leds[2]),
 `endif
@@ -1035,6 +1037,7 @@ drive_sounds drive_sounds_inst (
 	.enable  (osd_drive_sounds),
     //.fdd_led (leds[1]),
     .hdd_led (leds[2]),
+    .fdd_step_n (fdd_step_n),
     .buzzer  (buzzer)
 );
 `endif
