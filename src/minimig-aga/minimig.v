@@ -207,6 +207,7 @@ module minimig
 	input	      kms_level,
 	input [1:0]   kbd_mouse_type,
 	input [7:0]   kbd_mouse_data,
+	output        keyboard_ack,
 	output	      pwr_led, // power led
 	output	      fdd_led, // disk activity LED, active when DMA is on
  
@@ -625,6 +626,7 @@ ciaa CIAA1
 	.kbd_mouse_type(kbd_mouse_type),
 	.kms_level(kms_level),
 	.kbd_mouse_data(kbd_mouse_data), 
+	.keyboard_ack(keyboard_ack),
 	.freeze(freeze),
 	.hrtmon_en (memory_config[6])
 );

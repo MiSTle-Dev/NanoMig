@@ -295,6 +295,8 @@ wire [1:0] kbd_mouse_type;
 wire [7:0] kbd_mouse_data;  
 wire       kbd_reset;      // keyboard reset (Ctrl+LAmiga+RAmiga)
 
+wire keyboard_ack;
+
 hid hid (
         .clk(clk_28m),
         .reset(!pll_lock),
@@ -316,6 +318,7 @@ hid hid (
 		 .kbd_mouse_level(kbd_mouse_level),  
 		 .kbd_mouse_type(kbd_mouse_type),  
 		 .kbd_mouse_data(kbd_mouse_data),
+		 .keyboard_ack(keyboard_ack),
 		 
         .kbd_reset(kbd_reset),
         .joystick0(hid_joy0),
@@ -476,6 +479,7 @@ nanomig nanomig
  .kbd_mouse_level(kbd_mouse_level),  
  .kbd_mouse_type(kbd_mouse_type),  
  .kbd_mouse_data(kbd_mouse_data),
+ .keyboard_ack(keyboard_ack),
  .joystick0(joystick0),
  .joystick1(joystick1),
 				 

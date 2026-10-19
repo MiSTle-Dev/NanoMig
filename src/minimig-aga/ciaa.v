@@ -99,6 +99,7 @@ module ciaa
 	input        kms_level,
 	input  [1:0] kbd_mouse_type,
 	input  [7:0] kbd_mouse_data,
+	output       keyboard_ack,
 	output       freeze,        // Action Replay freeze key
 	input        hrtmon_en
 );
@@ -158,7 +159,8 @@ assign data_out = icr_out | tmra_out | tmrb_out | tmrd_out | sdr_out | pb_out | 
 // instantiate keyboard module
 //----------------------------------------------------------------------------------
 reg        keystrobe;
-wire [7:0] keydat;
+// Hold acknowledgement through the SDR read so HID waits for the bus to release.
+assign keyboard_ack = !reset && sdr && !wr;
 reg  [7:0] sdr_latch;
 
 reg    freeze_reg=0;
@@ -167,7 +169,10 @@ assign freeze = freeze_reg;
 // generate a keystrobe which is valid exactly one clk cycle
 always @(posedge clk) begin
 	reg kms_levelD;
-	if (clk7n_en) begin
+	if (reset) begin
+		kms_levelD <= kms_level;
+		keystrobe <= 1'b0;
+	end else if (clk7n_en) begin
 		kms_levelD <= kms_level;
 		keystrobe <= (kms_level ^ kms_levelD) && (kbd_mouse_type == 2);
 	end

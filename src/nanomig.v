@@ -51,6 +51,9 @@ module nanomig (
    input [7:0]	 joystick0,
    input [7:0]	 joystick1,
 
+   // explicit ACK after consuming keyboard event
+   output       keyboard_ack,
+
    // UART/RS232 for e.g. DiagROM or MIDI
    output	 uart_tx,
    input	 uart_rx,
@@ -1510,6 +1513,7 @@ minimig minimig
 	.kbd_mouse_data (kbd_mouse_data ), // mouse direction data, keycodes
 	.kbd_mouse_type (kbd_mouse_type ), // type of data
 	.kms_level    (kbd_mouse_level  ),
+	.keyboard_ack (keyboard_ack     ),
 	.pwr_led      (pwr_led_bright   ), // power led
 	.fdd_led      (fdd_led          ),
 `ifdef ENABLE_RTC
