@@ -214,6 +214,7 @@ module minimig
 	input [7:0]   kbd_mouse_data,
 	output	      pwr_led, // power led
 	output	      fdd_led, // disk activity LED, active when DMA is on
+	output	      fdd_step_n, // floppy head step (from CIA-B, active low)
  
 `ifdef ENABLE_RTC
 	input [11:0]  rtc,
@@ -659,6 +660,7 @@ ciab CIAB1
 	.porta_out({dtr,rts}),
 	.portb_out({_motor,_sel3,_sel2,_sel1,_sel0,side,direc,_step})
 );
+assign fdd_step_n = _step;
 
 //instantiate cpu bridge
 minimig_m68k_bridge CPU1 

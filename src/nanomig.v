@@ -20,6 +20,7 @@ module nanomig (
    // misc
    output	 pwr_led,
    output	 fdd_led,
+   output	 fdd_step_n,
 
    // video
    output	 hs, // horizontal sync
@@ -1561,6 +1562,7 @@ minimig minimig
 	.kms_level    (kbd_mouse_level  ),
 	.pwr_led      (pwr_led_bright   ), // power led
 	.fdd_led      (fdd_led          ),
+	.fdd_step_n   (fdd_step_n       ),
 `ifdef ENABLE_RTC
 	.rtc          (rtc              ),
 `endif
