@@ -37,6 +37,7 @@
   
   <menu label="NanoMig (v0.17-beta)">
     <fileselector label="Floppy DF0:" ext="adf" index="0"/>
+	<cfgselector label="Config" ext="amiga.ini" default="amiga.ini"/>
     <menu label="System">
         <!--IS mistle_gw5a_25 -->
 	<list label="CPU:" id="T" default="2" action="reset">

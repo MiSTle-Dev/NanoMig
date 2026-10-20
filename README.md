@@ -26,7 +26,8 @@ Current state:
   * Serial AT modem emulation giving the core basic networking support to a simple AT command interface similar to classic telephone modems  
   * FTP access to SD-Card via Network (optional)
   * NTP time synchronisation via Network (optional)  
-  * Telnet allows to read log and debug info from the companion  
+  * Telnet allows to read log and debug info from the companion
+  * Drive Sounds for FDD & HDD (hardware addon / buzzer)
   * Runs on
      - [Tang Nano 20k](https://wiki.sipeed.com/hardware/en/tang/tang-nano-20k/nano-20k.html)  
      - [Primer 25K](https://wiki.sipeed.com/hardware/en/tang/tang-primer-25k/primer-25k.html)  
@@ -43,13 +44,11 @@ Network options:
   * ESP32-Key (USB WIFI Stick)  
 
 
-Planned features:
+Planned features: 
 
-  * Drive Sounds for FDD & HDD (hardware addon / buzzer)
-  * RTG - Retargetable Graphics
-  * Toccata - Sound Card
-  * virtual AT modem via MCU / FPGA-Companion (optional)
-  * virtual SANA II network via MCU / FPGA-Companion (optional)
+  * RTG - Retargetable Graphics (ICEPI-ZERO XL)  
+  * Toccata - Sound Card (ICEPI-ZERO XL)  
+  * Roadshow / Companion PPP Tunnel (Internet access)  
 
 ## Videos
 
@@ -125,7 +124,6 @@ Change the target driver to WinUSB and click Replace Driver (or Install Driver).
   * For preparation of HDF images the HST-Imager works best. [HST-Imager](https://github.com/henrikstengaard/hst-imager) 
   * Professional Filesystem 3 (PFS3) is recommended for HDDs. [PFS3](https://aminet.net/package/disk/misc/pfs3aio)
   * Use ADF-Opus to create and modify ADF images under Windows [ADFOpus2025](https://github.com/chironb/ADFOpus2025)
-* With Disk Flashback you can mount ADF's & HDF's under Windows [Disk Flashback](https://robsmithdev.co.uk/diskflashback)
 
 ## Rigid Disk Block Info
 Please make sure to use RDB (Rigid Disk Block) images with a **Start Offset 0**.  
