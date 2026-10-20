@@ -21,8 +21,7 @@
 // `define DENISE_EBR   // block ram based bitplane and sprite buffers, saves logic
 `define DISABLE_ROM_LOADER // drop the rom loader to make room 
 `define ENABLE_AT_MODEM // serial port <-> virtual AT modem of the FPGA Companion (replaces the midi_in pin)
-`define ENABLE_DRIVE_SOUNDS      // drive sounds on the buzzer pin
-// `define ENABLE_DRIVE_SOUNDS_HDMI // drive sounds mixed into the HDMI audio (alternative to the buzzer)
+`define ENABLE_DRIVE_SOUNDS
 
 module top(
   input			clk,
@@ -1016,18 +1015,6 @@ reg signed [14:0] mixed_audio_right;
 reg signed [14:0] scaled_audio_left;
 reg signed [14:0] scaled_audio_right;
 
-`ifdef ENABLE_DRIVE_SOUNDS_HDMI
-// drive sounds: add +8192 (click) or -8192 (click, click_neg) to both channels, clipped to 15 bit
-wire drive_click, drive_click_neg;
-wire [15:0] hdmi_sum_l = {scaled_audio_left[14],  scaled_audio_left}  + {{2{drive_click_neg}}, drive_click, 13'd0};
-wire [15:0] hdmi_sum_r = {scaled_audio_right[14], scaled_audio_right} + {{2{drive_click_neg}}, drive_click, 13'd0};
-wire [14:0] hdmi_audio_l = (hdmi_sum_l[15:14] == 2'b01) ? 15'h3fff : (hdmi_sum_l[15:14] == 2'b10) ? 15'h4000 : hdmi_sum_l[14:0];
-wire [14:0] hdmi_audio_r = (hdmi_sum_r[15:14] == 2'b01) ? 15'h3fff : (hdmi_sum_r[15:14] == 2'b10) ? 15'h4000 : hdmi_sum_r[14:0];
-`else
-wire [14:0] hdmi_audio_l = scaled_audio_left;
-wire [14:0] hdmi_audio_r = scaled_audio_right;
-`endif
-
 // generate 48khz audio clock
 // An integer divider cannot hit 48kHz: 28500000 / 48000 / 2 = 296.88, and the
 // truncation leaves the stream running fast, which makes sinks drop a chunk of
@@ -1102,8 +1089,8 @@ always @(posedge clk_pixel) begin
         // Convert signed two's complement at offset binary:
         // flip sign bit (bit 14).  Bit 15 = 0 (15-bit audio in 16-bit slot).
         // Explicit per-element assignment avoids unpacked-array ambiguity.
-        audio_reg[0] <= {hdmi_audio_l[14],  hdmi_audio_l[14:0]};
-        audio_reg[1] <= {hdmi_audio_r[14], hdmi_audio_r[14:0]};	
+        audio_reg[0] <= {scaled_audio_left[14],  scaled_audio_left[14:0]};
+        audio_reg[1] <= {scaled_audio_right[14], scaled_audio_right[14:0]};	
     end
 end
    
@@ -1164,17 +1151,6 @@ drive_sounds drive_sounds_inst (
 );
 `endif
 
-`ifdef ENABLE_DRIVE_SOUNDS_HDMI
-drive_sounds_hdmi drive_sounds_hdmi_inst (
-    .clk        (clk_pixel),
-    .tick       (aclk_tick),
-    .enable     (osd_drive_sounds),
-    .hdd_led    (leds[2]),
-    .fdd_step_n (fdd_step_n),
-    .click      (drive_click),
-    .click_neg  (drive_click_neg)
-);
-`endif
    
 endmodule
 
