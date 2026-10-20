@@ -21,7 +21,7 @@
 // `define DENISE_EBR   // block ram based bitplane and sprite buffers, saves logic
 `define DISABLE_ROM_LOADER // drop the rom loader to make room 
 `define ENABLE_AT_MODEM // serial port <-> virtual AT modem of the FPGA Companion (replaces the midi_in pin)
-`define ENABLE_DRIVE_SOUNDS
+// `define ENABLE_DRIVE_SOUNDS
 
 module top(
   input			clk,
@@ -94,7 +94,6 @@ wire [5:0] db9_joy0 = { !js0[5], !js0[0], !js0[2], !js0[1], !js0[4], !js0[3] };
 wire [5:0] db9_joy1 = { !js1[5], !js1[0], !js1[2], !js1[1], !js1[4], !js1[3] }; 
    
 wire [5:0]	leds;
-wire		fdd_step_n;
 assign leds[5] = |sd_wr;
 assign leds[4] = |sd_rd;
 assign leds_n = ~leds;
@@ -678,7 +677,6 @@ nanomig nanomig
 
  .pwr_led(leds[0]),
  .fdd_led(leds[1]),
- .fdd_step_n(fdd_step_n),
 `ifndef DISABLE_IDE
  .hdd_led(leds[2]),
 `endif
@@ -1146,11 +1144,9 @@ drive_sounds drive_sounds_inst (
 	.enable  (osd_drive_sounds),
     //.fdd_led (leds[1]),
     .hdd_led (leds[2]),
-    .fdd_step_n (fdd_step_n),
     .buzzer  (buzzer)
 );
 `endif
-
    
 endmodule
 
