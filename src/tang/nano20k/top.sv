@@ -21,7 +21,7 @@
 // `define DENISE_EBR   // block ram based bitplane and sprite buffers, saves logic
 `define DISABLE_ROM_LOADER // drop the rom loader to make room 
 `define ENABLE_AT_MODEM // serial port <-> virtual AT modem of the FPGA Companion (replaces the midi_in pin)
-// `define ENABLE_DRIVE_SOUNDS
+`define ENABLE_DRIVE_SOUNDS
 
 module top(
   input			clk,
