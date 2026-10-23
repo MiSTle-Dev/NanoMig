@@ -120,9 +120,11 @@ wire req_cop;         //copper dma request
 wire req_blt;         //blitter dma request
 wire spren;
 wire copen;
+wire bplen;
+wire ddf;
 wire blten;
    
-wire dma_spr = req_spr & spren; //sprite dma is using its slot
+wire dma_spr = req_spr & spren & !(ddf & bplen); //sprite dma is using its slot, never while the bitplane data fetch runs
 wire dma_cop = req_cop & copen; //copper dma is using its slot
 wire dma_blt = req_blt & blten; //blitter dma is using its slot
 wire dma_ref;                   //refresh dma slots
@@ -296,7 +298,7 @@ end
 
 //assign dma enable bits
 wire bltpri = dmacon[10];
-wire bplen  = dmacon[8] & dmacon[9];
+assign bplen  = dmacon[8] & dmacon[9];
 assign copen  = dmacon[7] & dmacon[9];
 assign blten  = dmacon[6] & dmacon[9];
 assign spren  = dmacon[5] & dmacon[9];
@@ -365,6 +367,7 @@ agnus_bitplanedma bpd1
 	.clk7_en(clk7_en),
 	.reset(reset),
 	.harddis(harddis),
+	.ddf(ddf),
 	.aga(aga),
 	.ecs(ecs),
 	.a1k(a1k),

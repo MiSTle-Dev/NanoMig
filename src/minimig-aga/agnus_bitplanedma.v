@@ -31,6 +31,7 @@ module agnus_bitplanedma (
   input  wire           clk7_en,          // 7MHz clock enable
   input  wire           reset,            // reset
   input  wire           harddis,
+  output wire           ddf,              // high while the bitplane data fetch runs (masks sprite DMA)
   input  wire           aga,              // aga config
   input  wire           ecs,              // ddfstrt/ddfstop ECS bits enable
   input  wire           a1k,              // DIP Agnus feature
@@ -412,6 +413,9 @@ always @ (posedge clk) begin
     end
   end
 end
+
+// ECS: while the fetch runs; OCS: from ddfena, which rises before the fetch itself (as WinUAE, vAmiga and TC64 model OCS)
+assign ddf = ecs ? ddfrun : ddfena;
 
 // this signal is for matching ddfseq with last dma cycle (after ddfstop)
 assign ddfseq_match = ((!hires && !shres && bp_fmode3)                            && (ddfseq[4:0] == 5'd7)) ||
