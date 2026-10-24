@@ -6,7 +6,9 @@
 //           instantiated by sd_reader
 //--------------------------------------------------------------------------------------------------------
 
-module sdcmd_ctrl (
+module sdcmd_ctrl #(
+    parameter integer CLKDIV_WIDTH = 16
+) (
     input wire	       rstn,
     input wire	       clk,
     // SDcard signals (sdclk and sdcmd)
@@ -18,7 +20,7 @@ module sdcmd_ctrl (
     inout	       sdcmd,
 `endif   
     // config clk freq
-    input wire [15:0]  clkdiv,
+    input wire [CLKDIV_WIDTH-1:0] clkdiv,
     output	       ena_n, // falling sd clock edge (writing)
     output	       ena_p, // rising sd clock edge (reading)
 		   
@@ -76,14 +78,16 @@ reg  [ 5:0] resp_cmd;
 reg  [31:0] resp_arg;
 assign resparg = resp_arg;
 
-reg  [17:0] clkdivr = 18'h3FFFF;
-reg  [17:0] clkcnt  = 0;
+// The all-ones startup value is replaced while clkcnt is still zero.
+// No clock edge is generated before the first divider value is latched.
+reg [CLKDIV_WIDTH-1:0] clkdivr = {CLKDIV_WIDTH{1'b1}};
+reg [CLKDIV_WIDTH:0]   clkcnt  = 0;
 
 reg  [15:0] cnt  = 0;
 
 // clock counter states at which the sd clock changes
-assign	    ena_n = (clkcnt == clkdivr);
-assign	    ena_p = (clkcnt == {clkdivr[16:0],1'b1});
+assign	    ena_n = (clkcnt == {1'b0, clkdivr});
+assign	    ena_p = (clkcnt == {clkdivr,1'b1});
    
 reg [2:0] state;
 localparam STATE_IDLE     = 3'd0;
@@ -102,7 +106,7 @@ always @ (posedge clk or negedge rstn)
         sdclk <= 1'b0;
         {sdcmdoe, sdcmdout} <= 2'b11;  // drive cmd high while no command in progress
 
-        clkdivr <= 18'h3FFFF;                 // initially clock is divided by 256k
+        clkdivr <= {CLKDIV_WIDTH{1'b1}};      // startup sentinel
         clkcnt  <= 0;
         cnt <= 16'd0;
 
@@ -114,10 +118,10 @@ always @ (posedge clk or negedge rstn)
        // clkdiv == 2 -> 0,1,2 ... 5
        // clkdiv == 1 -> run 0,1,2,3
        // With 16Mhz clock and clk_div == 1, this should result in 16/4 = 4Mhz / 250ns
-       clkcnt <= ( clkcnt < {clkdivr[16:0],1'b1} ) ? (clkcnt+18'd1) : 18'd0;
+       clkcnt <= ( clkcnt < {clkdivr,1'b1} ) ? (clkcnt+1'b1) : {(CLKDIV_WIDTH+1){1'b0}};
 
        // latch clockdiv at the end of each clock cycle to prevent glitches
-       if (clkcnt == 18'd0) clkdivr <= {2'h0, clkdiv};
+       if (clkcnt == 0) clkdivr <= clkdiv;
 
        // generate sd clock itself. With 
         if (ena_n)        sdclk <= 1'b0;
