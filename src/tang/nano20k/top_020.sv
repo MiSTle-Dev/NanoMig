@@ -1147,7 +1147,8 @@ ELVDS_OBUF tmds_bufds [3:0] (
 // ========================= Drive Sounds =========================
 `ifdef ENABLE_DRIVE_SOUNDS	
 drive_sounds drive_sounds_inst (
-    .clk     (clk_28m),
+    .clk     (clk_pixel),
+    .aclk_tick (aclk_tick),
 	.enable  (osd_drive_sounds),
     //.fdd_led (leds[1]),
     .hdd_led (leds[2]),
