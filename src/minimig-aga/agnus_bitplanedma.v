@@ -377,8 +377,11 @@ end
 // softena : software display data fetch window
 
 // AMR - OCS and ECS/AGA behave differently when DDFSTRT == DDFSTOP.
-// On OCS the fetch runs until hard_stop. On ECS/AGA it stops after one complete fetch cycle.
+// On OCS the fetch runs until hard_stop. On AGA it stops after one complete fetch cycle.
+// ECS (A500 with ECS Agnus, vAmigaTS Agnus/DDF/DDF/single1): the start wins while no fetch
+// runs; while one runs, the match ends it like DDFSTOP (see same_stop below).
 reg softena_off;
+wire ecs_ddf = ecs & ~aga;  // ECS Agnus rules below; OCS and AGA keep the previous behaviour
 
 always @ (posedge clk) begin
   if (clk7_en) begin
@@ -387,7 +390,7 @@ always @ (posedge clk) begin
         softena <= #1 1'b1;
       else if (softena_off || (soft_stop || !ecs && hard_stop))
         softena <= #1 1'b0;
-      softena_off<=soft_stop && soft_start && ecs;  // AMR - ECS / AGA: DDFSTRT==DDFSTOP, disable fetch after one fetch cycle.
+      softena_off<=soft_stop && soft_start && aga;  // AMR - AGA: DDFSTRT==DDFSTOP, disable fetch after one fetch cycle.
     end
   end
 end
@@ -417,16 +420,50 @@ end
 // ECS: while the fetch runs; OCS: from ddfena, which rises before the fetch itself (as WinUAE, vAmiga and TC64 model OCS)
 assign ddf = ecs ? ddfrun : ddfena;
 
+// ECS: a DDFSTOP match while the fetch runs is kept as a pending stop: the last fetch unit
+// follows even if DDFSTRT sets the window again before that unit (vAmigaTS single2, DDFSTOP
+// $7A-$7E then DDFSTRT $80), and with DDFSTRT == DDFSTOP softena stays set, so the fetch resumes
+// at the next hard start. Timed like DDFSTOP via softena -> ddfena_0 -> ddfena.
+// Not at the hard start itself (DDFSTRT == DDFSTOP == $18).
+reg same_stop_0, same_stop_1, same_stop;
+always @ (posedge clk) begin
+  if (clk7_en) begin
+    if (hpos[0]) begin
+      same_stop_0 <= #1 ecs_ddf && soft_stop && softena && ddfrun && !hard_start;
+      same_stop_1 <= #1 same_stop_0;
+      if (same_stop_1)
+        same_stop <= #1 1'b1;
+      else if ((ddfseq[2:0]==7) || !ddfrun)
+        same_stop <= #1 1'b0;
+    end
+  end
+end
+
 // this signal is for matching ddfseq with last dma cycle (after ddfstop)
 assign ddfseq_match = ((!hires && !shres && bp_fmode3)                            && (ddfseq[4:0] == 5'd7)) ||
                       (((!shres && !hires && bp_fmode12) || (hires && bp_fmode3)) && (ddfseq[3:0] == 4'd7)) ||
                       (!(!hires && !shres && bp_fmode3) && !((!shres && !hires && bp_fmode12) || (hires && bp_fmode3))) && (ddfseq[2:0] == 3'd7);
 
+// ECS: once DDFSTOP (or same_stop) has started the last fetch unit, a DDFSTRT match before it
+// ends does not keep or restart the fetch; softena stays set and the fetch resumes at the next
+// hard start (vAmigaTS Agnus/DDF/DDF/single2 and single4, A500 ECS photo of single2).
+reg run_lock;
+wire run_ok = ddfena && vdiwena && dmaena_delayed[0];
+always @ (posedge clk) begin
+  if (clk7_en) begin
+    if (hpos[0])
+      if (!ecs_ddf || hard_start || !run_ok)
+        run_lock <= #1 1'b0;
+      else if (ddfrun && ddfend && ddfseq_match)
+        run_lock <= #1 1'b1;
+  end
+end
+
 // this signal enables bitplane DMA sequencer
 always @ (posedge clk) begin
   if (clk7_en) begin
     if (hpos[0]) //cycle alligment
-      if (ddfena && vdiwena && !hpos[1] && dmaena_delayed[0]) // bitplane DMA starts at odd timeslot
+      if (run_ok && !hpos[1] && !(ecs_ddf && (run_lock || ddfend))) // bitplane DMA starts at odd timeslot
         ddfrun <= #1 1'b1;
       else if ((ddfend || !vdiwena) && ddfseq_match) // cleared at the end of last bitplane DMA cycle
         ddfrun <= #1 1'b0;
@@ -449,8 +486,10 @@ always @ (posedge clk) begin
   if (clk7_en) begin
     if (hpos[0] && ddfseq_match && ddfend)
       ddfend <= #1 1'b0;
-    else if (hpos[0] && (ddfseq[2:0]==7) && !ddfena)
+    else if (hpos[0] && (ddfseq[2:0]==7) && (!ddfena || same_stop))
       ddfend <= #1 1'b1;
+    else if (hpos[0] && ecs_ddf && !ddfrun) // ECS: no last fetch unit without a fetch; a stale 1 (e.g. the FPGA's
+      ddfend <= #1 1'b0;                     // power-up value) would otherwise block every fetch start above
   end
 end
 
