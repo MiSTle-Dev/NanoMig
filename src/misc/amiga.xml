@@ -35,7 +35,7 @@
     </action>      
   </actions>
   
-  <menu label="NanoMig (v0.17-beta)">
+  <menu label="NanoMig (v0.18-beta)">
     <fileselector label="Floppy DF0:" ext="adf" index="0"/>
 	<cfgselector label="Config" ext="amiga.ini" default="amiga.ini"/>
     <menu label="System">
