@@ -88,6 +88,9 @@ add_file tang/nano20k/gowin_dpb/sector_dpram.v
 add_file tang/nano20k/gowin_dpb/ide_dpram.v
 add_file misc/sdram.sv
 add_file misc/rst_sync.v
+add_file misc/drive_sounds.v
+add_file misc/uart_port.v
+add_file misc/io_fifo.v
 add_file tang/nano20k/nanomig.cst
 add_file tang/nano20k/nanomig_020.sdc
 add_file fx68k/microrom.mem
@@ -97,8 +100,6 @@ add_file tg68k/TG68K.vhd
 add_file tg68k/TG68K_ALU.vhd
 add_file tg68k/TG68KdotC_Kernel.vhd
 add_file misc/amiga_xml.hex
-#add_file misc/uart_port.v
-#add_file misc/io_fifo.v
 
 set_option -synthesis_tool gowinsynthesis
 set_option -output_base_name nanomig

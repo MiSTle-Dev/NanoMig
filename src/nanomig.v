@@ -670,8 +670,8 @@ localparam DRIVES = 2;
    
 // default drive parameters. Should be taken from RDB sector 0   
 reg [15:0] cylinders[DRIVES];
-reg [15:0] sectors[DRIVES];
-reg [15:0] heads[DRIVES];
+reg [7:0] sectors[DRIVES];
+reg [4:0] heads[DRIVES];
 
 // total sectors could be calculated from cylinders * sectors * heads
 // which requires DSP units. Instead we simply use the image size
@@ -768,11 +768,9 @@ always @(posedge clk_sys) begin
             16*4+2: cylinders[drv][15:8] <= sdc_byte_in_data;
             16*4+3: cylinders[drv][ 7:0] <= sdc_byte_in_data;
             // long word 17 contains sectors
-            17*4+2: sectors[drv][15:8] <= sdc_byte_in_data;
-            17*4+3: sectors[drv][ 7:0] <= sdc_byte_in_data;
+            17*4+3: sectors[drv] <= sdc_byte_in_data;
             // long word 18 contains heads
-            18*4+2: heads[drv][15:8] <= sdc_byte_in_data;
-            18*4+3: heads[drv][ 7:0] <= sdc_byte_in_data;
+            18*4+3: heads[drv] <= sdc_byte_in_data[4:0];
 
             // TODO: emit "drive changed" signal and make sure ide config
             // is being updated

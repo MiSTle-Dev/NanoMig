@@ -970,16 +970,26 @@ assign pa_en = !nanomig_reset;   // simply enable amplifier with left channel
 reg [14:0] scaled_audio_left;
 reg [14:0] scaled_audio_right;
 
-reg clk_audio;
-reg [7:0] aclk_cnt;
-always @(posedge clk_28m) begin
-    if(aclk_cnt < 28375160 / (24000*32) / 2 - 1)
-        aclk_cnt <= aclk_cnt + 8'd1;
-    else begin
-        aclk_cnt <= 8'd0;
-        clk_audio <= ~clk_audio;
+// Use the same fractional audio clock generator as the HDMI top.
+localparam integer AUDIO_RATE = 48000;
+localparam integer AUDIO_ACC_WIDTH = $clog2(`PIXEL_CLOCK + AUDIO_RATE);
+localparam [AUDIO_ACC_WIDTH-1:0] AUDIO_INC = ((AUDIO_ACC_WIDTH*2)'(AUDIO_RATE) <<< AUDIO_ACC_WIDTH) / `PIXEL_CLOCK;
 
-	    // Scale values and Assign scaled values to the HDMI registers
+reg [AUDIO_ACC_WIDTH-1:0] aclk_acc;
+reg clk_audio;
+reg aclk_tick;
+reg clk_i2s;
+
+always @(posedge clk_pixel) begin
+    aclk_acc  <= aclk_acc + AUDIO_INC;
+    clk_audio <= aclk_acc[AUDIO_ACC_WIDTH-1];
+    aclk_tick <= (clk_audio != aclk_acc[AUDIO_ACC_WIDTH-1]);
+
+    // 16 times the 48 kHz clock: 768 kHz for 24 kHz, 32-bit I2S frames.
+    clk_i2s <= aclk_acc[AUDIO_ACC_WIDTH-5];
+
+    if(aclk_tick) begin
+        // Scale samples on the 96 kHz audio tick.
         case (osd_volume) 
             3'b100: begin // 100%
                 scaled_audio_left  <= audio_left;
@@ -1020,7 +1030,7 @@ wire [15:0] audio_scaled = { { AUDIO_SHIFT+1{audio_mix[15]}}, audio_mix[14:AUDIO
 // on rising edge
 reg [15:0] audio;
 reg [4:0] audio_bit_cnt;
-always @(posedge clk_audio) begin
+always @(posedge clk_i2s) begin
    if(nanomig_reset) audio_bit_cnt <= 5'd0;
    else              audio_bit_cnt <= audio_bit_cnt + 5'd1;
 
@@ -1030,14 +1040,15 @@ always @(posedge clk_audio) begin
 end
 
 // generate i2s signals
-assign hp_bck = !clk_audio;
+assign hp_bck = !clk_i2s;
 assign hp_ws = nanomig_reset?1'b0:audio_bit_cnt[4];
 assign hp_din = nanomig_reset?1'b0:audio[15-audio_bit_cnt[3:0]];
 
 // ========================= Drive Sounds =========================
-`ifdef ENABLE_DRIVE_SOUNDS	
+`ifdef ENABLE_DRIVE_SOUNDS
 drive_sounds drive_sounds_inst (
-    .clk     (clk_28m),
+    .clk     (clk_pixel),
+    .aclk_tick (aclk_tick),
 	.enable  (osd_drive_sounds),
     //.fdd_led (leds[1]),
     .hdd_led (leds[2]),
