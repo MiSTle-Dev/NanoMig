@@ -177,6 +177,8 @@ wire       osd_stereo_mix;      // 0=off, 1=on
 wire [1:0] osd_kickstart;       // 1=1.3, 2=3.1, 3=3.2
 wire 	   osd_drive_sounds;   	// 0 = disabled, 1 = enabled
 
+// wire	   rom_download_in_progress;	
+
 // this is the reset that goes into the nanomig itself
 reg nanomig_reset = 1;
 
