@@ -441,17 +441,18 @@ hid hid (
         .irq( hid_int ),
         .iack( hid_iack ),
 
-		 // keyboard & mouse				 
-		 .mouse_buttons(mouse_buttons), // mouse buttons
-		 .kbd_mouse_level(kbd_mouse_level),  
-		 .kbd_mouse_type(kbd_mouse_type),  
-		 .kbd_mouse_data(kbd_mouse_data),
-		 .keyboard_ack(keyboard_ack),
-		 
+        // keyboard & mouse
+        .mouse_buttons(mouse_buttons), // mouse buttons
+        .kbd_mouse_level(kbd_mouse_level),
+        .kbd_mouse_type(kbd_mouse_type),
+        .kbd_mouse_data(kbd_mouse_data),
+        .keyboard_ack(keyboard_ack),
+        .vsync_n(vs_n),
+
         .kbd_reset(kbd_reset),
         .joystick0(hid_joy0),
         .joystick1(hid_joy1)
-         );   
+);
 
 sysctrl sysctrl (
         .clk(clk_28m),

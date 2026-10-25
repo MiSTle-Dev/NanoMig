@@ -32,6 +32,7 @@ module hid #(
   output reg	   kbd_mouse_level,
   output reg [1:0] kbd_mouse_type,
   output reg [7:0] kbd_mouse_data,
+  input            vsync_n,
 
   // pending key read from CIA-A SDR
   input            keyboard_ack,
@@ -51,12 +52,16 @@ reg [7:0] keyboard_fifo [0:KEYBOARD_FIFO_DEPTH-1];
 
 reg [KEYBOARD_FIFO_BITS-1:0] keyboard_wr_ptr, keyboard_rd_ptr;
 reg [  KEYBOARD_FIFO_BITS:0] keyboard_count;
+reg [1:0] keyboard_vsync_d;
 reg keyboard_busy;
+reg keyboard_aged;
 
 wire mouse_event = data_in_strobe && !data_in_start &&
                    command == 8'd2 && state >= 4'd1 && state <= 4'd3;
 
-wire keyboard_pop = keyboard_ack && keyboard_busy;
+wire keyboard_timeout = keyboard_aged && keyboard_vsync_d[1] && !keyboard_vsync_d[0];
+
+wire keyboard_pop = (keyboard_ack || keyboard_timeout) && keyboard_busy;
 
 wire keyboard_push = data_in_strobe && !data_in_start &&
                      command == 8'd1 && state == 4'd0 &&
@@ -79,8 +84,13 @@ always @(posedge clk) begin
       keyboard_rd_ptr <= 0;
       keyboard_count <= 0;
       keyboard_busy <= 0;
+      keyboard_aged <= 0;
+      keyboard_vsync_d <= 0;
 
    end else begin
+      // Edge detector for vsync-triggered keyboard queue timeouts
+      keyboard_vsync_d <= {keyboard_vsync_d[0], vsync_n};
+
       // On overflow, drop the new event and preserve queued keys.
       if (keyboard_push) keyboard_wr_ptr <= keyboard_wr_ptr +1;
       if (keyboard_pop)  keyboard_rd_ptr <= keyboard_rd_ptr + 1;
@@ -91,8 +101,17 @@ always @(posedge clk) begin
          default: ;
       endcase
 
-      if (keyboard_pop)  keyboard_busy <= 0;
-      if (keyboard_send) keyboard_busy <= 1;
+      if (keyboard_busy && keyboard_vsync_d[1] && !keyboard_vsync_d[0]) begin
+         keyboard_aged <= 1;
+      end
+      if (keyboard_pop) begin
+         keyboard_busy <= 0;
+         keyboard_aged <= 0;
+      end
+      if (keyboard_send) begin
+         keyboard_busy <= 1;
+         keyboard_aged <= 0;
+      end
    end
 end
 
