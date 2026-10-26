@@ -176,6 +176,13 @@
 	<listentry label="Overscan" value="1"/>
 	<listentry label="Wide" value="2"/>
       </list>
+	  <!--END-->
+	  <!-- Companion on Pi Pico W: serial port is either a hayes (AT) modem or a PPP server -->
+      <!--IS tang_nano20k_020 tang_nano20k --> 
+      <list label="Serial:" id="N" default="0">
+    <listentry label="AT modem" value="0"/>
+    <listentry label="PPP" value="1"/>
+      </list>
       <!--END-->
       <!-- the vertical lcd size is not sufficient for PAL, so position can be adjusted -->
       <!--IS tang_nano20k_lcd -->
