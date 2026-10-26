@@ -46,8 +46,6 @@ Network options:
 
 Planned features: 
 
-  * RTG - Retargetable Graphics (ICEPI-ZERO XL)  
-  * Toccata - Sound Card (ICEPI-ZERO XL)  
   * Roadshow / Companion PPP Tunnel (Internet access)  
 
 ## Videos
