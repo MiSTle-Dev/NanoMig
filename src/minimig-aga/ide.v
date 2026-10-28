@@ -211,8 +211,8 @@ always @(posedge clk) begin
 			0: mgmt_readdata <= {features, 6'd0, use_fast, io_done};
 			1: mgmt_readdata <= {sector[7:0], sector_count[7:0]};
 			2: mgmt_readdata <= {cylinder[15:0]};
-			3: mgmt_readdata <= {sector[15:8], sector_count[15:8]};
-			4: mgmt_readdata <= {cylinder[31:16]};
+			// 3: mgmt_readdata <= {sector[15:8], sector_count[15:8]}; // unused in nanomig (CHS only)
+			// 4: mgmt_readdata <= {cylinder[31:16]}; // unused in nanomig (CHS only)
 			5: mgmt_readdata <= {cmd, drv_addr};
 	default: mgmt_readdata <= (mgmt_cnt[0]) ? buf_readdata[31:16] : buf_readdata[15:0];
 	endcase

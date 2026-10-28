@@ -125,7 +125,7 @@ localparam [3:0] RWAIT    = 4'd0,
 reg [3:0] sddat_stat = RWAIT;
 
 // Largest timeout is WBUSY_TMO SD clock edges (26 bits).
-reg [25:0] ridx   = 0;
+reg [23:0] ridx   = 0;
 reg [15:0] data_crc[4];     // crc's calculated from data
 reg [15:0] read_crc[4];     // crc's received from card
 reg [3:0] wdata;   
@@ -205,9 +205,9 @@ endtask
 
 always @ (posedge clk or negedge rstn)
     if(~rstn) begin
-        set_cmd(0,0,0,0);
+        start <= 1'b0;
         clkdiv      <= SLOWCLKDIV;
-        sectoraddr  <= 0;
+        // sectoraddr  <= 0;
         rca         <= 0;
         sdv1_maybe  <= 1'b0;
         card_type   <= UNKNOWN;
@@ -216,14 +216,14 @@ always @ (posedge clk or negedge rstn)
         wr_err      <= 1'b0;
         werr_done   <= 1'b0;
     end else begin
-        set_cmd(0,0,0,0);
+        start <= 1'b0;
         werr_done   <= 1'b0;
         if(sdcmd_stat == READING || sdcmd_stat == WRITING) begin
 	    // the question is: Do we also want to retry a failed
 	    // write? If this happens repeatedly it may wear out the
 	    // SD card. So for now i'd say: No retry on write!	   
             if(sddat_stat==RTIMEOUT) begin
-                set_cmd(1, 96, 17, sectoraddr);   // retry read
+                set_cmd(1, 96, 17, arg);   // retry read
                 sdcmd_stat <= CMD17;
             end else if(sddat_stat==DONE)
                 sdcmd_stat <= READY;
@@ -243,7 +243,7 @@ always @ (posedge clk or negedge rstn)
                 CMD16   :   set_cmd(1, (SIMULATE?512:64000), 16,  'h00000200);
                 READY   :   if(rstart || wstart) begin 
                                 set_cmd(1, 96, rstart?17:24, (card_type==SDHCv2) ? sector : (sector<<9) );
-                                sectoraddr <= (card_type==SDHCv2) ? sector : (sector<<9);
+                                // sectoraddr <= (card_type==SDHCv2) ? sector : (sector<<9);
                                 sdcmd_stat <= rstart?CMD17:CMD24;
                                 wr_err <= 1'b0;
 		            end
@@ -293,7 +293,7 @@ always @ (posedge clk or negedge rstn)
                 CMD17   :   if(~timeout && ~syntaxe)
                                 sdcmd_stat <= READING;
                             else
-                                set_cmd(1, 128, 17, sectoraddr);   // retry
+                                set_cmd(1, 128, 17, arg);   // retry
                 default :
 		  ;	      
             endcase
@@ -324,13 +324,14 @@ always @ (posedge clk or negedge rstn)
 		    // received a write command
 		    if(sdcmd_stat == WRITING) begin
 		        // data is written on the falling sd clock
-		        if(ena_n && ridx < 8)
+		        if(ena_n && !ridx[3])
 		           ridx <= ridx + 1;   // Nwr: pause after the response (spec: >= 2 SD clocks)
 		        else if(ena_n) begin
                            sddat_stat <= WDATA;
                            wfail  <= 1'b0;
-		       
                            for(i=0;i<4;i=i+1) data_crc[i] <= 16'h0000;
+		       
+                           // for(i=0;i<4;i=i+1) data_crc[i] <= 16'h0000;
                            ridx   <= 0;
                            outaddr<= 0;
 			   
@@ -344,13 +345,13 @@ always @ (posedge clk or negedge rstn)
                        if(~sddatin[0]) begin
                           sddat_stat <= RDATA;
                           ridx   <= 0;
-                          for(i=0;i<4;i=i+1) data_crc[i] <= 16'h0000;
+                          // for(i=0;i<4;i=i+1) data_crc[i] <= 16'h0000;
                        end else begin
 			  // according to SD datasheet, 1ms is
 			  // enough to wait for DAT result, here, we
 			  // set timeout to 1000000 clock cycles =
 			  // 80ms (when SDCLK=12.5MHz)
-                          if(ridx > 1000000) sddat_stat <= RTIMEOUT;
+                          if(ridx[20]) sddat_stat <= RTIMEOUT;
                           ridx   <= ridx + 1;
 		       end
                     end
@@ -372,7 +373,7 @@ always @ (posedge clk or negedge rstn)
                        outaddr<= ridx[9:1]+9'd1;
 		    end
 		     
-                    if(ridx >= 128*8-1) begin
+                    if(&ridx[9:0]) begin
                         sddat_stat <= WCRC;
                         ridx   <= 0; 
                     end else begin
@@ -384,15 +385,15 @@ always @ (posedge clk or negedge rstn)
 	        WCRC : if(ena_n) begin
                    outaddr <= 9'd0;
 
-		   if(ridx < 2*8)
+		   if(!ridx[4])
 		     for(i=0;i<4;i=i+1) 
-		       sddatout[i] <= data_crc[i][4'd15 - ridx[3:0]];
-		   else if(ridx == 2*8)
+		       begin sddatout[i] <= data_crc[i][15]; data_crc[i] <= {data_crc[i][14:0], 1'b0}; end
+		   else if(!ridx[0])
 		     sddatout <= 4'hf;		   
 		   else // ridx == 2*8+1
                      sddatoe <= 0;	// stop driving data output
 		   
-                    if(ridx >= 2*8+1) begin
+                    if(ridx[4] && ridx[0]) begin
                         sddat_stat <= WWAITACK;
                         ridx   <= 0; 
                     end else begin
@@ -405,7 +406,7 @@ always @ (posedge clk or negedge rstn)
 		   if(sddatin[0] == 0) begin
 		      sddat_stat <= WACK;
                       ridx   <= 0; 
-		   end else if(ridx > 4096) begin
+		   end else if(ridx[12]) begin
 		      sddat_stat <= WERR;   // no CRC status token
 		      ridx   <= 0; 
 		   end else begin
@@ -416,7 +417,7 @@ always @ (posedge clk or negedge rstn)
 	        // read ack on rising sd clock edge
 	        WACK : if(ena_p) begin
                     wack[ridx[1:0]] <= sddatin[0];
-                    if(ridx >= 4-1) begin
+                    if(&ridx[1:0]) begin
                         sddat_stat <= WWAIT;
                         wfail  <= (wack[2:0] != 3'b010);   // 010 = data accepted
                         ridx   <= 0; 
@@ -431,7 +432,7 @@ always @ (posedge clk or negedge rstn)
 		   if(sddatin[0] == 1) begin
 		      sddat_stat <= wfail ? WERR : RTAIL;   // wfail: card rejected the block
                       ridx   <= 0; 
-		   end else if(ridx > WBUSY_TMO) begin
+		   end else if(ridx[23]) begin
 		      sddat_stat <= WERR;   // busy timeout
 		      ridx   <= 0; 
 		   end else begin
@@ -443,13 +444,13 @@ always @ (posedge clk or negedge rstn)
                 RDATA : if(ena_p) begin
 		    if(ridx[0]) outbyte[3:0] <= sddatin;
 		    else        outbyte[7:4] <= sddatin;
-                    for(i=0;i<4;i=i+1) data_crc[i] <= CalcCrc16(data_crc[i], sddatin[i]);
+                    // for(i=0;i<4;i=i+1) data_crc[i] <= CalcCrc16(data_crc[i], sddatin[i]);
 		   
                     if(ridx[0] == 1) begin
                         outen  <= 1'b1;
                         outaddr<= ridx[9:1];
                     end
-                    if(ridx >= 128*8-1) begin
+                    if(&ridx[9:0]) begin
                         sddat_stat <= RCRC;
                         ridx   <= 0; 
                         for(i=0;i<4;i=i+1) read_crc[i] <= 16'h0000;
@@ -465,7 +466,7 @@ always @ (posedge clk or negedge rstn)
 		      read_crc[i][4'd15 - ridx[3:0]] <= sddatin[i];
 		   end
 		   
-                   if(ridx >= 2*8-1) begin
+                    if(&ridx[3:0]) begin
                         sddat_stat <= RTAIL;
                         ridx   <= 0; 
                     end else begin
@@ -479,7 +480,7 @@ always @ (posedge clk or negedge rstn)
 		      // TODO: On read this would be the moment to compare 
 		      // read CRC's data_crc vs. read_crc
 	           end		       
-                   if (ridx >= 8*8-1) begin
+                   if (&ridx[5:0]) begin
                       sddat_stat <= DONE;
 		   end
                    ridx   <= ridx + 1;

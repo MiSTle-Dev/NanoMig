@@ -450,7 +450,7 @@ agnus AGNUS1
 	.clk7_en(clk7_en),
 	.cck(cck),
 	.reset(reset),
-	.aen(sel_reg),
+	.aen(sel_reg & !audio_ext_selected & !ham_ext_selected),
 	.rd(cpu_rd),
 	.hwr(cpu_hwr),
 	.lwr(cpu_lwr),
@@ -515,9 +515,9 @@ paula PAULA1
 	.strhor(strhor_paula),
 	.vblint(vbl_int),
  `ifndef DISABLE_IDE
-	.int2(int2|(ide_fast ? ide_ext_irq : gayle_irq)),
+	.int2(int2|(ide_fast ? ide_ext_irq : gayle_irq)|audio_ext_irq),
 `else
-	.int2(int2), 
+	.int2(int2|audio_ext_irq), 
  `endif
 	.int3(int3),
 	.int6(int6 | int6_toccata),
@@ -537,8 +537,8 @@ paula PAULA1
 	._wprot(_wprot),
 	.index(index),
 	.fdd_led(fdd_led),
-	.ldata(ldata),
-	.rdata(rdata),
+	.ldata(paula_ldata),
+	.rdata(paula_rdata),
 	.ldata_okk(ldata_okk),
 	.rdata_okk(rdata_okk),
  
@@ -608,6 +608,8 @@ denise DENISE1
 	.a1k(chipset_config[2]),
 	.ecs(|chipset_config[4:3]),
 	.aga(chipset_config[4]),
+	.ham_frame_start(sof),
+	.ham_control(ham_control_active),
 	.hires(hires),
 	.shres(shres)
 );
@@ -876,6 +878,80 @@ always @(posedge clk) begin
 	else if(sel_cia_a & (cpu_lwr|cpu_hwr)) ovl <= 0;
 end
 
+// Experimental HAM register: CPU only (Moved behind 16 audio channels to $DFF680)
+wire ham_ext_selected = (cpu_address_out[23:1] == (24'hDFF680 >> 1));
+wire ham_ext_access = ham_ext_selected && !dbr && (cpu_rd || cpu_hwr || cpu_lwr);
+reg [15:0] ham_control_shadow = 16'h1084;
+reg [15:0] ham_control_active = 16'h1084;
+always @(posedge clk) begin
+ if(reset) begin
+  ham_control_shadow <= 16'h1084;
+  ham_control_active <= 16'h1084;
+ end else begin
+  if(ham_ext_access) begin
+   if(cpu_hwr) ham_control_shadow[15:8] <= cpu_data_out[15:8];
+   if(cpu_lwr) ham_control_shadow[ 7:0] <= cpu_data_out[ 7:0];
+  end
+  if(sof) ham_control_active <= ham_control_shadow;
+ end
+end
+
+// Audio Extension: 16 Voices ($DFF400-$DFF5FF) with shared ADPCM & DSP AGC mixer
+wire audio_ext_selected = (cpu_address_out[23:9] == 15'b1101_1111_1111_010);
+wire audio_ext_access = audio_ext_selected && !dbr && (cpu_rd || cpu_hwr || cpu_lwr);
+wire [15:0] audio_ext_rdata;
+wire audio_ext_irq;
+wire signed [15:0] audio_ext_l, audio_ext_r;
+wire audio_dma_req;
+wire [31:0] audio_dma_addr;
+reg audio_dma_ack;
+wire [15:0] audio_dma_data = 16'd0;
+wire audio_dma_error = 1'b0;
+
+always @(posedge clk) begin
+ if(reset) audio_dma_ack <= 1'b0;
+ else audio_dma_ack <= audio_dma_req && !audio_dma_ack;
+end
+
+audio_ext AUDIO_EXT (
+
+
+ .clk(clk),
+ .reset(reset),
+ .ntsc(~_csync),
+ .reg_cs(audio_ext_access),
+ .reg_wr(cpu_hwr || cpu_lwr),
+ .reg_addr(cpu_address_out[8:1]),
+ .reg_be({cpu_hwr, cpu_lwr}),
+ .reg_wdata(cpu_data_out),
+ .reg_rdata(audio_ext_rdata),
+ .irq(audio_ext_irq),
+ .dma_req(audio_dma_req),
+ .dma_addr(audio_dma_addr),
+ .dma_ack(audio_dma_ack),
+ .dma_data(audio_dma_data),
+ .dma_error(audio_dma_error),
+ .sample_l(audio_ext_l),
+ .sample_r(audio_ext_r)
+);
+
+// Mix Paula + Audio Extension
+wire [14:0] paula_ldata, paula_rdata;
+wire signed [15:0] paula_l_s = {{1{paula_ldata[14]}}, paula_ldata};
+wire signed [15:0] paula_r_s = {{1{paula_rdata[14]}}, paula_rdata};
+wire signed [16:0] mix_l = paula_l_s + (audio_ext_l >>> 1);
+wire signed [16:0] mix_r = paula_r_s + (audio_ext_r >>> 1);
+
+wire ovf_pos_l = (mix_l[16:15] == 2'b01);
+wire ovf_neg_l = (mix_l[16:15] == 2'b10);
+assign ldata = ovf_pos_l ? 15'sd16383 : (ovf_neg_l ? -15'sd16384 : mix_l[14:0]);
+
+wire ovf_pos_r = (mix_r[16:15] == 2'b01);
+wire ovf_neg_r = (mix_r[16:15] == 2'b10);
+assign rdata = ovf_pos_r ? 15'sd16383 : (ovf_neg_r ? -15'sd16384 : mix_r[14:0]);
+
+
+
 //-------------------------------------------------------------------------------------
 
 `ifdef ENABLE_RTC
@@ -1040,6 +1116,8 @@ assign int6_toccata = 1'b0;
 //data multiplexer
 assign cpu_data_in = gary_data_out
 		     | cia_data_out
+		     | ((ham_ext_access && cpu_rd) ? ham_control_shadow : 16'h0000)
+                     | ((audio_ext_access && cpu_rd) ? audio_ext_rdata : 16'h0000)
 `ifndef DISABLE_IDE
 		     | gayle_data_out
 `endif

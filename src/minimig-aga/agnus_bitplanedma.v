@@ -484,9 +484,12 @@ always @(posedge clk) begin
 	end
 end
 
+wire [15:1] bplmod_sel = mod ? (plane[0] ? bpl2mod_bscan : bpl1mod_bscan) : 15'd0;
+wire [ 2:0] bpl_step   = (fmode[1:0] == 2'b11) ? 3'd4 : (fmode[1:0] == 2'b00) ? 3'd1 : 3'd2;
 // dma pointer arithmetic unit
 always @ (*) begin
-  if (mod) begin
+  newpt[20:1] = address_out[20:1] + {{5{bplmod_sel[15]}},bplmod_sel[15:1]} + bpl_step;
+  if (1'b0) if (mod) begin
     if (plane[0]) // even plane modulo
       newpt[20:1] = address_out[20:1] + {{5{bpl2mod_bscan[15]}},bpl2mod_bscan[15:1]} + (fmode[1:0] == 2'b11 ? 3'd4 : fmode[1:0] == 2'b00 ? 3'd1 : 3'd2);
     else // odd plane modulo

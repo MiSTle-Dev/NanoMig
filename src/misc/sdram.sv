@@ -444,7 +444,7 @@ generate
             end
             PORT_2: begin
               if (addr_0)
-                p2_dout48[47:16] <= {ram_dout_hi, ram_dout_lo};
+                p2_dout48[31: 0] <= {ram_dout_hi, ram_dout_lo};
               else
                 p2_dout48[31: 0] <= {ram_dout_hi, ram_dout_lo};
             end
@@ -462,7 +462,7 @@ generate
             PORT_2: begin
               if (!ram_we && CHIP48_BURST) p2_ack_i <= ~p2_ack_i;
               if (addr_0)
-                p2_dout48[15:0] <= {ram_dout_hi};
+                /* no-op */;
               else
                 /* no-op */;
             end

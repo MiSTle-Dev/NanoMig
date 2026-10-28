@@ -15,30 +15,34 @@ module dpram_be_1024x16
 	output [15:0] q_b
 );
 
-dpram #(10,8) ram_l
-(
-	.clock(clock),
-	.address_a(address_a),
-	.data_a(data_a[7:0]),
-	.wren_a(byteena_a[0] & wren_a),
-	.q_a(q_a[7:0]),
-	.address_b(address_b),
-	.data_b(data_b[7:0]),
-	.wren_b(byteena_b[0] & wren_b),
-	.q_b(q_b[7:0])
+DPB dpb_inst (
+	.DOA(q_a),
+	.DOB(q_b),
+	.DIA(data_a),
+	.DIB(data_b),
+	.BLKSELA(3'b000),
+	.BLKSELB(3'b000),
+	.ADA({address_a, 2'b00, byteena_a}),
+	.ADB({address_b, 2'b00, byteena_b}),
+	.WREA(wren_a),
+	.WREB(wren_b),
+	.CLKA(clock),
+	.CLKB(clock),
+	.CEA(1'b1),
+	.CEB(1'b1),
+	.OCEA(1'b0),
+	.OCEB(1'b0),
+	.RESETA(1'b0),
+	.RESETB(1'b0)
 );
-
-dpram #(10,8) ram_u
-(
-	.clock(clock),
-	.address_a(address_a),
-	.data_a(data_a[15:8]),
-	.wren_a(byteena_a[1] & wren_a),
-	.q_a(q_a[15:8]),
-	.address_b(address_b),
-	.data_b(data_b[15:8]),
-	.wren_b(byteena_b[1] & wren_b),
-	.q_b(q_b[15:8])
-);
+defparam dpb_inst.READ_MODE0 = 1'b0;
+defparam dpb_inst.READ_MODE1 = 1'b0;
+defparam dpb_inst.WRITE_MODE0 = 2'b00;
+defparam dpb_inst.WRITE_MODE1 = 2'b00;
+defparam dpb_inst.BIT_WIDTH_0 = 16;
+defparam dpb_inst.BIT_WIDTH_1 = 16;
+defparam dpb_inst.BLK_SEL_0 = 3'b000;
+defparam dpb_inst.BLK_SEL_1 = 3'b000;
+defparam dpb_inst.RESET_MODE = "SYNC";
 
 endmodule

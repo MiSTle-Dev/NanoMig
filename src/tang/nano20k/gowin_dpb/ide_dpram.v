@@ -39,8 +39,8 @@ wire gw_gnd;
 assign gw_gnd = 1'b0;
 
 DPB dpb_inst_0 (
-    .DOA({dpb_inst_0_douta_w[11:0],douta[3:0]}),
-    .DOB({dpb_inst_0_doutb_w[11:0],doutb[3:0]}),
+    .DOA({dpb_inst_0_douta_w[7:0],douta[7:0]}),
+    .DOB({dpb_inst_0_doutb_w[7:0],doutb[7:0]}),
     .CLKA(clka),
     .OCEA(ocea),
     .CEA(cea),
@@ -53,25 +53,25 @@ DPB dpb_inst_0 (
     .WREB(wreb),
     .BLKSELA({gw_gnd,gw_gnd,gw_gnd}),
     .BLKSELB({gw_gnd,gw_gnd,gw_gnd}),
-    .ADA({ada[11:0],gw_gnd,gw_gnd}),
-    .DIA({gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,dina[3:0]}),
-    .ADB({adb[11:0],gw_gnd,gw_gnd}),
-    .DIB({gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,dinb[3:0]})
+    .ADA({ada[10:0],gw_gnd,gw_gnd,gw_gnd}),
+    .DIA({gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,dina[7:0]}),
+    .ADB({adb[10:0],gw_gnd,gw_gnd,gw_gnd}),
+    .DIB({gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,dinb[7:0]})
 );
 
 defparam dpb_inst_0.READ_MODE0 = 1'b0;
 defparam dpb_inst_0.READ_MODE1 = 1'b0;
 defparam dpb_inst_0.WRITE_MODE0 = 2'b00;
 defparam dpb_inst_0.WRITE_MODE1 = 2'b00;
-defparam dpb_inst_0.BIT_WIDTH_0 = 4;
-defparam dpb_inst_0.BIT_WIDTH_1 = 4;
+defparam dpb_inst_0.BIT_WIDTH_0 = 8;
+defparam dpb_inst_0.BIT_WIDTH_1 = 8;
 defparam dpb_inst_0.BLK_SEL_0 = 3'b000;
 defparam dpb_inst_0.BLK_SEL_1 = 3'b000;
 defparam dpb_inst_0.RESET_MODE = "SYNC";
 
 DPB dpb_inst_1 (
-    .DOA({dpb_inst_1_douta_w[11:0],douta[7:4]}),
-    .DOB({dpb_inst_1_doutb_w[11:0],doutb[7:4]}),
+    .DOA({dpb_inst_1_douta_w[7:0],douta[15:8]}),
+    .DOB({dpb_inst_1_doutb_w[7:0],doutb[15:8]}),
     .CLKA(clka),
     .OCEA(ocea),
     .CEA(cea),
@@ -84,22 +84,23 @@ DPB dpb_inst_1 (
     .WREB(wreb),
     .BLKSELA({gw_gnd,gw_gnd,gw_gnd}),
     .BLKSELB({gw_gnd,gw_gnd,gw_gnd}),
-    .ADA({ada[11:0],gw_gnd,gw_gnd}),
-    .DIA({gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,dina[7:4]}),
-    .ADB({adb[11:0],gw_gnd,gw_gnd}),
-    .DIB({gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,dinb[7:4]})
+    .ADA({ada[10:0],gw_gnd,gw_gnd,gw_gnd}),
+    .DIA({gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,dina[15:8]}),
+    .ADB({adb[10:0],gw_gnd,gw_gnd,gw_gnd}),
+    .DIB({gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,dinb[15:8]})
 );
 
 defparam dpb_inst_1.READ_MODE0 = 1'b0;
 defparam dpb_inst_1.READ_MODE1 = 1'b0;
 defparam dpb_inst_1.WRITE_MODE0 = 2'b00;
 defparam dpb_inst_1.WRITE_MODE1 = 2'b00;
-defparam dpb_inst_1.BIT_WIDTH_0 = 4;
-defparam dpb_inst_1.BIT_WIDTH_1 = 4;
+defparam dpb_inst_1.BIT_WIDTH_0 = 8;
+defparam dpb_inst_1.BIT_WIDTH_1 = 8;
 defparam dpb_inst_1.BLK_SEL_0 = 3'b000;
 defparam dpb_inst_1.BLK_SEL_1 = 3'b000;
 defparam dpb_inst_1.RESET_MODE = "SYNC";
 
+/*
 DPB dpb_inst_2 (
     .DOA({dpb_inst_2_douta_w[11:0],douta[11:8]}),
     .DOB({dpb_inst_2_doutb_w[11:0],doutb[11:8]}),
@@ -115,9 +116,9 @@ DPB dpb_inst_2 (
     .WREB(wreb),
     .BLKSELA({gw_gnd,gw_gnd,gw_gnd}),
     .BLKSELB({gw_gnd,gw_gnd,gw_gnd}),
-    .ADA({ada[11:0],gw_gnd,gw_gnd}),
+    .ADA({ada[10:0],gw_gnd,gw_gnd,gw_gnd}),
     .DIA({gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,dina[11:8]}),
-    .ADB({adb[11:0],gw_gnd,gw_gnd}),
+    .ADB({adb[10:0],gw_gnd,gw_gnd,gw_gnd}),
     .DIB({gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,dinb[11:8]})
 );
 
@@ -146,9 +147,9 @@ DPB dpb_inst_3 (
     .WREB(wreb),
     .BLKSELA({gw_gnd,gw_gnd,gw_gnd}),
     .BLKSELB({gw_gnd,gw_gnd,gw_gnd}),
-    .ADA({ada[11:0],gw_gnd,gw_gnd}),
+    .ADA({ada[10:0],gw_gnd,gw_gnd,gw_gnd}),
     .DIA({gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,dina[15:12]}),
-    .ADB({adb[11:0],gw_gnd,gw_gnd}),
+    .ADB({adb[10:0],gw_gnd,gw_gnd,gw_gnd}),
     .DIB({gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,dinb[15:12]})
 );
 
@@ -162,4 +163,5 @@ defparam dpb_inst_3.BLK_SEL_0 = 3'b000;
 defparam dpb_inst_3.BLK_SEL_1 = 3'b000;
 defparam dpb_inst_3.RESET_MODE = "SYNC";
 
+*/
 endmodule //ide_dpram

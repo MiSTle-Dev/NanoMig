@@ -287,7 +287,9 @@ reg  [ 7:0] mouse0scr;
 
 // data output multiplexer
 always @(*) begin
-	if ((reg_address_in[8:1]==JOY0DAT[8:1]) && joy1enable)//read port 1 joystick
+	if (reg_address_in[8:1]==JOY0DAT[8:1])
+		data_out[15:0] = {dmouse0dat[15:8] + {mouse0dat[15:10], joy1enable ? 2'b00 : mouse0dat[9:8]}, dmouse0dat[7:0] + {mouse0dat[7:2], joy1enable ? 2'b00 : mouse0dat[1:0]}};
+	else if ((reg_address_in[8:1]==JOY0DAT[8:1]) && joy1enable)//read port 1 joystick
 		data_out[15:0] = {mouse0dat[15:10] + dmouse0dat[15:10],dmouse0dat[9:8],mouse0dat[7:2] + dmouse0dat[7:2],dmouse0dat[1:0]};
 	else if (reg_address_in[8:1]==JOY0DAT[8:1])//read port 1 mouse
 		data_out[15:0] = {mouse0dat[15:8] + dmouse0dat[15:8],mouse0dat[7:0] + dmouse0dat[7:0]};

@@ -24,6 +24,9 @@ add_file minimig-aga/paula_audio_channel.v
 add_file minimig-aga/paula_audio_mixer.v
 add_file minimig-aga/paula_audio.v
 add_file minimig-aga/paula_audio_volume.v
+add_file minimig-aga/adpcm_decoder_shared.v
+add_file minimig-aga/biquad_iir_ringbuffer.v
+add_file minimig-aga/audio_ext.v
 add_file minimig-aga/paula_floppy_fifo.v
 add_file minimig-aga/paula_floppy.v
 add_file minimig-aga/paula_intcontroller.v
@@ -50,6 +53,8 @@ add_file minimig-aga/denise_playfields.v
 add_file minimig-aga/denise_sprites_shifter.v
 add_file minimig-aga/denise_bitplanes.v
 add_file minimig-aga/denise_hamgenerator.v
+add_file minimig-aga/ham_pixel_decoder.v
+add_file minimig-aga/ham_video_pipeline.v
 add_file minimig-aga/denise_spritepriority.v
 add_file minimig-aga/denise_sprites.v
 add_file minimig-aga/denise_colortable_ram_mf.v
@@ -105,6 +110,7 @@ set_option -synthesis_tool gowinsynthesis
 set_option -output_base_name nanomig
 set_option -verilog_std sysv2017
 set_option -top_module top
+set_option -opt_goal area
 set_option -use_mspi_as_gpio 1
 set_option -use_sspi_as_gpio 1
 set_option -use_jtag_as_gpio 0

@@ -40,7 +40,7 @@
 // 2009-08-31	- scanlines synthesis option
 // 2010-05-30	- htotal changed
 
-`define SCANLINES
+// `define SCANLINES
 
 module Amber
 (	
@@ -81,13 +81,6 @@ reg	_hsync_in_del;				//delayed horizontal synchronisation input
 reg	hss;					//horizontal sync start
 wire	eol;					//end of scan-doubled line
 
-reg	hfilter;				//horizontal interpolation enable
-reg	vfilter;				//vertical interpolation enable
-	
-reg	scanline_ena;				//signal active when the scan-doubled line is displayed
-
-//-----------------------------------------------------------------------------//
-
 // local horizontal counters for scan doubling
 reg		[10:0] wr_ptr;				//line buffer write pointer
 reg		[10:0] rd_ptr;				//line buffer read pointer
@@ -100,18 +93,10 @@ always @(posedge clk28m)
 always @(posedge clk28m)
 	hss <= ~_hsync_in & _hsync_in_del;
 
-// pixels delayed by one hires pixel for horizontal interpolation
-always @(posedge clk28m)
-	if (wr_ptr[0]) begin	//sampled at 14MHz (hires clock rate)
-		red_del <= red_in;
-		green_del <= green_in;
-		blue_del <= blue_in;
-	end
-
-//horizontal interpolation
-assign red   = hfilter ?   red_in +   red_del :   red_in*2;
-assign green = hfilter ? green_in + green_del : green_in*2;
-assign blue  = hfilter ?  blue_in +  blue_del :  blue_in*2;
+//horizontal interpolation disabled
+assign red   = {red_in, 1'b0};
+assign green = {green_in, 1'b0};
+assign blue  = {blue_in, 1'b0};
 
 // line buffer write pointer
 always @(posedge clk28m)
@@ -130,26 +115,8 @@ always @(posedge clk28m)
 	else
 		rd_ptr <= rd_ptr + 1;
 
-always @(posedge clk28m)
-	if (hss)
-		scanline_ena <= 0;
-	else if (eol)
-		scanline_ena <= 1;
-		
-//horizontal interpolation enable	
-always @(posedge clk28m)
-	if (hss)
-		hfilter <= hires ? hr_filter[0] : lr_filter[0];		//horizontal interpolation enable
-
-//vertical interpolation enable
-always @(posedge clk28m)
-	if (hss)
-		vfilter <= hires ? hr_filter[1] : lr_filter[1];		//vertical interpolation enable
-
 reg [15:0] lbf [1023:0]/*synthesis syn_ramstyle = "block_ram"*/;	// line buffer for scan doubling (there are 908/910 hires pixels in every line)
 reg [15:0] lbfo;			// line buffer output register
-reg [15:0] lbfo2;			// compensantion for one clock delay of the second line buffer
-reg [15:0] lbfdo;			// delayed line buffer output register
 
 // line buffer write and read
 always @(posedge clk28m) begin
@@ -157,43 +124,29 @@ always @(posedge clk28m) begin
    lbfo <= lbf[rd_ptr[9:0]];
 end
    
-reg [15:0] lbfd [1023:0]; // delayed line buffer for vertical interpolation
+// reg [15:0] lbfd [1023:0];
 
-//delayed line buffer read/write
-always @(posedge clk28m) begin
-   reg [15:0] lbfdoD;   
-
-   // this originally read and wrote the same cell at a time. But gowin (at least 1.9.11)
-   // fails to synthesize this. We thus write one cell "earlier" and delay the output word to
-   // compensate for that. This should cause the first pixel to be interpolated wrongly. But
-   // that's not part of the visible area, anyway
-   lbfd[rd_ptr[9:0]-10'd1] <= lbfo;
-   lbfdoD <= lbfd[rd_ptr[9:0]];
-   lbfdo <= lbfdoD;   
-end
+// //delayed line buffer read/write
+// always @(posedge clk28m) begin
+//    reg [15:0] lbfdoD;   
+// 
+//    // this originally read and wrote the same cell at a time. But gowin (at least 1.9.11)
+//    // fails to synthesize this. We thus write one cell "earlier" and delay the output word to
+//    // compensate for that. This should cause the first pixel to be interpolated wrongly. But
+//    // that's not part of the visible area, anyway
+//    lbfd[rd_ptr[9:0]-10'd1] <= lbfo;
+//    lbfdoD <= lbfd[rd_ptr[9:0]];
+//    lbfdo <= lbfdoD;   
+// end
    
-//delayed line buffer pixel by one clock cycle
-always @(posedge clk28m)
-   lbfo2 <= lbfo;
-   
-// output pixel generation - vertical interpolation
+// output pixel generation
 always @(posedge clk28m)
 begin
-		_hsync_out <= dblscan ? lbfo2[15] : _csync_in;
+		_hsync_out <= dblscan ? lbfo[15] : _csync_in;
 		_vsync_out <= dblscan ? _vsync_in : 1'b1;
-
-		if (vfilter)
-		begin //vertical interpolation
-			t_red    <= ( lbfo2[14:10] + lbfdo[14:10] ) / 4;
-			t_green  <= ( lbfo2[9:5] + lbfdo[9:5] ) / 4;
-			t_blue   <= ( lbfo2[4:0] + lbfdo[4:0] ) / 4;
-		end
-		else
-		begin //no vertical interpolation
-			t_red    <= lbfo2[14:11];
-			t_green  <= lbfo2[9:6];
-			t_blue   <= lbfo2[4:1];
-		end
+		t_red    <= lbfo[14:11];
+		t_green  <= lbfo[9:6];
+		t_blue   <= lbfo[4:1];
 end
 
 //scanlines effect
