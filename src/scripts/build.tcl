@@ -86,6 +86,9 @@ add_file tang/nano20k/gowin_dpb/sector_dpram.v
 add_file tang/nano20k/gowin_dpb/ide_dpram.v
 add_file misc/sdram.sv
 add_file misc/rst_sync.v
+add_file misc/drive_sounds.v
+add_file misc/uart_port.v
+add_file misc/io_fifo.v
 add_file tang/nano20k/nanomig.cst
 add_file tang/nano20k/nanomig.sdc
 add_file fx68k/microrom.mem
