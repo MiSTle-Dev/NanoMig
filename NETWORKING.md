@@ -18,7 +18,7 @@ Copy the **PPP Netinterface** from Storage to **Workbench:Devs/Netinterfaces/**
 
 <img width="600" height="462" alt="IMG_20261028_222343967" src="https://github.com/user-attachments/assets/25107f3e-9ef1-45eb-8d1c-9431d49c650c" />
 
-Place a **PPP** configuration file anywhere you like. E.g. S: or Preferences
+Place a **PPP** configuration file anywhere you like. For example **S:** or **Preferences**
 
 <img width="600" height="453" alt="IMG_20261028_222526108_HDR" src="https://github.com/user-attachments/assets/3b9504f6-7107-4003-af21-c4c4522ae266" />
 
