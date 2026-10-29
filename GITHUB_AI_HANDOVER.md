@@ -111,3 +111,30 @@ $$\text{Basisadresse Stimme } n = \$DFF400 + (n \times 32) = \$DFF400 + (n \time
   ```bash
   vasmm68k_mot -Fhunkexe -nosym -o audio_test audio_pipeline_16ch_test.s
   ```
+
+
+---
+
+## 🎙️ Audio Capture & Double-Buffering Unit (Weg A: Dual 4 KB BRAM)
+
+A dedicated **hardware recording / audio capture unit** is built into the core. It allows recording the 16-bit 48 kHz stereo audio output back into memory without any danger of memory trashing or DMA corruption.
+
+### Memory Windows (.. = 8 KB total):
+- **Block A:** $DF8000 – $DF8FFF (4096 Bytes = 1024 Stereo Sample Pairs: 16-Bit Left / 16-Bit Right interleaved)
+- **Block B:** $DF9000 – $DF9FFF (4096 Bytes = 1024 Stereo Sample Pairs: 16-Bit Left / 16-Bit Right interleaved)
+- Format: Word 0 = Left 0, Word 1 = Right 0, Word 2 = Left 1, Word 3 = Right 1, etc. A single MOVE.L ()+, D0 reads a coherent 32-bit stereo sample.
+
+### Control Register AUD_CAP_CTRL ():
+- **Bit 0:** CAPTURE_EN (1 = Recording active, 0 = Stopped)
+- **Bit 1:** FLAG_BLOCK_A (1 = Block A is full / ready to read; write 1 to clear / acknowledge)
+- **Bit 2:** FLAG_BLOCK_B (1 = Block B is full / ready to read; write 1 to clear / acknowledge)
+- **Bit 3:** ACTIVE_BLOCK (0 = Hardware currently filling A, 1 = Hardware filling B)
+- **Bit 4:** OVERRUN_FLAG (1 = Hardware paused because target block was still blocked; write 1 to clear)
+- **Bit 5:** IRQ_EN (1 = Trigger Level-2 interrupt INT2 whenever a block completes)
+- **Bits 15..6:** SAMPLE_POS (0..1023 current sample index within active block)
+
+### Hardware Backpressure / Overrun Protection:
+- While Hardware fills Block A (~21.3 ms @ 48 kHz), CPU reads Block B in peace.
+- When Block A completes, FLAG_BLOCK_A becomes 1.
+- If CPU has not cleared FLAG_BLOCK_A by the time hardware returns to Block A, **the hardware automatically pauses and drops incoming samples without overwriting Block A**, setting OVERRUN_FLAG = 1. Old data is NEVER corrupted!
+- Test program: [Tests/audio_capture_test.s](file:///D:/programmier_ordner/FPGA/HAM_Uebergabe/Tests/audio_capture_test.s)
