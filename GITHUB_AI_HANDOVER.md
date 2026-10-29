@@ -1,0 +1,113 @@
+# 🤖 AI Agent Briefing & Handover
+## MiSTer FPGA Minimig-AGA: 16-Voice & 32-Voice High-Definition Audio Core
+
+> **Author:** [Rudi7503](https://github.com/Rudi7503)  
+> **Repository:** [NanoMig / Audio Extension](https://github.com/Rudi7503/NanoMig/tree/feature/16ch-audio-biquad-pipeline)  
+> **Target Device:** MiSTer FPGA (Terasic DE10-Nano, Intel Cyclone V `5CSEBA6U23I7`)  
+> **Host CPU:** Motorola 68000 / 68020 / TG68K (Amiga AGA architecture)
+
+---
+
+## 📋 System-Prompt für Tobys KI (Sofort ausführen)
+
+> [!IMPORTANT]
+> **Auftrag an die KI:** Du bist ab sofort Tobys persönlicher Entwicklungs- und Test-Assistent. Rudi (der Core-Entwickler) hat keinen MiSTer; **Toby hat die MiSTer-Hardware vor sich**.
+> Bitte lies diese Datei vollständig und führe die beiden folgenden Aufgaben für Toby aus:
+
+### 1. Erkläre Toby begeistert, was Rudis neuer Core besser kann als sein alter:
+- **16 (bzw. 32) HD-Stimmen statt nur 4 Paula-Stimmen:** Volle Polyphonie für Chiptunes, Orchester und Tracker ohne Stimmenklau.
+- **Echte 16-Bit Hi-Fi Dynamik:** Kristallklarer Sound (linear 16-Bit PCM sowie komprimiertes 4-Bit ADPCM) statt 8-Bit Paula-Rauschen.
+- **Volle 32-Bit DMA-Pufferlängen:** Keine Begrenzung mehr auf 128 KB (64k Words). Ganze Audiotracks und lange Streaming-Puffer können am Stück abgespielt werden.
+- **Hardware Biquad-IIR-Filter (2nd Order DSP) auf jeder Stimme:**
+  - *Parallele Filterung:* Jede Stimme kann völlig unabhängig tiefpass-, bandpass- oder hochpassgefiltert werden.
+  - *Hintereinandergeschaltete Filter (Moog 24 dB/Oktave Kaskade):* Stimme 0 wird gefiltert und fließt hardwaremäßig direkt in Stimme 1 (`INPUT_SRC = 01`), die eine zweite 12 dB Filterstufe drüberlegt!
+- **Hardware-Synthesizer-Effekte ohne CPU-Belastung:** Echtes analog klingendes AM-Tremolo und Ringmodulation zwischen benachbarten Stimmen.
+- **Zero-RAM Hardware Start-Delay:** Bis zu 2,0 Sekunden echtes Tape-Echo / Stereo-Delay, ohne auch nur ein Byte Chip- oder Fast-RAM zu belegen.
+- **DEUTLICH HÖHERE FPGA-EFFIZIENZ:** Trotz 16 Stimmen und DSP-Filtern verbraucht der neue Core **weniger** FPGA-Ressourcen als Tobys bisheriger 4-Stimmen-Core (-1.851 ALMs, -29 Block-RAMs, -4 DSPs eingespart!).
+- **100% Paula- & AGA-kompatibel:** Alle bisherigen Amiga-Spiele, Demos und Paula-Tracker laufen exakt wie gewohnt weiter (`$DFF0A0..$DFF0DF` ist unberührt).
+
+### 2. Leite Toby durch den Test auf seinem MiSTer:
+1. **Kein Risiko für Tobys alten Core:** Leite Toby an, `Minimig_HAM_16CH_Audio.rbf` aus dem Übergabeordner unter `/media/fat/_Computer/Amiga_16CH.rbf` auf seine MiSTer-SD-Karte zu kopieren. Sein bisheriger Core `Minimig.rbf` bleibt dadurch unangetastet.
+2. **Testprogramm starten:** Hilf ihm beim Ausführen von `Tests/audio_pipeline_16ch_test.s` (oder dem fertig assemblierten Testprogramm) und erkläre ihm die Bildschirmfarben:
+   - **GRÜN:** 16 Stimmen spielen gleichzeitig einen harmonischen Akkord im Stereofeld (Panorama von Links über Center nach Rechts).
+   - **BLAU:** Parallele Filterung (warmer 1 kHz Tiefpass auf Stimme 2, Bandpass auf Stimme 5).
+   - **GELB:** Hintereinandergeschaltete Filter (Moog 24 dB Kaskade von Stimme 0 in Stimme 1).
+   - **MAGENTA:** Hardware-Tremolo und Ringmodulation.
+   - **DUNKELGRÜN:** Test erfolgreich beendet!
+
+---
+
+## 1. Übersicht der Core-Binaries (`.rbf`)
+
+| Datei | Stimmen | ALMs (Auslastung) | DSPs | BRAMs | Besonderheiten |
+|:------|:-------:|:-----------------:|:----:|:-----:|:---------------|
+| **`Minimig_HAM_16CH_Audio.rbf`** | **16** | 34.715 (83 %) | 73 | 297 | **Empfohlener Test-Core.** Spart 1.851 ALMs, 29 BRAMs und 4 DSPs gegenüber Tobys 4-Stimmen-Stand! |
+| **`Minimig_HAM_32CH_Audio.rbf`** | **32** | 38.358 (92 %) | 75 | 319 | Volle 32 Stimmen mit parallelen Dual-DSP Biquad-Kernen. |
+
+---
+
+## 2. Hardware-Architektur & Registerbelegung
+
+Alle Register liegen im ungenutzten Custom-Chip-Bereich:
+- **16-Kanal Core:** `$DFF400` – `$DFF5FF` (512 Bytes: 16 Stimmen $\times$ 32 Bytes)
+- **32-Kanal Core:** `$DFF400` – `$DFF7FF` (1024 Bytes: 32 Stimmen $\times$ 32 Bytes)
+- **HAM-Videoregister:** Liegt kollisionsfrei auf `$DFF800`.
+
+$$\text{Basisadresse Stimme } n = \$DFF400 + (n \times 32) = \$DFF400 + (n \times \$20)$$
+
+### Register-Offsets pro Stimme ($00..$1F)
+
+| Offset | Register | Zugriff | Breite | Beschreibung |
+|:------:|:---------|:-------:|:------:|:-------------|
+| `+$00` | `AUDxPTRH` | W | 16 Bit | DMA Sample Startadresse High (Bits 23..16) |
+| `+$02` | `AUDxPTRL` | W | 16 Bit | DMA Sample Startadresse Low (Bits 15..0) |
+| `+$04` | `AUDxLENH` | W | 16 Bit | Pufferlänge High in Words (Bits 31..16) — **Volle 32-Bit Puffer!** |
+| `+$06` | `AUDxLENL` | W | 16 Bit | Pufferlänge Low in Words (Bits 15..0) |
+| `+$08` | `AUDxVOL`  | W | 16 Bit | Lautstärke: High-Byte = Links (0..255), Low-Byte = Rechts (0..255) |
+| `+$0A` | `AUDxPER`  | W | 16 Bit | Teilerfaktor Samplerate: $f_s = 50\,\text{MHz} / \text{PER}$ |
+| `+$0C` | `AUDxCTRL` | W | 16 Bit | Steuerregister (Format, Filter, Modulation, Mute) |
+| `+$0E` | `AUDxPRED` | W | 16 Bit | ADPCM Startprädiktor & Schritt-Index |
+| `+$10` | `AUDxBQ_B0`| R/W | 16 Bit | Biquad Koeffizient $b_0$ (Q2.14, `$4000` = 1.0) |
+| `+$12` | `AUDxBQ_B1`| R/W | 16 Bit | Biquad Koeffizient $b_1$ (Q2.14) |
+| `+$14` | `AUDxBQ_B2`| R/W | 16 Bit | Biquad Koeffizient $b_2$ (Q2.14) |
+| `+$16` | `AUDxBQ_A1`| R/W | 16 Bit | Biquad Koeffizient $a_1$ (Q2.14) |
+| `+$18` | `AUDxBQ_A2`| R/W | 16 Bit | Biquad Koeffizient $a_2$ (Q2.14) |
+| `+$1A` | `AUDxCMD`  | R/W | 16 Bit | Kommando: Bit 0 = Start, Bit 1 = Stop |
+| `+$1C` | `AUDxDELAY`| W   | 16 Bit | Zero-RAM Start-Delay Counter (0..2,0 s @ 32.768 kHz) |
+| `+$1E` | `AUDxSTATUS`| R  | 16 Bit | Kanal-Status / Readback |
+
+### Bitbelegung Steuerregister (`AUDxCTRL` bei `+$0C`):
+- **Bit 0:** `VOICE_ENABLE` (1 = Aktiv, 0 = Aus)
+- **Bit 1:** `LOOP_MODE` (0 = Endlos-Schleife, 1 = One-Shot)
+- **Bit 2:** `FORMAT` (0 = 16-Bit Linear PCM, 1 = 4-Bit ADPCM)
+- **Bit 4..3:** `PREFILTER_MODE` (`00` = Bypass, `01` = LowPass, `10` = HighPass, `11` = BandPass)
+- **Bit 6..5:** `INPUT_SRC`:
+  - `00` = Standard DMA Sample
+  - `01` = **Pre-Filter Kaskade:** Greift Audio von Stimme $n-1$ vor deren Filter ab
+  - `10` = **Post-Filter Kaskade:** Greift Audio von Stimme $n-1$ nach deren Filter ab (Moog 24 dB Kaskade!)
+- **Bit 8..7:** `BIQUAD_ROUTING`:
+  - `00` = Biquad Bypass
+  - `11` = Stereo Biquad Aktiv (Filtert linken und rechten Kanal)
+- **Bit 10..9:** `MODULATION`:
+  - `00` = Keine Modulation
+  - `01` = **AM / Tremolo:** Stimme $n-1$ moduliert Lautstärke von Stimme $n$
+  - `10` = **Ringmodulation:** Stimme $n-1$ moduliert Trägerfrequenz von Stimme $n$
+- **Bit 11:** `MUTE` (1 = Stummgeschaltet)
+
+### Globale Level-2 Interrupts (`$68` / `INT2`)
+- **16-Kanal Core (an Stimme 15):**  
+  - `$DFF5FC`: `AUD_INTENA` (Globales 16-Bit Interrupt Enable)  
+  - `$DFF5FE`: `AUD_INTREQ` (Globales 16-Bit Interrupt Request, Write-1-to-Clear)
+- **32-Kanal Core (an Stimme 31):**  
+  - `$DFF7F8` / `$DFF7FA`: `AUD_INTENA_HI` / `LO` (Stimmen 31..16 / 15..0)  
+  - `$DFF7FC` / `$DFF7FE`: `AUD_INTREQ_HI` / `LO` (Write-1-to-Clear)
+
+---
+
+## 3. Assembler-Testsuite
+
+- Quellcode: `Tests/audio_pipeline_16ch_test.s`
+- Kompilierung mit VASM:
+  ```bash
+  vasmm68k_mot -Fhunkexe -nosym -o audio_test audio_pipeline_16ch_test.s
+  ```
