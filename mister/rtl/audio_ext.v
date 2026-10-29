@@ -296,6 +296,7 @@ module audio_ext #(
             tdm_need_init <= {NUM_VOICES{1'b0}};
         end else begin
             if (cmd_we && reg_wdata[0]) tdm_need_init[ch] <= 1'b1;
+            if (loop_reload) tdm_need_init[cur_voice] <= 1'b1;
             if (tdm_need_init[cur_voice]) begin
                 tdm_need_init[cur_voice] <= 1'b0;
                 ram_rdptr[cur_voice] <= 6'd0;
