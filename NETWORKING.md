@@ -4,7 +4,7 @@ Please read [Networking](https://github.com/MiSTle-Dev/FPGA-Companion/tree/main/
 
 To use the Internet with the NanoMig a **Pi-Pico W** or **Pi-Pico2 W** is mandatory.  
 
-This help file describes the installation and configuration of the nework stack **Roadshow**. 
+This help file describes the installation and configuration of the network stack **Roadshow**. 
 
 <img width="4096" height="3072" alt="IMG_20261028_224427434_HDR" src="https://github.com/user-attachments/assets/de1d7bd7-f0d1-4958-a79e-2c5bab96ed25" />
 
