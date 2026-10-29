@@ -7,25 +7,25 @@ This file describes the installation and configuration of the network stack **Ro
 
 Make sure **PPP** is selected in the Settings menu under Serial:
 
-<img width="600" height="450" alt="IMG_20261028_224427434_HDR" src="https://github.com/user-attachments/assets/de1d7bd7-f0d1-4958-a79e-2c5bab96ed25" />
+<img width="600" height="459" alt="IMG_20261028_224427434_HDR" src="https://github.com/user-attachments/assets/300808a9-0d48-4f19-9910-21a3476032c1" />
 
-Download and install Roadshow. Copy the ppp-serial.device to **Workbench:Devs/Networks/**
 
-<img width="2048" height="1536" alt="IMG_20261028_222322933" src="https://github.com/user-attachments/assets/36a4d894-88ed-47a6-8cf1-dc50b279513d" />
+Download and install Roadshow. Copy the **ppp-serial.device** to **Workbench:Devs/Networks/**
+
+<img width="600" height="447" alt="IMG_20261028_222322933" src="https://github.com/user-attachments/assets/2e174276-568b-4afa-945d-76e532c7c2be" />
 
 Copy PPP to **Workbench:Devs/Netinterfaces/**
 
-<img width="2048" height="1536" alt="IMG_20261028_222343967" src="https://github.com/user-attachments/assets/f4fc297f-1938-4ff4-9aa3-7378c4a16f2d" />
-
-<img width="2048" height="1536" alt="IMG_20261028_222414271" src="https://github.com/user-attachments/assets/282a2915-b0bc-4218-8349-2b7ffe7e339d" />
+<img width="600" height="462" alt="IMG_20261028_222343967" src="https://github.com/user-attachments/assets/25107f3e-9ef1-45eb-8d1c-9431d49c650c" />
 
 Place a **PPP** configuration file anywhere you like. E.g. S: or Preferences
 
-<img width="1865" height="1428" alt="IMG_20261028_222526108_HDR" src="https://github.com/user-attachments/assets/fb43cf3c-2617-4e87-a862-e08d301be561" />
+<img width="600" height="453" alt="IMG_20261028_222526108_HDR" src="https://github.com/user-attachments/assets/3b9504f6-7107-4003-af21-c4c4522ae266" />
 
 Call the config file with ppp-dialer
 
-<img width="4096" height="3072" alt="IMG_20261028_222608031_HDR" src="https://github.com/user-attachments/assets/8f535ae1-5841-479e-8052-103145bd7981" />
+<img width="600" height="447" alt="IMG_20261028_222608031_HDR" src="https://github.com/user-attachments/assets/f8d68899-137f-4e5c-a2a0-58b25120ac50" />
+
 
 
 
