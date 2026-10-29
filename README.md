@@ -342,8 +342,9 @@ flowchart LR
    - Operates in real-time on all 32 voices simultaneously using only 2 Cyclone V hardware DSP blocks.
 3. **Wavetable-Hüllkurven & Modulation statt starrem ADSR:**
    - Ein dedizierter Silizium-ADSR-Generator ist überflüssig: Kanal $n$ kann über den Modulations-Modus (`v_mod_mode = 2'b01`) direkt von Kanal $n-1$ amplitudenmoduliert werden. Jede beliebige Hüllkurve (linear, exponentiell, LFO-Wellenformen) kann als kurzes Sample abgespielt werden und steuert die Lautstärke samplegenau bei 48 kHz.
-4. **Multisampling-Präzision ohne Interpolations-Overhead:**
-   - Dank großem Fast-RAM auf modernen FPGA-Amigas ist künstliche Interpolation (Spline/Hermite) nicht erforderlich. Durch Multisampling (Samples pro Note/Oktave) wird Transponierungs-Aliasing an der Wurzel verhindert, wodurch der Klang absolut authentisch, knackig und ressourcenschonend bleibt.
+4. **Anti-Aliasing durch Multisampling & nachgeschaltete Biquad-Filter:**
+   - Dank großem Fast-RAM auf modernen FPGA-Amigas ist künstliche Interpolation (Spline/Hermite) überflüssig: Durch Multisampling entfällt extremes Transponieren weitgehend.
+   - Sollten bei stark transponierten Samples dennoch hochfrequente Spiegelfrequenzen entstehen, werden diese durch die direkt nachgeschalteten, resonanten Biquad-Tiefpassfilter (mit bis zu 24 dB/Okt. Flankensteilheit) musikalisch warm und stufenlos abgerundet – exakt wie bei klassischen Analog-Synthesizern.
 5. **Safe Double-Buffered Audio Capture (Weg A):**
    - Direct mixer capture mapped into two isolated 4 KB blocks (`$DF8000..$DF8FFF` and `$DF9000..$DF9FFF`).
    - Hardware overrun protection ensures sample integrity: while one block is filled, the host CPU processes the other. If the host falls behind, the hardware automatically locks the finished buffer, preventing memory corruption or CPU lockups.
