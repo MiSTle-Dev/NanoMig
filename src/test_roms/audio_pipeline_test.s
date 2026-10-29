@@ -119,7 +119,7 @@ Main:
                 bsr     StopAllVoices
 
                 ; 3. Eigene Level-2 Interrupt Service Routine installieren
-                lea     Audio_ISR(a6),a0
+                lea     Audio_ISR(pc),a0
                 move.l  a0,$6c
 
                 ; ==============================================================

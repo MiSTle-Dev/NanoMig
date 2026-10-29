@@ -76,23 +76,29 @@ $$\text{Basisadresse Stimme } n = \$DFF400 + (n \times 32) = \$DFF400 + (n \time
 | `+$1C` | `AUDxDELAY`| W   | 16 Bit | Zero-RAM Start-Delay Counter (0..2,0 s @ 32.768 kHz) |
 | `+$1E` | `AUDxSTATUS`| R  | 16 Bit | Kanal-Status / Readback |
 
-### Bitbelegung Steuerregister (`AUDxCTRL` bei `+$0C`):
-- **Bit 0:** `VOICE_ENABLE` (1 = Aktiv, 0 = Aus)
-- **Bit 1:** `LOOP_MODE` (0 = Endlos-Schleife, 1 = One-Shot)
-- **Bit 2:** `FORMAT` (0 = 16-Bit Linear PCM, 1 = 4-Bit ADPCM)
-- **Bit 4..3:** `PREFILTER_MODE` (`00` = Bypass, `01` = LowPass, `10` = HighPass, `11` = BandPass)
-- **Bit 6..5:** `INPUT_SRC`:
-  - `00` = Standard DMA Sample
-  - `01` = **Pre-Filter Kaskade:** Greift Audio von Stimme $n-1$ vor deren Filter ab
-  - `10` = **Post-Filter Kaskade:** Greift Audio von Stimme $n-1$ nach deren Filter ab (Moog 24 dB Kaskade!)
-- **Bit 8..7:** `BIQUAD_ROUTING`:
-  - `00` = Biquad Bypass
-  - `11` = Stereo Biquad Aktiv (Filtert linken und rechten Kanal)
-- **Bit 10..9:** `MODULATION`:
+### Exakte Bitbelegung Steuerregister (`AUDxCTRL` bei `+$0C`, 100% RTL-abgeglichen):
+- **Bit 0 (`CTRL_PCM16`):** Sample-Format (`1` = 16-Bit Signed Linear PCM, `0` = 8-Bit)
+- **Bit 1 (`CTRL_ONESHOT`):** Loop-Modus (`1` = One-Shot Buffer, `0` = Endlos-Loop)
+- **Bit 2 (`CTRL_STEREO`):** Kanal-Modus (`1` = Interleaved Stereo, `0` = Mono)
+- **Bit 3 (`CTRL_ADPCM`):** Dekompressor (`1` = 4-Bit ADPCM aktiviert, `0` = Linear)
+- **Bits 5..4:** ADPCM Hybrid-Modus (`00` = 4-Bit standard, `01` = 2-Bit, `10` = 5-Bit)
+- **Bit 7 (`CTRL_FLT_R`):** Biquad IIR Filter Rechter Kanal aktiviert (`1` = Aktiv, `0` = Bypass)
+- **Bit 8 (`CTRL_FLT_L`):** Biquad IIR Filter Linker Kanal aktiviert (`1` = Aktiv, `0` = Bypass)
+- **Bits 8..7 (`CTRL_FLT_STEREO`):** `11` = Stereo Biquad IIR DSP-Filter auf beiden Kanälen aktiv
+- **Bits 10..9 (`v_input_src`):** Eingangsquelle der Stimme:
+  - `00` = Standard DMA-Sample
+  - `01` = **Pre-Filter Kaskade:** Greift das Audiosignal von Stimme n-1 VOR deren Filter ab
+  - `10` = **Post-Filter Kaskade:** Greift das Audiosignal von Stimme n-1 NACH deren Filter ab (Moog 24 dB/Okt. Kaskade!)
+- **Bits 12..11 (`v_mod_mode`):** Hardware-Modulation:
   - `00` = Keine Modulation
-  - `01` = **AM / Tremolo:** Stimme $n-1$ moduliert Lautstärke von Stimme $n$
-  - `10` = **Ringmodulation:** Stimme $n-1$ moduliert Trägerfrequenz von Stimme $n$
-- **Bit 11:** `MUTE` (1 = Stummgeschaltet)
+  - `01` = **AM / Tremolo:** Stimme n-1 moduliert die Amplitude von Stimme n
+  - `10` = **Ringmodulation:** Stimme n-1 multipliziert bipolar Träger von Stimme n
+- **Bit 13 (`CTRL_MUTE_MIX`):** Stummschaltung im Master-Mix (`1` = Mute, Audiosignal wird nur zum Chaining/Kaskadieren genutzt)
+
+> [!NOTE]
+> **DMA-Pufferlängen-Unterschied (MiSTer vs. Tang Nano):**
+> - Auf dem **MiSTer FPGA (Cyclone V)** ist die DMA-Länge vollwertig **32-Bit** (`ram_len[31:0]` in `audio_ext.v`), d.h. `AUDxLENH` (Bits 31..16) und `AUDxLENL` (Bits 15..0) bilden einen 32-Bit Wortzähler.
+> - Auf dem Tang Nano 20K (Gowin) war die Länge aus LUT-Gründen historisch auf 18-Bit (`[17:0]`) gekappt. Im MiSTer-Core ist die volle 32-Bit DMA aktiv.
 
 ### Globale Level-2 Interrupts (`$68` / `INT2`)
 - **16-Kanal Core (an Stimme 15):**  
