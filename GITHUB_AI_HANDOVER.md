@@ -37,14 +37,21 @@
 
 ---
 
-## 1. Übersicht der Core-Binaries (`.rbf`)
+## 1. Direkte Download-Links der MiSTer Core-Binaries (`mister/releases/`)
 
-| Datei | Stimmen | ALMs (Auslastung) | DSPs | BRAMs | Besonderheiten |
-|:------|:-------:|:-----------------:|:----:|:-----:|:---------------|
-| **`Minimig_HAM_16CH_Audio.rbf`** | **16** | 34.715 (83 %) | 73 | 297 | **Empfohlener Test-Core.** Spart 1.851 ALMs, 29 BRAMs und 4 DSPs gegenüber Tobys 4-Stimmen-Stand! |
-| **`Minimig_HAM_32CH_Audio.rbf`** | **32** | 38.358 (92 %) | 75 | 319 | Volle 32 Stimmen mit parallelen Dual-DSP Biquad-Kernen. |
+Alle Binaries und Quellcodes liegen direkt in diesem Branch:
 
----
+| Datei (Direktlink) | Stimmen | ALMs | DSPs | BRAMs | Besonderheiten / Empfehlung |
+|:---|:---:|:---:|:---:|:---:|:---|
+| 💾 [**`Minimig_HAM_16CH_Audio.rbf`**](https://github.com/Rudi7503/NanoMig/raw/feature/16ch-audio-biquad-pipeline/mister/releases/Minimig_HAM_16CH_Audio.rbf) | **16** | 34.715 (83 %) | 73 | 297 | **Empfohlener Test-Core für Toby.** Spart 1.851 ALMs, 29 BRAMs und 4 DSPs gegenüber Tobys altem Core! |
+| 💾 [**`Minimig_HAM_32CH_Audio.rbf`**](https://github.com/Rudi7503/NanoMig/raw/feature/16ch-audio-biquad-pipeline/mister/releases/Minimig_HAM_32CH_Audio.rbf) | **32** | 38.358 (92 %) | 75 | 319 | Volle 32 Stimmen mit parallelen Dual-DSP Biquad-Kernen. |
+| 💾 [**`Minimig_HAM_32CH_Audio_Capture.rbf`**](https://github.com/Rudi7503/NanoMig/raw/feature/16ch-audio-biquad-pipeline/mister/releases/Minimig_HAM_32CH_Audio_Capture.rbf) | **32** | 38.279 (91 %) | 75 | 327 | 32 Stimmen + 2x 4 KB Audio-Capture Ringpuffer ($DF8000..$DF9FFF) mit Hardware-Backpressure. |
+
+### 📁 Quellcode & Testprogramme im Branch:
+- **MiSTer Verilog Quellcode:** [`mister/rtl/`](https://github.com/Rudi7503/NanoMig/tree/feature/16ch-audio-biquad-pipeline/mister/rtl)
+- **16-Kanal Test (VASM 2.0f getestet):** [`mister/tests/audio_pipeline_16ch_test.s`](https://github.com/Rudi7503/NanoMig/blob/feature/16ch-audio-biquad-pipeline/mister/tests/audio_pipeline_16ch_test.s)
+- **32-Kanal Test:** [`mister/tests/audio_pipeline_32ch_test.s`](https://github.com/Rudi7503/NanoMig/blob/feature/16ch-audio-biquad-pipeline/mister/tests/audio_pipeline_32ch_test.s)
+- **Audio Capture Test:** [`mister/tests/audio_capture_test.s`](https://github.com/Rudi7503/NanoMig/blob/feature/16ch-audio-biquad-pipeline/mister/tests/audio_capture_test.s)
 
 ## 2. Hardware-Architektur & Registerbelegung
 
