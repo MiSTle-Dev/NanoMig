@@ -180,41 +180,68 @@ This fork features an ultra-efficient, studio-grade 32-channel audio subsystem a
 
 ```mermaid
 flowchart TD
-    subgraph CPU_BUS["Amiga Host System"]
-        CPU["Motorola 68020 CPU / DMA Controller"]
-        CHIP_REG["Custom Chip Register Space<br/>($DFF800 - $DFF9FC)"]
-        CAPTURE_MEM["Audio Capture Memory Window<br/>($DF8000 - $DF9FFF: 2x 4KB BRAM)"]
-        CPU -->|Register Writes| CHIP_REG
-        CAPTURE_MEM -->|DMA / CPU Readback| CPU
+    subgraph CHANNEL_PIPELINE["Channel Pipeline (TDM über Channels 0..31)"]
+        direction TB
+
+        subgraph DEC_STAGE["1. Dekodier-Stufe (Pro Channel n)"]
+            RAW_STREAM["Sample-Stream (DMA / FIFO)"]
+            PCM_DEC["Linear PCM Unpacker<br/>(8-Bit / 16-Bit)"]
+            ADPCM_DEC["Shared ADPCM Decoder<br/>(2/3/4/5-Bit DPCM Prädiktor & Schrittindex)"]
+            SEL_DEC{"Format-Wahl<br/>(v_adpcm [3])"}
+            
+            RAW_STREAM --> PCM_DEC
+            RAW_STREAM --> ADPCM_DEC
+            PCM_DEC -->|Linear PCM| SEL_DEC
+            ADPCM_DEC -->|Rekonstruiertes PCM| SEL_DEC
+        end
+
+        subgraph INPUT_ROUTER["2. Input-Multiplexer & Channel-Chaining"]
+            PRE_PREV["Ch(n-1) Pre-Filter Signal<br/>(Ungefiltertes Durchreichen)"]
+            POST_PREV["Ch(n-1) Post-Filter Signal<br/>(Filter-Kaskadierung / 24 dB Moog-Typ)"]
+            SRC_MUX{"Input-Source Select<br/>(v_input_src [10:9])"}
+
+            SEL_DEC -->|2'b00: Eigener Sample-Stream| SRC_MUX
+            PRE_PREV -->|2'b01: Ch(n-1) Pre-Filter| SRC_MUX
+            POST_PREV -->|2'b10: Ch(n-1) Post-Filter| SRC_MUX
+        end
+
+        subgraph FILTER_STAGE["3. Dual Biquad IIR Filter DSP-Stufe"]
+            SRC_MUX --> IN_FILTER["Filter-Eingangssignal (in_pcm_src)"]
+            IN_FILTER --> BIQ_CORE["Dual Parallel Biquad IIR DSP Filter<br/>(Tiefpass / Hochpass / Bandpass / Notch / Peaking)"]
+            
+            IN_FILTER -->|Pre-Filter Abgriff| PRE_FORWARD["Pre-Filter Durchreichung an Ch(n+1)"]
+            BIQ_CORE -->|Post-Filter Abgriff| POST_FORWARD["Post-Filter Signal an Ch(n+1)<br/>(Kaskadierung für 24 dB/Okt. Flankensteilheit)"]
+        end
+
+        subgraph MOD_STAGE["4. Modulations- & Lautstärkestufe"]
+            BIQ_CORE --> MIX_VOICE["Gefiltertes Kanalsignal"]
+            CARRIER_IN["Carrier-Signal von Ch(n-1) (prev_carrier_l)"]
+            
+            MOD_SELECT{"Modulations-Modus<br/>(v_mod_mode [12:11])"}
+            AM_MOD["Amplitudenmodulation / Tremolo (01)"]
+            RING_MOD["Ringmodulation (Bipolares Produkt) (10)"]
+            DIR_VOL["Direkte Lautstärke / Panning (00)"]
+            
+            CARRIER_IN --> MOD_SELECT
+            MOD_SELECT --> AM_MOD
+            MOD_SELECT --> RING_MOD
+            MOD_SELECT --> DIR_VOL
+            
+            MIX_VOICE --> MULT_STAGE["Stereo Multiplizierer-Stufe<br/>(Kanal-Sample × Modulations-/Vol-Faktor)"]
+            AM_MOD --> MULT_STAGE
+            RING_MOD --> MULT_STAGE
+            DIR_VOL --> MULT_STAGE
+            
+            MULT_STAGE --> CARRIER_OUT["Carrier-Signal an Ch(n+1)"]
+        end
     end
 
-    subgraph VOICE_CORE["32-Channel Pipelined Voice Engine (48 kHz)"]
-        CHIP_REG -->|Pitch / Sample Ptr / Length| VOICES["Voice Generators (Voices 0..31)<br/>Independent Phase Accumulators"]
-        VOICES -->|Raw 16-bit PCM| MOD_MATRIX["Modulation Matrix<br/>• AM / Ring Modulation<br/>• FM Cross-Voice Modulation"]
-        MOD_MATRIX -->|Modulated Samples| PAN_VOL["Panning & Volume Stage<br/>Independent Left/Right Attenuators"]
-    end
-
-    subgraph MIXER_DSP["Time-Multiplexed DSP Pipeline (Dual DSP Blocks)"]
-        PAN_VOL -->|32x Voices Summed| MASTER_ACC["32-Bit Master Accumulator<br/>Soft-Clipping Headroom Protection"]
-        MASTER_ACC --> BIQUAD_L["Left Biquad IIR DSP Filter<br/>Lowpass / Highpass / Bandpass / Notch / Peaking<br/>Cascadable up to 24 dB/Octave"]
-        MASTER_ACC --> BIQUAD_R["Right Biquad IIR DSP Filter<br/>Lowpass / Highpass / Bandpass / Notch / Peaking<br/>Cascadable up to 24 dB/Octave"]
+    subgraph MIXER_CAPTURE["5. Summierungs- & Capture-Einheit"]
+        MULT_STAGE -->|32x Kanalsumme| MASTER_SUM["Master Accumulator (32 Channels)<br/>32-Bit Summe mit Soft-Clipping / Headroom-Schutz"]
         
-        BIQUAD_L --> DELAY_CORE["Zero-RAM Stereo Delay Line<br/>Circular Buffer Delay (up to 2.0s)<br/>Feedback & Ping-Pong Reverb"]
-        BIQUAD_R --> DELAY_CORE
-    end
-
-    subgraph CAPTURE_DMA["Audio Capture & Double-Buffering Unit"]
-        DELAY_CORE --> CAP_ROUTER["Capture Router & Overrun Protection<br/>Register $DFF802 Status Flag"]
-        CAP_ROUTER -->|Buffer 0: 2048 x 16-Bit| BUF0["Block 0: $DF8000 - $DF8FFF (4 KB)"]
-        CAP_ROUTER -->|Buffer 1: 2048 x 16-Bit| BUF1["Block 1: $DF9000 - $DF9FFF (4 KB)"]
-        BUF0 -.-> CAPTURE_MEM
-        BUF1 -.-> CAPTURE_MEM
-    end
-
-    subgraph AUDIO_OUT["Audio Physical Output"]
-        DELAY_CORE --> I2S_DAC["I2S Stereo Digital DAC (48 kHz, 16-bit)"]
-        DELAY_CORE --> HDMI_AUDIO["HDMI Audio Stream"]
-        DELAY_CORE --> SIGMA_DELTA["Delta-Sigma / PWM Headphone Jack"]
+        MASTER_SUM --> CAP_LOGIC["Capture Router & Overrun-Protection<br/>(Handshake-Flag $DFF802)"]
+        CAP_LOGIC -->|Block 0 aktiv| BRAM0["BRAM Puffer 0 (4 KB)<br/>$DF8000 - $DF8FFF"]
+        CAP_LOGIC -->|Block 1 aktiv| BRAM1["BRAM Puffer 1 (4 KB)<br/>$DF9000 - $DF9FFF"]
     end
 ```
 
