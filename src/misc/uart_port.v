@@ -19,7 +19,10 @@
                   the receiver never overruns.
 */
 
-module uart_port (
+module uart_port #(
+  // both fifos hold 2**FIFO_BITS-1 bytes (original: 4 = 15 bytes, which is only 1.3 ms at 115200 Bd)
+  parameter FIFO_BITS = 6
+) (
   input             clk,        // 28 MHz system clock
   input             clk7_en,    // 7 MHz enable, bit times are counted in these
   input             reset,
@@ -50,9 +53,10 @@ reg        tx_push;
 reg  [7:0] tx_byte;
 
 assign hold = tx_full;
-assign serial_tx_available[7:4] = 4'h0;
+wire [FIFO_BITS-1:0] tx_used;
+assign serial_tx_available = { {(8-FIFO_BITS){1'b0}}, tx_used };
 
-io_fifo tx_fifo (
+io_fifo #(.DEPTH(FIFO_BITS)) tx_fifo (
   .reset      ( reset ),
 
   .in_clk     ( clk ),
@@ -66,7 +70,7 @@ io_fifo tx_fifo (
   .out_enable ( 1'b0 ),
 
   .space      (  ),
-  .used       ( serial_tx_available[3:0] ),
+  .used       ( tx_used ),
   .empty      (  ),
   .full       ( tx_full )
 );
@@ -132,9 +136,10 @@ wire [7:0] rx_byte;
 wire       rx_empty;
 reg        rx_pop;
 
-assign serial_rx_available[7:4] = 4'h0;
+wire [FIFO_BITS-1:0] rx_space;
+assign serial_rx_available = { {(8-FIFO_BITS){1'b0}}, rx_space };
 
-io_fifo rx_fifo (
+io_fifo #(.DEPTH(FIFO_BITS)) rx_fifo (
   .reset      ( reset ),
 
   .in_clk     ( clk ),
@@ -147,7 +152,7 @@ io_fifo rx_fifo (
   .out_strobe ( 1'b0 ),
   .out_enable ( rx_pop ),
 
-  .space      ( serial_rx_available[3:0] ),
+  .space      ( rx_space ),
   .empty      ( rx_empty ),
   .full       (  )
 );
