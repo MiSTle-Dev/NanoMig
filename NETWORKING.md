@@ -14,7 +14,7 @@ Download and install Roadshow. Copy the **ppp-serial.device** to **Workbench:Dev
 
 <img width="600" height="447" alt="IMG_20261028_222322933" src="https://github.com/user-attachments/assets/2e174276-568b-4afa-945d-76e532c7c2be" />
 
-Copy PPP to **Workbench:Devs/Netinterfaces/**
+Copy the **PPP Netinterface** to **Workbench:Devs/Netinterfaces/**
 
 <img width="600" height="462" alt="IMG_20261028_222343967" src="https://github.com/user-attachments/assets/25107f3e-9ef1-45eb-8d1c-9431d49c650c" />
 
