@@ -340,19 +340,13 @@ flowchart LR
 2. **Moog-Style Cascaded Biquad Filtering:**
    - Two fully programmable IIR Biquad stages allow resonant 12 dB/octave and 24 dB/octave sweeps, highpass, bandpass, notch, and peaking equalization.
    - Operates in real-time on all 32 voices simultaneously using only 2 Cyclone V hardware DSP blocks.
-3. **Safe Double-Buffered Audio Capture (Weg A):**
+3. **Wavetable-Hüllkurven & Modulation statt starrem ADSR:**
+   - Ein dedizierter Silizium-ADSR-Generator ist überflüssig: Kanal $n$ kann über den Modulations-Modus (`v_mod_mode = 2'b01`) direkt von Kanal $n-1$ amplitudenmoduliert werden. Jede beliebige Hüllkurve (linear, exponentiell, LFO-Wellenformen) kann als kurzes Sample abgespielt werden und steuert die Lautstärke samplegenau bei 48 kHz.
+4. **Multisampling-Präzision ohne Interpolations-Overhead:**
+   - Dank großem Fast-RAM auf modernen FPGA-Amigas ist künstliche Interpolation (Spline/Hermite) nicht erforderlich. Durch Multisampling (Samples pro Note/Oktave) wird Transponierungs-Aliasing an der Wurzel verhindert, wodurch der Klang absolut authentisch, knackig und ressourcenschonend bleibt.
+5. **Safe Double-Buffered Audio Capture (Weg A):**
    - Direct mixer capture mapped into two isolated 4 KB blocks (`$DF8000..$DF8FFF` and `$DF9000..$DF9FFF`).
    - Hardware overrun protection ensures sample integrity: while one block is filled, the host CPU processes the other. If the host falls behind, the hardware automatically locks the finished buffer, preventing memory corruption or CPU lockups.
 
-### 💡 Future Improvement Roadmap
-
-1. **Polyphonic Spline / Hermite Interpolation:**
-   - Integrating 3-point or 4-point polynomial Hermite interpolation into the phase accumulator will virtually eliminate Nyquist alias mirrors when transposing samples across higher octaves.
-2. **Hardware ADSR Envelope & LFO Generators:**
-   - Dedicated 4-stage hardware envelope sweepers per channel will eliminate the need for 50 Hz vertical blank interrupt polling from Amiga tracker engines.
-3. **Dedicated AmigaOS AHI Subdriver (`audiomister.audio`):**
-   - Providing a native AHI driver will offer plug-and-play support for AmigaOS 3.9/3.2, ScummVM, Doom, Quake, Symphony Player, and Digibooster Pro without any software hacks.
-4. **Direct Digital S/PDIF & I2S Master Output:**
-   - Bit-exact bypass output to route raw 48 kHz 24-bit audio directly to external audiophile DACs or optical TOSLink interfaces.
 
 
