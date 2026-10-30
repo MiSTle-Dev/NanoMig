@@ -9,7 +9,8 @@ Make sure **PPP** is selected in the Settings menu under Serial:
 <img width="600" height="459" alt="IMG_20261028_224427434_HDR" src="https://github.com/user-attachments/assets/300808a9-0d48-4f19-9910-21a3476032c1" />
 
 
-Download and install **Roadshow**. Copy the **ppp-serial.device** from Storage to **Workbench:Devs/Networks/**
+Download and install [**Roadshow**](http://roadshow.apc-tcp.de/index-en.php).  
+Copy the **ppp-serial.device** from Storage to **Workbench:Devs/Networks/**
 
 <img width="600" height="447" alt="IMG_20261028_222322933" src="https://github.com/user-attachments/assets/2e174276-568b-4afa-945d-76e532c7c2be" />
 
