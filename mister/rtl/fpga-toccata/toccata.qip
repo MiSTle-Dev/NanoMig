@@ -1,0 +1,5 @@
+set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) toccata_capture.sv ]
+set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) toccata_playback.sv ]
+set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) toccata_volume.sv ]
+set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) toccata_fifo.sv ]
+set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) toccata.sv ]

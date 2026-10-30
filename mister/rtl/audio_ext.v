@@ -131,7 +131,7 @@ module audio_ext #(
 
     always @(posedge clk) begin
         if (dma_push) fifo_ram[{dma_voice, dma_wrptr}] <= dma_data;
-        fifo_dout <= fifo_ram[{cur_voice, tdm_rdptr}];
+        fifo_dout <= fifo_ram[{cur_voice_next, ram_rdptr[cur_voice_next]}];
     end
 
     // Volume & Period RAM (Standard Dual-Port RAM)
@@ -222,8 +222,9 @@ module audio_ext #(
     wire do_refill = v_act && (v_bc <= 8) && (|tdm_fifo_fill) && !do_decode;
 
     wire [15:0] be_fifo = {fifo_dout[7:0], fifo_dout[15:8]};
-    wire [31:0] merged_fill = {be_fifo, v_res[7:0], 8'd0} >> (4'd8 - v_bc[3:0]);
-    wire [23:0] next_res_fill = (v_bc[3:0] == 4'd8) ? {be_fifo, v_res[7:0]} : merged_fill[23:0];
+    // FIFO data is a little-endian bit reservoir; retain only valid residual bits.
+    wire [23:0] residual_mask = 24'hffffff >> (24 - v_bc);
+    wire [23:0] next_res_fill = (v_res & residual_mask) | ({8'd0, be_fifo} << v_bc);
 
     reg [23:0] next_res_consume;
     always @* begin

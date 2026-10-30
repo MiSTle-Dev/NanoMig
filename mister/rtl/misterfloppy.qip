@@ -1,0 +1,9 @@
+set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) MiSTerFloppyi2c.v ]
+set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) MiSTerFloppyPLL.v ]
+set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) MiSTerFloppyRAWIO.v ]
+set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) MiSTerFloppySHUGART.v ]
+set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) MiSTerFloppyIBM.v ]
+set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) MiSTerFloppyFifo.v ]
+set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) MiSTerFloppyVirtualFluxDrive.v ]
+
+
