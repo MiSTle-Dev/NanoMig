@@ -41,10 +41,15 @@ verschiedene Stellen; der Merge lief konfliktfrei durch.
 
 * `rudi/<thema>` — Core, RTL, Doku
 * `toby/<thema>` — Testprogramme, Hardware-Befunde, Belege
-* PRs immer gegen `main`.
-* Kein Force-Push auf `main`. Jeder rebased nur seinen eigenen Themenbranch.
-* Direktes Pushen auf `main` ist durch das Ruleset gesperrt — auch für Rudi
-  und Toby. Änderungen gehen ausschließlich über PRs.
+* `main` ist gemeinsamer Arbeitsbranch: **direktes Pushen ist erlaubt.**
+  Gesperrt ist nur der Force-Push, per Ruleset `no-force-push` — für beide Seiten
+  und ohne Bypass. Grund: Commits werden in Befundpackages per Hash zitiert, und
+  jede RBF hängt an einem Quellstand; ein Force-Push macht beides unauffindbar.
+* Für RTL-Änderungen und alles, was eine RBF beeinflusst, ist ein PR der
+  vereinbarte Weg — nicht als Kontrolle, sondern weil der PR der Ort ist, an dem
+  „geprüft / nicht geprüft" dokumentiert wird. Doku-Korrekturen und Kleinkram
+  dürfen direkt gepusht werden.
+* Jeder rebased nur seinen eigenen Themenbranch.
 * **Ein PR = ein Thema.** RTL-Fix, Doku-Korrektur und Pfadanpassungen nicht mischen.
 * Der PR nennt den Basis-Commit, auf dem er aufsetzt.
 
