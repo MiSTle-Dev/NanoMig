@@ -7,7 +7,12 @@
 // -> run cpu on unused hpos[0] == 1 for turbo
 // TODO:
 // - check IDE head adressing heads[0] vs heads[drive]
-module nanomig (
+module nanomig #(
+   // 1: bypass the scandoubler for native progressive video (programmed beam,
+   // e.g. DblPAL). Only for boards whose video path supports it (video_analyzer
+   // and hdmi with NATIVE=1); all other boards keep the scandoubler always on.
+   parameter NATIVE = 0
+) (
    input	 clk_sys,
    input	 reset,
    input	 por,
@@ -1624,7 +1629,7 @@ minimig minimig
 // Native progressive video: a programmed beam with short lines (BEAMCON0, e.g.
 // the DblPAL monitor driver, 31kHz) is already scandoubled by the chipset, so
 // the scandoubler is bypassed. A normal PAL/NTSC line has 227 colour clocks.
-assign native       = (htotal[8:1] < 8'd180);
+assign native       = (NATIVE != 0) && (htotal[8:1] < 8'd180);
 assign native_width = ({3'b000, htotal[8:1]} + 11'd1) << 3;  // 8 clocks per colour clock
 
 reg [3:0] nat_r, nat_g, nat_b;

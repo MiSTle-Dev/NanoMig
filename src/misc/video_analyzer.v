@@ -20,7 +20,7 @@ module video_analyzer
  output reg       pal,         // pal mode detected
  output reg       short_frame, // short frame has two lines less
  output reg       interlace,   // interlace modes have one line less
- output reg [9:0] lines,       // frame height in lines (native mode)
+ output reg [9:0] lines = 10'd625, // frame height in lines (native mode), valid after the first native frame
  output reg	  vreset
 );
 
@@ -111,8 +111,10 @@ always @(posedge clk) begin
     // HDMI frame. Center screen according to screen type standard (0),
     // overscan (1) or wide (2). Native video is not compressed by the
     // scandoubler, so it has longer back porches. The window starts 234 clocks
-    // (hsync + back porch of the HDMI timing) after hsync and 10 lines after vsync (both measured on hardware, DblPAL 625p);
-    // the picture can be moved within the window with the monitor driver (HSSTRT/HSSTOP).
+    // (hsync + back porch of the HDMI timing) after hsync and 10 lines after vsync
+    // (both measured on hardware, DblPAL 625p). The position of the picture within
+    // the line is set by the Amiga (DIWSTRT/overscan prefs), the HBSTRT/HBSTOP
+    // tooltypes of the monitor driver did not move it in tests.
     if( hcnt == (nat ? ((screen==2'd2)?178:(screen==2'd1)?210:234) :
                        ((screen==2'd2)? 88:(screen==2'd1)?120:162)) &&
         vcnt == (nat ? 10 : 46) && changed) begin

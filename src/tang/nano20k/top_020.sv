@@ -685,7 +685,9 @@ wire [3:0] video_config = { osd_video_filter, osd_video_scanlines };
 // to GAYLE and set ide_config[5] to 0 to improve performance
 wire [5:0] ide_config = { 5'b10000, osd_ide_enable };   
    
-nanomig nanomig
+nanomig #(
+ .NATIVE(1)
+) nanomig
 (
  .clk_sys(clk_28m),
  .reset(nanomig_reset),
