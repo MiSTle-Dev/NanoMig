@@ -1502,7 +1502,7 @@ minimig minimig
 	.nmi_addr     (cpu_nmi_addr     ), // M68K NMI address
 	.ovr          (                 ), // M68K NMI address decoding override
 
-        .memory_config (memory_config   ), // ram sizes
+        .memory_config ({memory_config[7:4], slowram_config, memory_config[1:0]}), // effective RAM sizes
         .chipset_config(chipset_config  ), 
         .floppy_config (floppy_config   ), 
 `ifndef DISABLE_IDE
