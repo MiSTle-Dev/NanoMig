@@ -16,20 +16,35 @@ belegt ist (siehe *Belegpflicht*).
 
 ## Ein einziges Integrationsziel
 
-`Rudi7503/NanoMig`, Branch **`feature/16ch-audio-biquad-pipeline`**.
+`Rudi7503/NanoMig`, Branch **`main`**. Dort wird gemeinsam gearbeitet.
 
-* Basis dieses Branches: `6ea514e` (Upstream-Stand vom 2026-10-26), darauf 15 Commits.
-* `main` ist reiner Upstream-Spiegel von `MiSTle-Dev/NanoMig` und wird nicht direkt bearbeitet.
-* **Achtung:** Upstream ist inzwischen 20 Commits weiter. Ein Rebase auf den
-  aktuellen Upstream ist ein eigener Vorgang und macht jede darauf gebaute
-  RBF ungültig — nur mit separater Absprache.
+* `main` ist Integration **und** Upstream-Ableger: 20 Upstream-Commits vom
+  2026-10-30 plus die 15 Audio-Commits, zusammengeführt als Merge `aacf921`.
+* Bewusst **gemergt, nicht rebased**: die Commit-Hashes `d90e0fb`, `0b86a3e`
+  und `3fba796` bleiben gültig. Tobys Befundpackages verweisen darauf.
+* `feature/16ch-audio-biquad-pipeline` ist **eingefroren**, nur noch Referenz.
+  Nicht weiter darauf arbeiten und nicht löschen, solange eine RBF im Umlauf ist,
+  die darauf gebaut wurde.
+* Upstream (`MiSTle-Dev/NanoMig`) läuft weiter. Aktualisierung nur als bewusster
+  Merge `origin/main` → `main`, nie als Rebase und nie während ein Hardware-Test
+  gegen einen bestimmten Stand läuft.
+
+### Warum der Wechsel unkritisch war
+
+Die 20 Upstream-Commits berühren ausschließlich `NETWORKING.md`,
+`nanomig-uart-fifo.patch`, `src/misc/amiga.xml`, `src/misc/uart_port.v` und
+`src/scripts/build.tcl` — nichts davon liegt im MiSTer-Baum `mister/`.
+Der einzige gemeinsam geänderte Pfad war `src/misc/amiga.xml`, dort aber
+verschiedene Stellen; der Merge lief konfliktfrei durch.
 
 ## Branches und Pull Requests
 
 * `rudi/<thema>` — Core, RTL, Doku
 * `toby/<thema>` — Testprogramme, Hardware-Befunde, Belege
-* PRs immer gegen `feature/16ch-audio-biquad-pipeline`, nie gegen `main`.
-* Kein Force-Push auf den Integrationsbranch. Jeder rebased nur seinen eigenen Themenbranch.
+* PRs immer gegen `main`.
+* Kein Force-Push auf `main`. Jeder rebased nur seinen eigenen Themenbranch.
+* Direktes Pushen auf `main` ist durch das Ruleset gesperrt — auch für Rudi
+  und Toby. Änderungen gehen ausschließlich über PRs.
 * **Ein PR = ein Thema.** RTL-Fix, Doku-Korrektur und Pfadanpassungen nicht mischen.
 * Der PR nennt den Basis-Commit, auf dem er aufsetzt.
 
@@ -77,7 +92,8 @@ Synthese-Erfolg ist kein Timing-Pass. Eine Hörprobe ist kein Sample-Beweis.
 | Audio-Registerbasis: `$DFF400` oder `$DFF800`? | Handover sagt `$DFF400`, `mister/README.md` sagt `$DFF800` | Rudi, dann Doku-Fix |
 | Doppelte RTL-Kopien (`rtl/x.v` und `rtl/x/x.v`) | identisch, nur `rtl/audio_ext/...` wird gebaut | Rudi, Aufräum-PR |
 | Timing `feature`-Branch: −1,819 ns | offen, unverändert | Rudi |
-| Upstream-Rebase (20 Commits Rückstand) | bewusst zurückgestellt | beide |
+| Upstream-Abgleich | erledigt am 2026-10-31 (Merge `aacf921`), ab jetzt periodisch | beide |
+| Capture-Stereo-Fix | liegt als `rudi/capture-stereo-coherence` (`225e8d5`) bereit | Rudi → PR |
 
 ## Technische Randbedingungen
 
