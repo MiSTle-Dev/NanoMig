@@ -110,10 +110,10 @@ always @(posedge clk) begin
     // account for back porches to adjust image position within the
     // HDMI frame. Center screen according to screen type standard (0),
     // overscan (1) or wide (2). Native video is not compressed by the
-    // scandoubler, so it has longer back porches. The window starts 168 clocks
-    // (hsync + back porch of the HDMI timing) after hsync and 10 lines after vsync (measured on hardware, DblPAL 625p);
+    // scandoubler, so it has longer back porches. The window starts 218 clocks
+    // (hsync + back porch of the HDMI timing) after hsync and 10 lines after vsync (both measured on hardware, DblPAL 625p);
     // the picture can be moved within the window with the monitor driver (HSSTRT/HSSTOP).
-    if( hcnt == (nat ? ((screen==2'd2)?112:(screen==2'd1)?144:168) :
+    if( hcnt == (nat ? ((screen==2'd2)?162:(screen==2'd1)?194:218) :
                        ((screen==2'd2)? 88:(screen==2'd1)?120:162)) &&
         vcnt == (nat ? 10 : 46) && changed) begin
         vreset <= 1'b1;
