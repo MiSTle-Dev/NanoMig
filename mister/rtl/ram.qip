@@ -1,0 +1,4 @@
+set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) sdram_ctrl.v ]
+set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) ddram_ctrl.v ]
+set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) cpu_cache_new.v ]
+set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) bram.vhd ]

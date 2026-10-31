@@ -10,3 +10,17 @@ src/impl/pnr/**
 impl/gwsynthesis/**
 impl/temp/**
 impl/pnr/**
+# Temporary build tests and logs
+src/build.log
+src/temp_res.py
+src/test_bram.*
+src/test_multi_bram.*
+src/test_sdpb.*
+src/test_synth_*
+src/scripts/test_*
+
+src/minimig-aga/*_working.v
+src/minimig-aga/test_audio_ext_*.v
+
+src/minimig-aga/biquad_iir_4ch.v
+

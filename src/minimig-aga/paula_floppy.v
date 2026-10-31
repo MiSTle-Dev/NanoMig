@@ -107,13 +107,13 @@ module paula_floppy
         input [31:0]	  sdc_image_size, // length of image file
         output reg [3:0]  sdc_rd, // request to read a sector for drive 0..3
         output reg [3:0]  sdc_wr, // request to write a sector for drive 0..3
-        output reg [31:0] sdc_sector, // sector to read or write
+        output [31:0]     sdc_sector, // sector to read or write
         input		  sdc_busy, // sd card has accepted request and is now processing it
         input		  sdc_done, // sector transfer is done. Actually not used ...
 	input		  sdc_byte_in_strobe, // byte from sd card is ready
 	input [8:0]	  sdc_byte_addr, // index of sd card data byte within sector
 	input [7:0]	  sdc_byte_in_data, // sd card to cpu data byte
-	output reg [7:0]  sdc_byte_out_data // cpu to sd card data byte
+	output [7:0]      sdc_byte_out_data // cpu to sd card data byte
 );
 
 //register names and addresses
@@ -188,13 +188,15 @@ reg        cmd_fdd;			//HPS accesses floppy drive buffer
    
 // buffer to store one sector (not MFM encoded, yet). This consists of two
 // 8 bit buffers as the data is written in bytes but read in 16 bit words
+/*
 reg [7:0]  fd_dma_buf_even[255:0];
 reg [7:0]  fd_dma_buf_odd[255:0];   
+*/
 reg [7:0]  fd_dma_csum[3:0];
 reg [8:0]  fd_dma_wr_ptr;
    
 reg [3:0]  fd_dma_buf_wr_state;
-reg [15:0] fd_dma_buf_out;
+wire [15:0] fd_dma_buf_out;
 reg [3:0]  fd_dma_wr_sec;
 reg	   fd_dma_sector_ready;  
 reg	   fd_dma_buffer_trigger_wr;	      
@@ -213,6 +215,51 @@ reg 	  fifo_is_writing;
 wire [7:0] fd_dma_rd_ptr = fifo_word_counter - 10'd31;
    
 // read data from fifo
+reg fd_dma_buffer_trigger_wrD;
+wire fd_buf_wr_st2  = (fd_dma_buf_wr_state == 4'd2) && sdc_byte_in_strobe;
+wire fd_buf_wr_st6  = (fd_dma_buf_wr_state == 4'd6) && (fd_dma_buffer_trigger_wr != fd_dma_buffer_trigger_wrD);
+wire fd_buf_we_even = (fd_buf_wr_st2 && !sdc_byte_addr[0]) || (fd_buf_wr_st6 &&  fd_dma_wr_ptr[8]);
+wire fd_buf_we_odd  = (fd_buf_wr_st2 &&  sdc_byte_addr[0]) || (fd_buf_wr_st6 && !fd_dma_wr_ptr[8]);
+wire [7:0] fd_buf_waddr = (fd_dma_buf_wr_state == 4'd6) ? fd_dma_wr_ptr[7:0] : sdc_byte_addr[8:1];
+wire [7:0] fd_buf_wdata = (fd_dma_buf_wr_state == 4'd6) ? fd_dma_buffer_data_wr : sdc_byte_in_data;
+wire [7:0] fd_buf_raddr = fd_dma_is_writing ? sdc_byte_addr[8:1] : fd_dma_rd_ptr;
+wire fd_buf_reb = fd_dma_is_writing ? 1'b1 : (clk7_en && fifo_wr);
+wire [15:0] fd_buf_do_unused;
+
+SDPB fd_dma_buf_inst (
+   .DO({fd_buf_do_unused, fd_dma_buf_out}),
+   .DI({16'h0000, fd_buf_wdata, fd_buf_wdata}),
+   .BLKSELA(3'b000),
+   .BLKSELB(3'b000),
+   .ADA({2'b00, fd_buf_waddr, 2'b00, fd_buf_we_even, fd_buf_we_odd}),
+   .ADB({2'b00, fd_buf_raddr, 4'b0000}),
+   .CLKA(clk),
+   .CLKB(clk),
+   .CEA(fd_buf_we_even | fd_buf_we_odd),
+   .CEB(fd_buf_reb),
+   .OCE(1'b0),
+   .RESETA(1'b0),
+   .RESETB(1'b0)
+);
+defparam fd_dma_buf_inst.BIT_WIDTH_0 = 16;
+defparam fd_dma_buf_inst.BIT_WIDTH_1 = 16;
+defparam fd_dma_buf_inst.READ_MODE = 1'b0;
+defparam fd_dma_buf_inst.RESET_MODE = "SYNC";
+defparam fd_dma_buf_inst.BLK_SEL_0 = 3'b000;
+defparam fd_dma_buf_inst.BLK_SEL_1 = 3'b000;
+
+wire [7:0] fd_buf_even_q = fd_dma_buf_out[15:8];
+wire [7:0] fd_buf_odd_q  = fd_dma_buf_out[7:0];
+assign sdc_byte_out_data = sdc_byte_addr[0] ?
+   { fd_buf_odd_q[3], fd_buf_even_q[3],
+     fd_buf_odd_q[2], fd_buf_even_q[2],
+     fd_buf_odd_q[1], fd_buf_even_q[1],
+     fd_buf_odd_q[0], fd_buf_even_q[0] } :
+   { fd_buf_odd_q[7], fd_buf_even_q[7],
+     fd_buf_odd_q[6], fd_buf_even_q[6],
+     fd_buf_odd_q[5], fd_buf_even_q[5],
+     fd_buf_odd_q[4], fd_buf_even_q[4] };
+/*
 always @(posedge clk) begin
    if(!fd_dma_is_writing) begin
       if(clk7_en && fifo_wr) begin
@@ -237,6 +284,7 @@ always @(posedge clk) begin
    end
 end
    
+*/
 // registers needed to process outgoing fifo data
 reg [3:0] cpu_wr_state;
 reg [8:0] cpu_wr_cnt;
@@ -247,11 +295,16 @@ reg [15:0] wr_sector_csum;
 // the dsklen top bit has two times been written '1'
 wire dma_active = dmaen && !lenzero && enable;
 wire [3:0] fd_dma_wr_sec_next =  (fd_dma_wr_sec < 4'd10)?(fd_dma_wr_sec+4'd1):4'd0;  
+reg [11:0] sdc_sector_r;
+assign sdc_sector = {20'd0, sdc_sector_r};
+wire [7:0] sec_trk = (fd_dma_buf_wr_state == 4'd6) ? wr_sector_header_word[23:16] : track;
+wire [7:0] sec_num = (fd_dma_buf_wr_state == 4'd6) ? wr_sector_header_word[15:8] : {4'd0, fd_dma_wr_sec_next};
+wire [11:0] sec_calc = ({4'd0, sec_trk} << 3) + ({4'd0, sec_trk} << 1) + {4'd0, sec_trk} + {4'd0, sec_num};
 
 // state machine reading data received from sd card into the two sector buffers.
 // This buffer is split into an even and odd half
 always @(posedge clk) begin
-   reg fd_dma_buffer_trigger_wrD;
+   // reg fd_dma_buffer_trigger_wrD;
    
    if(reset) begin
       fd_dma_buf_wr_state <= 4'h0;
@@ -280,7 +333,7 @@ always @(posedge clk) begin
 	      // request first sector of track from MCU
 	      // This needs to be synchronized with the sector id at read
 	      fd_dma_wr_sec <= fd_dma_wr_sec_next;
-	      sdc_sector <= track * 11 + fd_dma_wr_sec_next;
+	      sdc_sector_r <= sec_calc;
 	      
 	      sdc_rd <= ~_sel;                    // request data sector for selected drive
 	      
@@ -312,8 +365,8 @@ always @(posedge clk) begin
 	   // write data into sector buffer and update checksum
 	   // write into lo/hi buffer to be able to read 16 bits from both buffers
 	   if(sdc_byte_in_strobe) begin
-	      if(sdc_byte_addr[0])  fd_dma_buf_odd[sdc_byte_addr[8:1]] <= sdc_byte_in_data;
-	      else                  fd_dma_buf_even[sdc_byte_addr[8:1]] <= sdc_byte_in_data;
+	      // if(sdc_byte_addr[0])  fd_dma_buf_odd[sdc_byte_addr[8:1]] <= sdc_byte_in_data;
+	      // else                  fd_dma_buf_even[sdc_byte_addr[8:1]] <= sdc_byte_in_data;
 	      fd_dma_csum[sdc_byte_addr[1:0]] <= 8'haa |
 				     fd_dma_csum[sdc_byte_addr[1:0]] ^
 				     sdc_byte_in_data ^ {1'b0, sdc_byte_in_data[7:1]};
@@ -358,7 +411,7 @@ always @(posedge clk) begin
 
 		 // request next sector of track from MCU
 		 fd_dma_wr_sec <= fd_dma_wr_sec_next;
-		 sdc_sector <= track * 11 + fd_dma_wr_sec_next;
+		 sdc_sector_r <= sec_calc;
 	      
 		 sdc_rd <= ~_sel;
 
@@ -377,8 +430,8 @@ always @(posedge clk) begin
 	   // transfer data from FIFO into buffer odd/even sector buffer
 	   if(fd_dma_buffer_trigger_wr != fd_dma_buffer_trigger_wrD) begin
 	      // write byte to the buffer
-	      if(fd_dma_wr_ptr[8])  fd_dma_buf_even[fd_dma_wr_ptr[7:0]] <= fd_dma_buffer_data_wr;
-	      else                  fd_dma_buf_odd[fd_dma_wr_ptr[7:0]] <= fd_dma_buffer_data_wr;
+	      // if(fd_dma_wr_ptr[8])  fd_dma_buf_even[fd_dma_wr_ptr[7:0]] <= fd_dma_buffer_data_wr;
+	      // else                  fd_dma_buf_odd[fd_dma_wr_ptr[7:0]] <= fd_dma_buffer_data_wr;
 
 	      fd_dma_wr_ptr <= fd_dma_wr_ptr + 9'd1;	      
 	      fd_dma_buffer_trigger_wrD <= fd_dma_buffer_trigger_wr;
@@ -395,7 +448,7 @@ always @(posedge clk) begin
 		 fd_dma_buf_wr_state <= 4'd0;
 	      end else begin	      
 		 // data is now complete. We now need to trigger the sdc write
-		 sdc_sector <=  wr_sector_header_word[23:16] * 11 + wr_sector_header_word[15:8];
+		 sdc_sector_r <= sec_calc;
 	      
 		 // now wait for sd card to become ready
 		 fd_dma_buf_wr_state <= 4'd7;

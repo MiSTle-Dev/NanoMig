@@ -65,6 +65,7 @@ begin
 end
 endfunction
 
+reg [39:0] req_shift;  // {2'b01, cmd, arg} shifted out MSB first
 reg [ 5:0] req_cmd;    // request[45:40]
 reg [31:0] req_arg;    // request[39: 8]
 reg [ 6:0] req_crc;    // request[ 7: 1]
@@ -131,6 +132,7 @@ always @ (posedge clk or negedge rstn)
          STATE_IDLE: begin
             if(start) begin
 	       state <= STATE_PRECOUNT;	       
+               req_shift <= {2'b01, cmd, arg};
                req_cmd <= cmd;
                req_arg <= arg;
                req_crc <= 0;
@@ -154,10 +156,14 @@ always @ (posedge clk or negedge rstn)
 	    if( ena_n ) begin
 	       if(cnt != 16'hffff) begin
 		  cnt <= cnt - 16'd1;
-		  sdcmdout <= request[cnt];   // drive cmd bit
+		  sdcmdout <= (|cnt[5:3]) ? req_shift[39] : req_crc[6];   // drive cmd bit
+		  req_shift <= {req_shift[38:0], 1'b1};
+		  if(|cnt[5:3]) req_crc <= CalcCrc7(req_crc, req_shift[39]);
+		  else req_crc <= {req_crc[5:0], 1'b1};
+		  if (1'b0) sdcmdout <= request[cnt];   // drive cmd bit
 		  
 		  // calculate the crc during transmission. It's then mapped into request bits 1 to 7
-		  if(cnt>=8 && cnt<48) req_crc <= CalcCrc7(req_crc, request[cnt]);
+		  // if(cnt>=8 && cnt<48) req_crc <= CalcCrc7(req_crc, request[cnt]);
 	       end else begin
 		  state <= STATE_WAIT4RES;
 		  cnt <= TIMEOUT;
@@ -188,7 +194,7 @@ always @ (posedge clk or negedge rstn)
                  {resp_st, resp_cmd, resp_arg} <= {resp_cmd, resp_arg, sdcmdin};
                if(cnt == 16'd0) begin
 		  state <= STATE_DONE;		   
-                  syntaxe <= resp_st || ((resp_cmd!=req_cmd) && (resp_cmd!=6'h3F) && (resp_cmd!=6'd0));
+                  syntaxe <= resp_st || ((resp_cmd!=cmd) && (resp_cmd!=6'h3F) && (resp_cmd!=6'd0));
                end
 	    end
          end // if (state == STATE_RCV_RES )

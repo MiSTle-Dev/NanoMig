@@ -1,0 +1,3 @@
+set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) akiko.v ]
+set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) akiko_hps_bridge.v ]
+set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) akiko_nvram.v ]

@@ -1,0 +1,8 @@
+# ModelSim/Questa build artifacts
+work/
+transcript
+modelsim.ini
+*.wlf
+*.vstf
+vsim.dbg
+.modelsim

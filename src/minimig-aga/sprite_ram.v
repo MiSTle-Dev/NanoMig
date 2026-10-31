@@ -10,6 +10,29 @@ module sprite_ram (
   output wire [31:0] doutb
 );
 
+`ifndef SPRITE_SSRAM
+SDPB sdpb_inst (
+  .DO(doutb),
+  .DI({16'h0000, dina}),
+  .BLKSELA(3'b000),
+  .BLKSELB(3'b000),
+  .ADA({6'b000000, addra, 2'b00, 2'b11}),
+  .ADB({6'b000000, addrb, 5'b00000}),
+  .CLKA(clk),
+  .CLKB(clk),
+  .CEA(wea),
+  .CEB(1'b1),
+  .OCE(1'b0),
+  .RESETA(1'b0),
+  .RESETB(1'b0)
+);
+defparam sdpb_inst.BIT_WIDTH_0 = 16;
+defparam sdpb_inst.BIT_WIDTH_1 = 32;
+defparam sdpb_inst.READ_MODE = 1'b0;
+defparam sdpb_inst.RESET_MODE = "SYNC";
+defparam sdpb_inst.BLK_SEL_0 = 3'b000;
+defparam sdpb_inst.BLK_SEL_1 = 3'b000;
+`else
 reg [15:0] mem0 [0:7];
 reg [15:0] mem1 [0:7];
 
@@ -30,5 +53,6 @@ end
 always @(posedge clk) begin
   addrb_r <= addrb;
 end
+`endif
 
 endmodule

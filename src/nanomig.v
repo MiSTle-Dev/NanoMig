@@ -368,9 +368,9 @@ reg         snoop_act;
 // two entries are enough: the chip bus delivers a write at most every four
 // clocks and one is handed over every four, so the queue only has to absorb
 // the case where a write arrives while the previous one is still being passed
-reg  [22:1] sq_adr [0:1];
-reg  [15:0] sq_dat [0:1];
-reg  [1:0]  sq_bs  [0:1];
+(* syn_ramstyle = "registers" *) reg  [22:1] sq_adr [0:1];
+(* syn_ramstyle = "registers" *) reg  [15:0] sq_dat [0:1];
+(* syn_ramstyle = "registers" *) reg  [1:0]  sq_bs  [0:1];
 reg  [1:0]  sq_wr, sq_rd;
 reg  [1:0]  sq_pace;
 wire        sq_empty = (sq_wr == sq_rd);
@@ -462,7 +462,7 @@ cpu_cache_new #(
 
 // line fill / write buffer sequencer driving the sdram's second port
 reg  [1:0]  fill_state;     // 0 idle, 1 line read issued, 2 delivering words
-reg  [63:0] fill_line;      // w0..w3 of the aligned 64 bit line
+wire [63:0] fill_line = { fastram_dout, fastram_dout48 }; // w0..w3 of the aligned 64 bit line
 reg  [1:0]  fill_idx;       // requested (critical) word index
 reg  [1:0]  fill_cnt;
 reg         wbuf_pending;   // a write is in flight on the sdram port
@@ -504,7 +504,7 @@ always @(posedge clk_sys) begin
       wbuf_pending  <= 1'b0;
     end
     if(fastram_done && (fill_state == 2'd1)) begin
-      fill_line  <= { fastram_dout, fastram_dout48 };
+      // fill_line  <= { fastram_dout, fastram_dout48 };
       fill_cnt   <= 2'd0;
       fill_state <= 2'd2;
     end
@@ -677,6 +677,7 @@ reg [4:0] heads[DRIVES];
 // which requires DSP units. Instead we simply use the image size
 // divided by 512
 reg [31:0] total_sectors[DRIVES];
+wire [31:0] ide_lba = (ide_cylinder * heads[ide_drv] + ide_head) * sectors[ide_drv] + ide_sector - 1;
 
 // TODO:
 // - make sure we know which drive we are currently initializing
@@ -708,6 +709,7 @@ always @(posedge clk_sys) begin
          end
       end
 
+      /*
       // check if amiga wants to read a sector
       if(!sdc_busy && !ide_sdc_rd && ide_exec == IDE_EXEC_READ_SECTOR ) begin
          // this really only works with HW multipliers in the FPGA
@@ -738,6 +740,7 @@ always @(posedge clk_sys) begin
          ide_sdc_wr[ide_drv] <= 1'b1;
       end
 
+      */
       // sd card has accepted read request
       if ( ide_sdc_rd && sdc_busy ) begin
          ide_sdc_rd <= 2'b00;
@@ -785,6 +788,15 @@ always @(posedge clk_sys) begin
    // this is a minimal reset to ensure no drive is mounted
    // on power-up while keeping logic usage low; adding reset logic
    // to entire block considerably increases logic usage
+   if(!sdc_busy && !ide_sdc_rd && ide_exec == IDE_EXEC_READ_SECTOR ) begin
+      ide_sdc_sector <= ide_lba;
+      ide_sdc_rd[ide_drv] <= 1'b1;
+   end
+   if(!sdc_busy && !ide_sdc_wr && ide_exec == IDE_EXEC_WRITE_SECTOR ) begin
+      ide_sdc_sector <= ide_lba;
+      ide_sdc_wr[ide_drv] <= 1'b1;
+   end
+
    if (por) begin
       for(drv = 0; drv < DRIVES; drv = drv+1) begin
           ide_drv_state[drv] <= IDE_DRV_STATE_NONE;
@@ -802,6 +814,11 @@ wire [5:0] ide_request;
 // IDE management signals   
 wire [15:0] ide_writedata;   
 wire [15:0] ide_readdata;   
+wire [7:0] ide_sec_cnt_m1 = ide_sector_cnt - 8'd1;
+wire [7:0] ide_cnt_cmp = (ide_exec == IDE_EXEC_RECV_PAYLOAD) ? ide_sec_cnt_m1 : ide_sector_cnt;
+wire [7:0] ide_blk_cnt = (ide_cnt_cmp < ide_spb) ? ide_cnt_cmp : ide_spb;
+wire ide_sec_step = ((ide_exec == IDE_EXEC_SEND_PAYLOAD) && sdc_byte_in_strobe && (sdc_byte_addr == 9'd511)) ||
+                    ((ide_exec == IDE_EXEC_RECV_PAYLOAD) && sdc_done);
 
 always @(posedge clk_sys, posedge reset) begin
    if(reset) begin
@@ -867,7 +884,9 @@ always @(posedge clk_sys, posedge reset) begin
 
 		 // check how many sectors can be sent in this
 		 // transfer
-		 if ( ide_sector_cnt < ide_spb ) begin
+		 ide_sdc_cnt <= ide_blk_cnt;
+		 ide_io_size <= ide_blk_cnt;
+		 if ( 1'b1 ) ; else if ( 1'b0 ) begin
 		    ide_sdc_cnt <= ide_sector_cnt;
 		    ide_io_size <= ide_sector_cnt;
 		 end else begin
@@ -883,6 +902,21 @@ always @(posedge clk_sys, posedge reset) begin
 	   end
       end // if (!ide_busy)
       
+      if (ide_sec_step) begin
+         ide_sector_cnt <= ide_sec_cnt_m1;
+         ide_sdc_cnt <= ide_sdc_cnt - 8'd1;
+         if (ide_sector < sectors[ide_drv])
+            ide_sector <= ide_sector + 8'd1;
+         else begin
+            ide_sector <= 8'd1;
+            if (ide_head < heads[ide_drv] - 1)
+               ide_head <= ide_head + 4'd1;
+            else begin
+               ide_head <= 4'd0;
+               ide_cylinder <= ide_cylinder + 16'd1;
+            end
+         end
+      end
       case (ide_exec)
 
 	IDE_EXEC_SET_CONFIG: begin
@@ -903,16 +937,17 @@ always @(posedge clk_sys, posedge reset) begin
 	   // transmit 256 words of payload
 	   if ( sdc_byte_in_strobe && sdc_byte_addr == 9'd511 ) begin
 	      // decrease sector counter and increase sector number.
-	      ide_sector_cnt <= ide_sector_cnt - 8'd1;
+	      // ide_sector_cnt <= ide_sector_cnt - 8'd1;
 
 	      // advance to next sector
 	      // ide_sector goes from 1 to sectors,
 	      // ide_head goes from 0 to heads-1
-	      if ( ide_sector < sectors[0] )
+	      // if ( ide_sector < sectors[ide_drv] )
+	      if ( 1'b1 ) ; else if ( 1'b0 )
 		ide_sector <= ide_sector + 8'd1;
 	      else begin
 		 ide_sector <= 8'd1;
-		 if( ide_head < heads[0]-1 )
+		 if( ide_head < heads[ide_drv]-1 )
 		   ide_head <= ide_head + 8'd1;
 		 else begin
 		    ide_head <= 8'd0;
@@ -920,7 +955,7 @@ always @(posedge clk_sys, posedge reset) begin
 		 end
 	      end
 	      
-	      ide_sdc_cnt <= ide_sdc_cnt - 8'd1;	      
+	      // ide_sdc_cnt <= ide_sdc_cnt - 8'd1;	      
 
 	      if ( ide_sdc_cnt <= 1 ) begin
 		 // finally send the registers incl irq		 
@@ -972,12 +1007,13 @@ always @(posedge clk_sys, posedge reset) begin
 	   if ( sdc_done ) begin
 
 	      // decrease sector counter and increase sector number.
-	      ide_sector_cnt <= ide_sector_cnt - 8'd1;
+	      // ide_sector_cnt <= ide_sector_cnt - 8'd1;
 
 	      // advance to next sector
 	      // ide_sector goes from 1 to sectors,
 	      // ide_head goes from 0 to heads-1
-		   if ( ide_sector < sectors[ide_drv] )
+		   // if ( ide_sector < sectors[ide_drv] )
+		   if ( 1'b1 ) ; else if ( 1'b0 )
 		ide_sector <= ide_sector + 8'd1;
 	      else begin
 		 ide_sector <= 8'd1;
@@ -989,7 +1025,7 @@ always @(posedge clk_sys, posedge reset) begin
 		 end
 	      end
 	      
-	      ide_sdc_cnt <= ide_sdc_cnt - 8'd1;	      
+	      // ide_sdc_cnt <= ide_sdc_cnt - 8'd1;	      
 
 	      // check if sdc sector counter is/will be down to zero
 	      if ( ide_sdc_cnt <= 1 ) begin
@@ -1004,7 +1040,9 @@ always @(posedge clk_sys, posedge reset) begin
 		    
 		    // ide_sector_cnt has just been decreased in this same event
 		    // so the following needs to assume it's not been decreased, yet
-		    if ( (ide_sector_cnt-1) < ide_spb ) begin
+		    ide_sdc_cnt <= ide_blk_cnt;
+		    ide_io_size <= ide_blk_cnt;
+		    if ( 1'b1 ) ; else if ( 1'b0 ) begin
 		       ide_sdc_cnt <= ide_sector_cnt - 1;
 		       ide_io_size <= ide_sector_cnt - 1;
 		    end else begin
@@ -1097,7 +1135,9 @@ always @(posedge clk_sys, posedge reset) begin
 
 		 // request sectors from sd card		 
 		 // check how many sectors can be sent in this transfer
-		 if ( ide_sector_cnt < ide_spb ) begin
+		 ide_sdc_cnt <= ide_blk_cnt;
+		 ide_io_size <= ide_blk_cnt;
+		 if ( 1'b1 ) ; else if ( 1'b0 ) begin
 		    ide_sdc_cnt <= ide_sector_cnt;
 		    ide_io_size <= ide_sector_cnt;
 		 end else begin
@@ -1116,7 +1156,7 @@ always @(posedge clk_sys, posedge reset) begin
 
 	      end else if ( ide_readdata[15:8] /* -> ide_cmd */ == 8'hc6) begin
 		 // command c6: set multiple
-		 ide_spb <= ide_sector_cnt;
+		 ide_spb <= (ide_sector_cnt > 8'd16) ? 8'd16 : ide_sector_cnt;
 		 		 
 		 ide_status[2] <= 1'b1;  // raise irq
 		 ide_exec <= IDE_EXEC_SET_REGS;
@@ -1141,7 +1181,9 @@ always @(posedge clk_sys, posedge reset) begin
 		 ide_exec_cnt <= 9'd0;	      
 		 		 
 		 // check how many sectors can be sent in this transfer
-		 if ( ide_sector_cnt < ide_spb ) begin
+		 ide_sdc_cnt <= ide_blk_cnt;
+		 ide_io_size <= ide_blk_cnt;
+		 if ( 1'b1 ) ; else if ( 1'b0 ) begin
 		    ide_sdc_cnt <= ide_sector_cnt;
 		    ide_io_size <= ide_sector_cnt;
 		 end else begin
@@ -1214,7 +1256,7 @@ wire [15:0] ide_identify_data =
 	    (ide_exec_cnt[8:1] == 8'd22)?16'd4:	//word 22 number of ecc bytes
 	    //words 23..26 firmware revision
 	    ((ide_exec_cnt[8:1] >= 8'd27)&&(ide_exec_cnt[8:1] <= 8'd46))?"  ": //words 27..46 model number
-	    (ide_exec_cnt[8:1] == 8'd47)?16'h8020:	//word 47 max multiple sectors
+	    (ide_exec_cnt[8:1] == 8'd47)?16'h8010:	//word 47 max multiple sectors (16 = 8KB)
 	    (ide_exec_cnt[8:1] == 8'd48)?16'd1:	//word 48 dword io
 	    (ide_exec_cnt[8:1] == 8'd49)?16'b0000_0000_0000_0000: // 9 - word 49 lba not supported
 	    (ide_exec_cnt[8:1] == 8'd50)?16'h4001:	//word 50 reserved

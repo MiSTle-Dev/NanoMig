@@ -22,6 +22,7 @@
 //       SD card access without companion (NO_COMPANION set)
 //
 
+`define DISABLE_ROM_IMAGE
 // without companion interface the rom interface is also disabled
 `ifdef NO_COMPANION
  `ifndef DISABLE_ROM_IMAGE
@@ -56,6 +57,7 @@ module sd_card # (
     output [3:0]	  sddat,
     input [3:0]		  sddat_in,
 `else
+/* `endif */
     inout			  sdcmd, 
     inout [3:0]		  sddat,
 `endif   
@@ -72,7 +74,7 @@ module sd_card # (
 `endif
    
     // export sd image size   
-    output reg [63:0] image_size,
+    output [63:0]     image_size,
     // up to eight drive images supported
     output reg [7:0]  image_mounted,
 
@@ -86,6 +88,16 @@ module sd_card # (
     input			  rom_image_data_strobe,
 `endif
   
+/* `endif */
+`ifdef DISABLE_ROM_IMAGE
+    output            rom_image_selection_strobe,
+    output [2:0]      rom_image_selected,
+    input             rom_image_accepted,
+    output            rom_image_data_available,
+    output [7:0]      rom_image_data,
+    input             rom_image_data_strobe,
+`endif
+
     // read sector command interface (sync with clk), this once was
     // directly tied to the sd card. Now this goes to the MCU via the
     // MCU interface as the MCU translates sector numbers from those
@@ -111,6 +123,15 @@ module sd_card # (
 wire [3:0] card_stat;  // show the sdcard initialize status
 wire [1:0] card_type;  // 0=UNKNOWN    , 1=SDv1    , 2=SDv2  , 3=SDHCv2
 
+reg [39:0] image_size_r;
+assign image_size = {24'd0, image_size_r};
+/* `endif */
+`ifdef DISABLE_ROM_IMAGE
+assign rom_image_selection_strobe = 1'b0;
+assign rom_image_selected = 3'd0;
+assign rom_image_data_available = 1'b0;
+assign rom_image_data = 8'd0;
+`endif
 reg [7:0] command;
 reg [7:0] sub_command;
 reg [3:0] byte_cnt;  
@@ -342,7 +363,7 @@ always @(posedge clk, negedge rstn) begin
       command <= 8'hff;
       rstart_int <= 1'b0;
       wstart_int <= 1'b0;
-      image_size <= 64'd0;
+      image_size_r <= 40'd0;
       image_mounted <= 8'b00000000;
       direct_start_we <= 1'b0;
       dinb_we <=1'b0;
@@ -619,11 +640,11 @@ always @(posedge clk, negedge rstn) begin
 			   // MCU reports that some image has been inserted. If
 			   // the image size is 0, then no image is inserted
 			   if(byte_cnt == 4'd0) image_target <= data_in;
-			   if(byte_cnt == 4'd1) image_size[63:24] <= { 32'h00000000, data_in };
-			   if(byte_cnt == 4'd2) image_size[23:16] <= data_in;
-			   if(byte_cnt == 4'd3) image_size[15:8]  <= data_in;
+			   if(byte_cnt == 4'd1) image_size_r[39:24] <= { 8'h00, data_in };
+			   if(byte_cnt == 4'd2) image_size_r[23:16] <= data_in;
+			   if(byte_cnt == 4'd3) image_size_r[15:8]  <= data_in;
 			   if(byte_cnt == 4'd4) begin 
-				  image_size[7:0] <= data_in;
+				  image_size_r[7:0] <= data_in;
 				  image_mounted[image_target] <= 1'b1;
 				  direct_start_wdata <= 32'b0;
 				  direct_start_we <= 1'b1;
@@ -677,15 +698,15 @@ always @(posedge clk, negedge rstn) begin
                // MCU reports that some large image has been inserted.
                if(byte_cnt == 4'd0) image_target <= data_in;
                // it should be ok to limit image size to 1TiB
-               if(byte_cnt == 4'd1) image_size[63:56] <= 8'h00;
-               if(byte_cnt == 4'd2) image_size[55:48] <= 8'h00;
-               if(byte_cnt == 4'd3) image_size[47:40] <= 8'h00;
-               if(byte_cnt == 4'd4) image_size[39:32] <= data_in;
-               if(byte_cnt == 4'd5) image_size[31:24] <= data_in;
-               if(byte_cnt == 4'd6) image_size[23:16] <= data_in;
-               if(byte_cnt == 4'd7) image_size[15:8]  <= data_in;
+               // if(byte_cnt == 4'd1) image_size[63:56] <= 8'h00;
+               // if(byte_cnt == 4'd2) image_size[55:48] <= 8'h00;
+               // if(byte_cnt == 4'd3) image_size[47:40] <= 8'h00;
+               if(byte_cnt == 4'd4) image_size_r[39:32] <= data_in;
+               if(byte_cnt == 4'd5) image_size_r[31:24] <= data_in;
+               if(byte_cnt == 4'd6) image_size_r[23:16] <= data_in;
+               if(byte_cnt == 4'd7) image_size_r[15:8]  <= data_in;
                if(byte_cnt == 4'd8) begin
-                  image_size[7:0] <= data_in;
+                  image_size_r[7:0] <= data_in;
                   image_mounted[image_target] <= 1'b1;
                   direct_start_wdata <= 32'b0;
                   direct_start_we <= 1'b1;

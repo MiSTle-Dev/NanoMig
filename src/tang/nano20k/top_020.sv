@@ -17,11 +17,11 @@
 `define ENABLE_CACHE // MiSTer cpu cache between the cpu and the sdram (cached kickstart + fast ram)
 `define CHIPRAM_CACHE
 // `define DISABLE_IDE  // v32 experiment: cache + ide together
-// `define NO_WS2812   // drop the rgb status led to make room for cache + ide
+`define NO_WS2812   // drop the rgb status led to make room for cache + ide
 `define DENISE_EBR   // block ram based bitplane and sprite buffers, saves logic
 `define DISABLE_ROM_LOADER // drop the rom loader to make room 
-`define ENABLE_AT_MODEM // serial port <-> virtual AT modem of the FPGA Companion (replaces the midi_in pin)
-`define ENABLE_DRIVE_SOUNDS
+// `define ENABLE_AT_MODEM // serial port <-> virtual AT modem of the FPGA Companion (replaces the midi_in pin)
+// `define ENABLE_DRIVE_SOUNDS
 
 module top(
   input			clk,
@@ -802,9 +802,10 @@ always @(posedge clk_28m, posedge rst_28m) begin
 end
 
 /* -------------- state machine copying data from flash to sdram ---------------- */
-reg  [21:0] flash_addr = 22'h200000;
+reg  [ 3:0] flash_base = 4'b1000;
 reg  [17:0] flash_ram_addr = 18'h0;
-reg  [31:0] word_count = 32'h40000;
+wire [21:0] flash_addr = {flash_base, flash_ram_addr};
+reg         rom_done = 1'b0;
 
 wire [15:0] flash_dout;
 reg         flash_cs;
@@ -813,7 +814,7 @@ wire        flash_busy;
 reg         flash_ram_write;
 
 // once the copy counter has run to zero, all rom has been copied
-wire        rom_done = (word_count == 0);
+// wire        rom_done = (word_count == 0);
 
 `ifdef DISABLE_ROM_LOADER
 assign leds[3] = !rom_done;
@@ -847,13 +848,20 @@ always @(posedge clk_28m, posedge rst_28m, posedge reset) begin
       FLASH_STATE_INIT: begin
         if (clk7n_en && flash_ready_d2) begin
           case(osd_kickstart)
-                  2'b00: flash_addr <= 22'h380000; // Kickstart 1.3 (at 7,0 MB)
-                  2'b01: flash_addr <= 22'h200000; // Kickstart 3.1 (at 4,0 MB)
-                  2'b10: flash_addr <= 22'h3C0000; // Kickstart 3.2 (at 7,5 MB)
-                  default: flash_addr <= 22'h200000;
+                  2'b00: flash_base <= 4'b1110; // Kickstart 1.3 (at 7,0 MB)
+                  2'b01: flash_base <= 4'b1000; // Kickstart 3.1 (at 4,0 MB)
+                  2'b10: flash_base <= 4'b1111; // Kickstart 3.2 (at 7,5 MB)
+                  default: flash_base <= 4'b1000;
           endcase
           flash_ram_addr <= 18'h0;
-          word_count     <= 32'h40000;
+          rom_done       <= 1'b0;
+          /* if (1'b0) begin case(osd_kickstart) 2'b00: ; endcase
+                  2'b01: flash_addr <= 22'h200000; // Kickstart 3.1 (at 4,0 MB)
+                  2'b10: flash_addr <= 22'h3C0000; // Kickstart 3.2 (at 7,5 MB)
+          // end default: flash_addr <= 22'h200000;
+          endcase
+          flash_ram_addr <= 18'h0;
+          // word_count     <= 32'h40000; */
 
           flash_cs        <= 0;
           flash_ram_write <= 0;
@@ -861,7 +869,7 @@ always @(posedge clk_28m, posedge rst_28m, posedge reset) begin
         end
       end
       FLASH_STATE_READ: begin
-        if (word_count != 0) begin
+        if (!rom_done) begin
           flash_cs    <= 1;
           flash_state <= FLASH_STATE_WAIT;
         end
@@ -882,9 +890,10 @@ always @(posedge clk_28m, posedge rst_28m, posedge reset) begin
         if (clk7n_en) begin
           flash_ram_write <= 0;
           flash_ram_addr  <= flash_ram_addr + 1;
-          flash_addr      <= flash_addr + 1;
+          if (&flash_ram_addr) rom_done <= 1'b1;
+          // flash_addr      <= flash_addr + 1;
           flash_state     <= FLASH_STATE_READ;
-          word_count      <= word_count - 1;
+          // word_count      <= word_count - 1;
         end
       end
       default: begin
@@ -1047,6 +1056,7 @@ reg [15:0] audio_reg [2]; // 16 bit signed audio for HDMI
 // cannot overflow, result always fits back in 15 bit.
 wire signed [15:0] audio_left_s  = {{1{audio_left[14]}},  audio_left};
 wire signed [15:0] audio_right_s = {{1{audio_right[14]}}, audio_right};
+wire signed [15:0] blend_diff = (audio_left_s - audio_right_s) >>> 2;
 
 reg signed [14:0] mixed_audio_left;
 reg signed [14:0] mixed_audio_right;
@@ -1086,10 +1096,8 @@ always @(posedge clk_pixel) begin
                 mixed_audio_right <= audio_right;
             end
             default: begin  // 75 / 25 blend
-                mixed_audio_left  <= (audio_left_s  - (audio_left_s  >>> 2))
-                                   + (audio_right_s >>> 2);
-                mixed_audio_right <= (audio_right_s - (audio_right_s >>> 2))
-                                   + (audio_left_s  >>> 2);
+                mixed_audio_left  <= audio_left_s  - blend_diff;
+                mixed_audio_right <= audio_right_s + blend_diff;
             end
         endcase
 
@@ -1102,8 +1110,8 @@ always @(posedge clk_pixel) begin
                 scaled_audio_right <= mixed_audio_right;
             end
             3'b011: begin // 75%
-                scaled_audio_left  <= (mixed_audio_left  >>> 1) + (mixed_audio_left  >>> 2);
-                scaled_audio_right <= (mixed_audio_right >>> 1) + (mixed_audio_right >>> 2);
+                scaled_audio_left  <= mixed_audio_left  - (mixed_audio_left  >>> 2);
+                scaled_audio_right <= mixed_audio_right - (mixed_audio_right >>> 2);
             end
             3'b010: begin // 50%
                 scaled_audio_left  <= mixed_audio_left  >>> 1;
@@ -1188,6 +1196,8 @@ drive_sounds drive_sounds_inst (
 	.fdd_step_n (fdd_step_n),
     .buzzer  (buzzer)
 );
+`else
+assign buzzer = 1'b0;
 `endif
    
 endmodule

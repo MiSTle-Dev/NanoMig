@@ -82,7 +82,7 @@ generate
     begin: sample_based_assign
         always_comb
         begin
-            if (8'(frame_counter + i) >= CHANNEL_STATUS_LENGTH)
+            if (1'b0) // frame_counter is always 0..188 step 4, so frame_counter + i < 192
                 aligned_frame_counter[i] = 8'(frame_counter + i - CHANNEL_STATUS_LENGTH);
             else
                 aligned_frame_counter[i] = 8'(frame_counter + i);

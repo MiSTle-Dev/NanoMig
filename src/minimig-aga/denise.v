@@ -45,6 +45,8 @@ module denise (
   output wire [  8-1:0] red,            // red componenent video out
   output wire [  8-1:0] green,          // green component video out
   output wire [  8-1:0] blue,           // blue component video out
+  input  wire           ham_frame_start,
+  input  wire [ 16-1:0] ham_control,
   input  wire           a1k,            // control EHB chipset feature
   input  wire           ecs,            // enables ECS chipset features
   input  wire           aga,            // enables AGA features
@@ -517,6 +519,21 @@ denise_hamgenerator ham0
   .rgb(ham_rgb)
 );
 
+wire ext_supported = aga && !dpf;
+wire ext_pixel_tick = (shres) ? 1'b1 : (hires) ? (c1 ^ c3) : (c1 && c3);
+wire ext_selected = ham_control[15] && ext_supported &&
+ ((l_bpu==4'd3)||(l_bpu==4'd4)||(l_bpu==4'd5)||
+  (l_bpu==4'd6)||(l_bpu==4'd8));
+wire [23:0] ext_rgb;
+wire ext_rgb_valid;
+ham_video_pipeline ext_ham (
+ .clk(clk),.reset(reset),.frame_start(ham_frame_start),
+ .pixel_valid(ext_selected && window_ena && !blank && display_ena && ext_pixel_tick),
+ .planes(l_bpu),.code(bpldata),.control(ham_control),
+ .clk7_en(clk7_en),.reg_address_in(reg_address_in),.data_in(data_in[11:0]),
+ .bank(bank),.loct(loct),.rdram(rdram),.rgb(ext_rgb),.rgb_valid(ext_rgb_valid)
+);
+
 // instantiate collision detection module
 denise_collision col0
 (
@@ -562,7 +579,15 @@ wire t_blank;
 assign t_blank = blank | ecs & ecsena & brdrblnk & (~window_del | ~display_ena);
 
 // RGB video output
-assign {red[7:0],green[7:0],blue[7:0]} = t_blank ? 24'h000000 : out_rgb;
+reg [23:0] ext_normal_rgb;
+reg ext_window, ext_sprite, ext_blank, ext_on;
+always @(posedge clk) begin
+ ext_normal_rgb <= out_rgb; ext_window <= window_del; ext_sprite <= sprsel_del;
+ ext_blank <= t_blank; ext_on <= ext_selected;
+end
+wire [23:0] ext_output = ext_window && !ext_sprite ? ext_rgb : ext_normal_rgb;
+assign {red[7:0],green[7:0],blue[7:0]} = ext_on ?
+ (ext_blank ? 24'h000000 : ext_output) : (t_blank ? 24'h000000 : out_rgb);
 
 assign blank_out = t_blank;
 

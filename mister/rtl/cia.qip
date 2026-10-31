@@ -1,0 +1,6 @@
+set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) ciaa.v ]
+set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) ciab.v ]
+set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) cia_timerd.v ]
+set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) cia_timerb.v ]
+set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) cia_timera.v ]
+set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) cia_int.v ]
