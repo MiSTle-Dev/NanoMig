@@ -9,15 +9,22 @@
 //
 
 module video_analyzer
+#(
+ // 1: also handle native progressive video (programmed beam, no scandoubler).
+ // If 0 the native input is ignored and may be left open.
+ parameter bit NATIVE = 1'b0
+)
 (
  // system interface
  input		  clk,
  input		  hs,
  input		  vs,
  input [1:0]      screen, // standard, overscan or wide screen jailbars enabled
+ input		  native,      // hs/vs are native progressive amiga video
  output reg       pal,         // pal mode detected
  output reg       short_frame, // short frame has two lines less
  output reg       interlace,   // interlace modes have one line less
+ output reg [9:0] lines = 10'd625, // frame height in lines (native mode), valid after the first native frame
  output reg	  vreset,
 
  // OSD control signals
@@ -27,6 +34,9 @@ module video_analyzer
  output [6:0]     osd_col,     // OSD bitmap column (2 pixels per column)
  output [5:0]     osd_row      // OSD bitmap row (2 lines per row)
 );
+
+wire nat = NATIVE && native;
+reg  natD;
 
 
 // generate a reset signal in the upper left corner of active video used
@@ -43,6 +53,11 @@ always @(posedge clk) begin
     // resync HDMI whenever screen setting changes
     screenD <= screen;
     if(screenD != screen)
+        changed <= 1'b1;
+
+    // ... and whenever the scandoubler is switched in or out
+    natD <= nat;
+    if(natD != nat)
         changed <= 1'b1;
 
     // ---- hsync processing -----
@@ -66,6 +81,10 @@ always @(posedge clk) begin
         if(!vs && vsD) begin
             // check if image height has changed during last cycle
             vcntL <= vcnt;
+            // native video: the frame height is simply the number of lines
+            if(nat)
+                lines <= vcnt[9:0] + 10'd1;
+
             if(vcntL != vcnt) begin
                 if(vcnt == 11'd523) begin
                     pal <= 1'b0; // NTSC
@@ -101,8 +120,15 @@ always @(posedge clk) begin
     vreset <= 1'b0;
     // account for back porches to adjust image position within the
     // HDMI frame. Center screen according to screen type standard (0),
-    // overscan (1) or wide (2)
-    if( hcnt == ((screen==2'd2)?88:(screen==2'd1)?120:162) && vcnt == 46 && changed) begin
+    // overscan (1) or wide (2). Native video is not compressed by the
+    // scandoubler, so it has longer back porches. The window starts 234 clocks
+    // (hsync + back porch of the HDMI timing) after hsync and 10 lines after vsync
+    // (both measured on hardware, DblPAL 625p). The position of the picture within
+    // the line is set by the Amiga (DIWSTRT/overscan prefs), the HBSTRT/HBSTOP
+    // tooltypes of the monitor driver did not move it in tests.
+    if( hcnt == (nat ? ((screen==2'd2)?178:(screen==2'd1)?210:234) :
+                       ((screen==2'd2)? 88:(screen==2'd1)?120:162)) &&
+        vcnt == (nat ? 10 : 46) && changed) begin
         vreset <= 1'b1;
         changed <= 1'b0;
     end
