@@ -7,12 +7,7 @@
 // -> run cpu on unused hpos[0] == 1 for turbo
 // TODO:
 // - check IDE head adressing heads[0] vs heads[drive]
-module nanomig #(
-   // 1: bypass the scandoubler for native progressive video (programmed beam,
-   // e.g. DblPAL). Only for boards whose video path supports it (video_analyzer
-   // and hdmi with NATIVE=1); all other boards keep the scandoubler always on.
-   parameter NATIVE = 0
-) (
+module nanomig (
    input	 clk_sys,
    input	 reset,
    input	 por,
@@ -33,8 +28,6 @@ module nanomig #(
    output [3:0]	 r,
    output [3:0]	 g,
    output [3:0]	 b,
-   output	 native,       // 1: video is native progressive (short lines), scandoubler bypassed
-   output [10:0] native_width, // native line length in 28MHz clocks
 
    input [7:0]	 memory_config,
    input [2:0]	 fastram_config,
@@ -1626,31 +1619,6 @@ minimig minimig
  	.sdc_byte_out_data  ( sdc_byte_out_data_fdc ) 
 );
 
-// Native progressive video: a programmed beam with short lines (BEAMCON0, e.g.
-// the DblPAL monitor driver, 31kHz) is already scandoubled by the chipset, so
-// the scandoubler is bypassed. A normal PAL/NTSC line has 227 colour clocks.
-assign native       = (NATIVE != 0) && (htotal[8:1] < 8'd180);
-assign native_width = ({3'b000, htotal[8:1]} + 11'd1) << 3;  // 8 clocks per colour clock
-
-reg [3:0] nat_r, nat_g, nat_b;
-reg	  nat_hs = 1'b1, nat_vs = 1'b1;
-always @(posedge clk_sys) begin
-	nat_r  <= r_in;
-	nat_g  <= g_in;
-	nat_b  <= b_in;
-	nat_hs <= hs_in;
-	nat_vs <= vs_in;
-end
-
-wire [3:0] amb_r, amb_g, amb_b;
-wire	   amb_hs, amb_vs;
-
-assign r  = native ? nat_r  : amb_r;
-assign g  = native ? nat_g  : amb_g;
-assign b  = native ? nat_b  : amb_b;
-assign hs = native ? nat_hs : amb_hs;
-assign vs = native ? nat_vs : amb_vs;
-
 Amber AMBER
 (
 	.clk28m(clk_sys),
@@ -1666,11 +1634,11 @@ Amber AMBER
 	._hsync_in(hs_in),		//horizontal synchronisation in
 	._vsync_in(vs_in),		//vertical synchronisation in
 	._csync_in(1'b1),		//composite synchronization in, only used if dblscan==0
-	.red_out(amb_r), 	        //red componenent video out
-	.green_out(amb_g),  	        //green component video out
-	.blue_out(amb_b),		//blue component video out
-	._hsync_out(amb_hs),		//horizontal synchronisation out
-	._vsync_out(amb_vs)		//vertical synchronisation out
+	.red_out(r), 		        //red componenent video out
+	.green_out(g),  	        //green component video out
+	.blue_out(b),		        //blue component video out
+	._hsync_out(hs),		//horizontal synchronisation out
+	._vsync_out(vs)			//vertical synchronisation out
  );
     
 endmodule
