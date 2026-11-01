@@ -37,7 +37,12 @@ module hdmi
     // If you care about this, change it below.
     parameter bit [8*8-1:0] VENDOR_NAME = {"Unknown", 8'd0}, // Must be 8 bytes null-padded 7-bit ASCII
     parameter bit [8*16-1:0] PRODUCT_DESCRIPTION = {"FPGA", 96'd0}, // Must be 16 bytes null-padded 7-bit ASCII
-    parameter bit [7:0] SOURCE_DEVICE_INFORMATION = 8'h00 // See README.md or CTA-861-G for the list of valid codes
+    parameter bit [7:0] SOURCE_DEVICE_INFORMATION = 8'h00, // See README.md or CTA-861-G for the list of valid codes
+
+    // 1: support native progressive amiga video (programmed beam, e.g. DblPAL). The
+    // frame size is then given by native_width/native_height instead of the fixed
+    // PAL/NTSC timings. If 0, the native_* inputs are ignored and may be left open.
+    parameter bit NATIVE = 1'b0
 )
 (
     input logic 		      clk_pixel_x5,
@@ -48,6 +53,9 @@ module hdmi
     input logic [1:0]                 screen,      // 0 std, 1 overscan, 2 for some jailbars
     input logic                       short_frame, // 1 if short frame has been detected
     input logic                       interlace,   // 1 if interlace has been detected
+    input logic                       native,        // 1 for native progressive video (only if NATIVE)
+    input logic [10:0]                native_width,  // native line length in pixel clocks
+    input logic [9:0]                 native_height, // native frame height in lines
     // synchronous reset back to 0,0
     input logic 		      reset,
     input logic [23:0] 		      rgb, 
@@ -84,8 +92,18 @@ wire [54:0] htiming0 =
 	    (screen==2'd1)?htiming0o:
 	    htiming0n;   
    
-wire [102:0]  timing = pal_mode?{  htiming0, vtiming0, cea0 }:
-                                {  htiming0, vtiming1, cea1 };
+// native progressive video: frame size follows the amiga, 576 visible lines
+// unless the frame is too short for that (e.g. 525 line DblNTSC modes). No CEA
+// video id (0) as these timings are not part of any CEA mode.
+wire        nat = NATIVE && native;
+wire [54:0] htiming_n = (screen==2'd2)?{ 11'd0, native_width, 11'd832, 11'd24, 11'd48 }:
+                        (screen==2'd1)?{ 11'd0, native_width, 11'd768, 11'd24, 11'd72 }:
+                                       { 11'd0, native_width, 11'd720, 11'd24, 11'd72 };
+wire [39:0] vtiming_n = { native_height, (native_height >= 10'd600)?10'd576:10'd480, 10'd5, 10'd5 };
+
+wire [102:0]  timing = nat      ?{ htiming_n, vtiming_n, 8'd0 }:
+                       pal_mode ?{  htiming0, vtiming0, cea0 }:
+                                 {  htiming0, vtiming1, cea1 };
 
 // demux timing parameters   
 wire [10:0] start_x           = timing[102:92];
@@ -98,7 +116,8 @@ wire [10:0] hsync_pulse_size  = timing[58:48];
 // if we have a short frame, then the scandoubler outputs two lines less
 // if amiga outputs interlaced video, then the scandoubler outputs one line
 // less resulting in an odd overall frame height
-wire [9:0] frame_height       = timing[47:38] - (short_frame ? 10'd2 : 10'd0) - (interlace ? 10'd1 : 10'd0);
+wire [9:0] frame_height       = nat ? timing[47:38] :
+                                timing[47:38] - (short_frame ? 10'd2 : 10'd0) - (interlace ? 10'd1 : 10'd0);
 wire [9:0] screen_height      = timing[37:28];
 wire [9:0] vsync_pulse_start  = timing[27:18];
 wire [9:0] vsync_pulse_size   = timing[17: 8];
