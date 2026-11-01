@@ -1,4 +1,4 @@
-# zieht den PLIP-/CIA-Verdrahtungsblock woertlich aus minimig.v (kein Nachbau)
+# extracts the PLIP/CIA wiring block verbatim from minimig.v (no re-implementation)
 import sys
 s = open(sys.argv[1]).read()
 a = s.index("`ifdef ENABLE_PLIP\n// ---- virtual parallel port")

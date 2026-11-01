@@ -1,20 +1,20 @@
 `timescale 1ns/100ps
-// Testbench fuer plip_peer: Treiber nach hwpar.asm (hwburstsend/hwburstrecv),
-// 1 CIA-Zugriff = 1 E-Takt = 40 Takte (28,57 MHz Takt, E = 1,40 us), bset/bclr = 2 Zugriffe.
+// Testbench for plip_peer: driver modelled on hwpar.asm (hwburstsend/hwburstrecv),
+// 1 CIA access = 1 E clock = 40 clocks (28.57 MHz clock, E = 1.40 us), bset/bclr = 2 accesses.
 module tb_spi_net;
     parameter SLOT = 40;
-    localparam TMO_SLOTS = 20000;     // Treiber-Zeitueberschreitung (real 500 ms)
+    localparam TMO_SLOTS = 20000;     // driver timeout (500 ms on the real driver)
 
     reg clk = 0, rst = 1;
     always #17.5 clk = ~clk;
 
-    // ---- Amiga-Seite (CIA-Register)
+    // ---- Amiga side (CIA registers)
     reg        pra_sel = 0, pra_req = 0, ddra_sel = 0, ddra_req = 0;
     reg [7:0]  prb = 0, ddrb = 0;
     reg        prb_rd = 0;
     wire       rak, bus_oe, flag_n;
     wire [7:0] bus;
-    // ---- Host-Seite
+    // ---- host side
     wire       h_we, h_commit, h_release, plip_en, loop_en;
     wire [10:0] h_waddr, h_len, h_raddr;
     wire [7:0]  h_wdata;
@@ -35,9 +35,9 @@ module tb_spi_net;
     );
 
     integer errors = 0;
-    task fail(input [8*40-1:0] msg); begin errors = errors + 1; $display("FEHLER: %0s (t=%0t)", msg, $time); end endtask
+    task fail(input [8*40-1:0] msg); begin errors = errors + 1; $display("ERROR: %0s (t=%0t)", msg, $time); end endtask
 
-    // ---- Zeit
+    // ---- time
     task clk1; begin @(posedge clk); #1; end endtask
     task slot; integer k; begin for (k = 0; k < SLOT; k = k + 1) clk1; end endtask
 
@@ -45,7 +45,7 @@ module tb_spi_net;
         pins = (ddrb == 8'hFF) ? prb : (bus_oe ? bus : 8'hEE);
     endfunction
 
-    // ---- Treiberbausteine
+    // ---- driver building blocks
     reg jitter = 0;
     task gap; integer k; begin if (jitter) for (k = {$random} % 3; k > 0; k = k - 1) slot; end endtask
     reg timeout;
@@ -62,7 +62,7 @@ module tb_spi_net;
     endtask
 
     reg [7:0] rv;
-    task rd_prb;   // Lesezugriff auf PRB, danach prb_rd-Impuls
+    task rd_prb;   // read access to PRB, followed by a prb_rd pulse
         begin
             repeat (SLOT - 1) clk1;
             rv = pins(0);
@@ -74,7 +74,7 @@ module tb_spi_net;
     task detach;  begin ddra_sel = 0; ddra_req = 0; pra_sel = 0; pra_req = 0; ddrb = 0; end endtask
     task exit_seq; begin slot; ddrb = 0; slot; slot; pra_req = 0; slot; slot; pra_sel = 0; end endtask
 
-    // Rahmen: fr[0..1] = Groesse, fr[2..] = Daten
+    // frame: fr[0..1] = size, fr[2..] = data
     reg [7:0] fr  [0:2051];
     reg [7:0] rcv [0:2051];
     reg [7:0] ref_ [0:2051];
@@ -87,13 +87,13 @@ module tb_spi_net;
             for (i = 0; i < 2052; i = i + 1) begin fr[i] = 0; ref_[i] = 0; end
             fr[0] = n >> 8; fr[1] = n & 255;
             for (i = 0; i < n; i = i + 1) begin
-                ref_[i] = (i * 7 + seed) & 8'h7F;      // $FF-Bytes vermeiden, Ethertype wird extra gesetzt
+                ref_[i] = (i * 7 + seed) & 8'h7F;      // avoid $FF bytes, the ethertype is set separately
                 fr[2 + i] = ref_[i];
             end
         end
     endtask
 
-    // SEND_BURST; abort_w > 0: Treiber bricht nach abort_w Worten ab (SEL weg)
+    // SEND_BURST; abort_w > 0: the driver gives up after abort_w words (SEL released)
     reg send_ok;
     task burst_send(input integer abort_w, input [7:0] cmd);
         integer w, n, words;
@@ -176,9 +176,9 @@ module tb_spi_net;
         end
     endtask
 
-    // ---- SPI-Seite: Bitebene, echtes mcu_spi.v (Mode 1, 19,2 MHz) + plip_host
+    // ---- SPI side: bit level, the real mcu_spi.v (mode 1, 19.2 MHz) + plip_host
     reg        ss = 0, sck = 0, mosi = 0, iack = 0;
-    initial begin #50 ss = 1; end            // erste steigende Flanke von SS (setzt die Bitzaehler zurueck)
+    initial begin #50 ss = 1; end            // first rising edge of SS (resets the bit counters)
     wire       miso, net_strobe, mcu_start;
     wire [7:0] mcu_dout, net_din_w, sp_dout_unused;
     wire       irq;
@@ -202,8 +202,8 @@ module tb_spi_net;
         .stat_rx(stat_rx), .stat_tx(stat_tx), .rt_clks(rt_clks)
     );
 
-    integer sp_gap = 0;        // ns zwischen zwei Bytes (0 = ohne Pause, wie ein Block-Transfer)
-    integer sp_half = 26;      // ns, 19,2 MHz
+    integer sp_gap = 0;        // ns between two bytes (0 = no gap, like a block transfer)
+    integer sp_half = 26;      // ns, 19.2 MHz
     reg [7:0] rep;
     task bits(input [7:0] b);
         integer i;
@@ -221,7 +221,7 @@ module tb_spi_net;
             if (first) begin
                 if (open_tr) begin ss = 1; #200; end
                 ss = 0; open_tr = 1; #100;
-                bits(8'd5);                           // Ziel NET
+                bits(8'd5);                           // target NET
             end
             bits(b);
         end
@@ -239,7 +239,7 @@ module tb_spi_net;
         integer k;
         begin
             xfer(8'd1, 1); xfer(0, 0); st_b = rep;
-            xfer(0, 0); if (rep !== 8'h00) fail("READ nicht bereit");
+            xfer(0, 0); if (rep !== 8'h00) fail("READ not ready");
             for (k = 0; k < n; k = k + 1) begin xfer(0, 0); hrx[k] = rep; end
         end
     endtask
@@ -262,18 +262,18 @@ module tb_spi_net;
 
     task wait_irq;
         integer g;
-        begin g = 0; while (!irq && g < 400000) begin clk1; g = g + 1; end if (!irq) fail("kein IRQ"); end
+        begin g = 0; while (!irq && g < 400000) begin clk1; g = g + 1; end if (!irq) fail("no IRQ"); end
     endtask
     task wait_flag;
         integer g;
-        begin g = 0; while (flag_n && g < 400000) begin clk1; g = g + 1; end if (flag_n) fail("kein /ACK-Puls"); end
+        begin g = 0; while (flag_n && g < 400000) begin clk1; g = g + 1; end if (flag_n) fail("no /ACK pulse"); end
     endtask
     task idle_check(input [8*24-1:0] where);
         begin
             repeat (50) clk1;
-            if (dut.st !== 4'd0) begin $display("  Zustand %0d (%0s)", dut.st, where); fail("Automat nicht im Leerlauf"); end
-            if (rak !== 1'b0)    fail("RAK nicht 0");
-            if (bus_oe !== 1'b0) fail("Bus nicht frei");
+            if (dut.st !== 4'd0) begin $display("  state %0d (%0s)", dut.st, where); fail("state machine not idle"); end
+            if (rak !== 1'b0)    fail("RAK not 0");
+            if (bus_oe !== 1'b0) fail("bus not free");
         end
     endtask
 
@@ -287,16 +287,16 @@ module tb_spi_net;
         repeat (5) clk1; rst = 0; repeat (20) clk1;
         attach;
 
-        $display("H1 ohne Freigabe");
+        $display("H1 not enabled");
         spi_status;
-        if (st_b !== 8'h00) begin $display("  Status %02x", st_b); fail("Status nach Reset"); end
+        if (st_b !== 8'h00) begin $display("  status %02x", st_b); fail("status after reset"); end
         pra_sel = 1; ddrb = 8'hFF; prb = 8'h33;
         repeat (500) clk1;
-        if (rak !== 1'b0) fail("Gegenstelle reagiert ohne Freigabe");
+        if (rak !== 1'b0) fail("peer reacts while not enabled");
         pra_sel = 0; ddrb = 0;
         spi_config(2'b01); repeat (10) clk1;
         spi_status;
-        if (st_b !== 8'h04) begin $display("  Status %02x", st_b); fail("Status nach CONFIG"); end
+        if (st_b !== 8'h04) begin $display("  status %02x", st_b); fail("status after CONFIG"); end
 
         $display("H2 Amiga -> Host");
         for (k = 0; k < 4; k = k + 1) begin
@@ -307,17 +307,17 @@ module tb_spi_net;
             wait_irq;
             do_iack;
             repeat (3) clk1;
-            if (irq) fail("IRQ nach Quittung");
+            if (irq) fail("IRQ after acknowledge");
             spi_status;
-            if (st_b !== 8'h05 || st_len !== n) begin $display("  Status %02x len %0d erwartet %0d", st_b, st_len, n); fail("Status/Laenge"); end
+            if (st_b !== 8'h05 || st_len !== n) begin $display("  status %02x len %0d expected %0d", st_b, st_len, n); fail("status/length"); end
             spi_read(n);
             for (i = 0; i < n; i = i + 1) if (hrx[i] !== ref_[i]) begin
-                if (errors < 10) $display("  Byte %0d: %02x erwartet %02x", i, hrx[i], ref_[i]);
+                if (errors < 10) $display("  byte %0d: %02x expected %02x", i, hrx[i], ref_[i]);
                 errors = errors + 1;
             end
             spi_release; repeat (5) clk1;
-            if (rx_valid) fail("rx_valid nach RELEASE");
-            idle_check("nach H2");
+            if (rx_valid) fail("rx_valid after RELEASE");
+            idle_check("after H2");
             $display("  n=%0d ok", n);
         end
 
@@ -327,48 +327,48 @@ module tb_spi_net;
             make_frame(n, 11 + k);
             do_iack;
             spi_status;
-            if (st_b[1] !== 1'b0) fail("tx belegt vor Schreiben");
+            if (st_b[1] !== 1'b0) fail("tx busy before write");
             spi_write(n);
             spi_commit(n);
             wait_flag;
             burst_recv;
             if (!recv_ok) fail("recv");
-            if (rsize !== n) begin $display("  rsize=%0d erwartet %0d", rsize, n); fail("Groesse"); end
+            if (rsize !== n) begin $display("  rsize=%0d expected %0d", rsize, n); fail("size"); end
             for (i = 0; i < n; i = i + 1) if (rcv[i] !== ref_[i]) begin
-                if (errors < 10) $display("  Byte %0d: %02x erwartet %02x", i, rcv[i], ref_[i]);
+                if (errors < 10) $display("  byte %0d: %02x expected %02x", i, rcv[i], ref_[i]);
                 errors = errors + 1;
             end
             repeat (5) clk1;
-            if (!irq) fail("kein IRQ nach Abholen");
+            if (!irq) fail("no IRQ after fetch");
             do_iack;
-            idle_check("nach H3");
+            idle_check("after H3");
             $display("  n=%0d ok", n);
         end
 
-        $display("H4 COMMIT bei belegtem Puffer, Laenge 0");
+        $display("H4 COMMIT with a busy buffer, length 0");
         make_frame(40, 21);
         spi_write(40); spi_commit(0); repeat (20) clk1;
-        if (tx_valid) fail("COMMIT mit Laenge 0 angenommen");
+        if (tx_valid) fail("COMMIT with length 0 accepted");
         spi_commit(40); wait_flag;
         make_frame(40, 22);
-        spi_write(40); spi_commit(25); repeat (20) clk1;     // darf weder schreiben noch commiten
+        spi_write(40); spi_commit(25); repeat (20) clk1;     // must neither write nor commit
         make_frame(40, 21);
         burst_recv;
-        if (!recv_ok || rsize !== 40) fail("H4: Groesse");
+        if (!recv_ok || rsize !== 40) fail("H4: size");
         for (i = 0; i < 40; i = i + 1) if (rcv[i] !== ref_[i]) errors = errors + 1;
         do_iack;
 
 `ifdef PLIP_LITE
-        $display("H5/H6 entfallen (PLIP_LITE): keine Statistik, kein Loopback");
+        $display("H5/H6 skipped (PLIP_LITE): no statistics, no loopback");
         spi_stats;
-        if (sstats !== 96'd0) fail("STATS bei PLIP_LITE nicht 0");
+        if (sstats !== 96'd0) fail("STATS not 0 with PLIP_LITE");
 `else
-        $display("H5 Zaehler");
+        $display("H5 counters");
         spi_stats;
         $display("  stat_rx=%0d stat_tx=%0d rt_clks=%0d", sstats[95:64], sstats[63:32], sstats[31:0]);
         if (sstats[95:64] !== stat_rx || sstats[63:32] !== stat_tx || sstats[31:0] !== rt_clks) fail("STATS");
 
-        $display("H6 Loopback ueber CONFIG");
+        $display("H6 loopback through CONFIG");
         spi_config(2'b11);
         make_frame(1514, 5); fr[2+12] = 8'hFF; fr[2+13] = 8'hFD; ref_[12] = 8'hFF; ref_[13] = 8'hFD;
         burst_send(0, 8'h33);
@@ -377,20 +377,20 @@ module tb_spi_net;
         burst_recv;
         if (!recv_ok || rsize !== 1514) fail("loop recv");
         for (i = 0; i < 1514; i = i + 1) if (rcv[i] !== ref_[i]) errors = errors + 1;
-        if (rx_valid) fail("Loopback belastet den Host");
+        if (rx_valid) fail("loopback loads the host");
         do_iack;
         spi_config(2'b01);
 `endif
 
-        $display("H7 Abschalten");
+        $display("H7 disable");
         spi_config(2'b00); repeat (10) clk1;
         pra_sel = 1; ddrb = 8'hFF; prb = 8'h33;
         repeat (300) clk1;
-        if (rak !== 1'b0) fail("Gegenstelle reagiert nach Abschalten");
+        if (rak !== 1'b0) fail("peer reacts after disable");
         pra_sel = 0; ddrb = 0;
 
-        if (errors == 0) $display("PASS"); else $display("FAIL: %0d Fehler", errors);
+        if (errors == 0) $display("PASS"); else $display("FAIL: %0d errors", errors);
         $finish;
     end
-    initial begin #3000000000; $display("FAIL: Zeitlimit"); $finish; end
+    initial begin #3000000000; $display("FAIL: time limit"); $finish; end
 endmodule

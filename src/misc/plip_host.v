@@ -121,7 +121,7 @@ always @(posedge clk) begin
               end
 
 `ifdef PLIP_LITE
-        8'd6: data_out <= 8'h00;                 // keine Statistik
+        8'd6: data_out <= 8'h00;                 // no statistics
 `else
         8'd6: data_out <= (cnt == 12'd0) ? 8'h00 :
                           (cnt <= 12'd12) ? stats[(12 - cnt) * 8 +: 8] : 8'h00;

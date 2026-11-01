@@ -1,6 +1,6 @@
 `timescale 1ns/100ps
-// Integrationstest: echte ciaa/ciab/minimig_m68k_bridge/amiga_clk + plip_peer, Verdrahtung
-// woertlich aus minimig.v (minimig_cia_glue.vh). Treiber nach hwpar.asm auf 68000-Buszyklen.
+// Integration test: the real ciaa/ciab/minimig_m68k_bridge/amiga_clk + plip_peer, wiring
+// taken verbatim from minimig.v (minimig_cia_glue.vh). Driver modelled on hwpar.asm, on 68000 bus cycles.
 module tb_cia_plip;
     reg clk = 0;
     always #17.5 clk = ~clk;
@@ -11,7 +11,7 @@ module tb_cia_plip;
     amiga_clk ac (.clk_28(clk), .clk7_en(clk7_en), .clk7n_en(clk7n_en), .c1(c1), .c3(c3),
                   .cck(cck), .eclk(eclk), .reset_n(reset_n));
 
-    // ---- CPU-Seite
+    // ---- CPU side
     reg        _as = 1, _uds = 1, _lds = 1, r_w = 1;
     reg [23:1] cpu_addr = 0;
     reg [15:0] cpu_wdata = 0;
@@ -32,7 +32,7 @@ module tb_cia_plip;
         .data(cpu_dq), .cpudatain(cpu_wdata), .data_out(cpu_data_out), .data_in(cia_data_out),
         .rd_cyc(rd_cyc));
 
-    // ---- Signale, die der Verdrahtungsblock aus minimig.v erwartet
+    // ---- signals expected by the wiring block from minimig.v
     wire _vsync = 1'b1, _hsync = 1'b1, index = 1'b0;
     wire int2, int6, keyboard_ack, freeze;
     wire _fire1 = 1'b1, _fire0 = 1'b1, _ready = 1'b1, _track0 = 1'b1, _wprot = 1'b1, _change = 1'b1;
@@ -45,10 +45,10 @@ module tb_cia_plip;
     wire dtr, rts, _motor, _sel3, _sel2, _sel1, _sel0, side, direc, _step, fdd_step_n;
     wire _fire1_dat, _fire0_dat, _led;
 
-    parameter DLY = 2;               // CPU uebernimmt die Daten DLY E7-Takte nach DTACK
+    parameter DLY = 2;               // the CPU takes the data DLY E7 clocks after DTACK
     reg        plip_en = 1, plip_loop = 0;
     reg        plip_h_we = 0, plip_h_commit = 0, plip_h_release_r = 0, auto_rel = 0;
-    wire       plip_h_release = plip_h_release_r | (auto_rel & plip_rx_valid);   // auto_rel: wie nanomig.v (kein Host)
+    wire       plip_h_release = plip_h_release_r | (auto_rel & plip_rx_valid);   // auto_rel: as in nanomig.v (no host)
     reg [10:0] plip_h_waddr = 0, plip_h_len = 0, plip_h_raddr = 0;
     reg [7:0]  plip_h_wdata = 0;
     wire [7:0] plip_h_rdata;
@@ -56,16 +56,16 @@ module tb_cia_plip;
     wire [10:0] plip_rx_len;
     wire [31:0] plip_stat_rx, plip_stat_tx, plip_rt_clks;
 
-    // wie in minimig.v: cpu_rd bleibt wirksam fuer die CIAs
+    // as in minimig.v: cpu_rd stays effective for the CIAs
     `include "minimig_cia_glue.vh"
 
-    // ---- Hilfen
+    // ---- helpers
     integer errors = 0;
-    task fail(input [8*40-1:0] msg); begin errors = errors + 1; $display("FEHLER: %0s (t=%0t)", msg, $time); end endtask
+    task fail(input [8*40-1:0] msg); begin errors = errors + 1; $display("ERROR: %0s (t=%0t)", msg, $time); end endtask
     task clk1; begin @(posedge clk); #1; end endtask
     task clk7w; begin @(posedge clk); while (!clk7_en) @(posedge clk); #1; end endtask
 
-    // 68000-Lese-/Schreibzyklus (Daten werden 2 Takte nach DTACK uebernommen, AS danach weg)
+    // 68000 read/write cycle (data is taken 2 clocks after DTACK, AS is released afterwards)
     reg [7:0] cv;
     integer n_rd_drv = 0, n_rd_pulse = 0, n_acc = 0;
     always @(posedge clk) if (plip_prb_rd) n_rd_pulse = n_rd_pulse + 1;
@@ -78,7 +78,7 @@ module tb_cia_plip;
             else begin clk7w; _uds = a[0]; _lds = ~a[0]; end
             t = 0; clk7w;
             while (_dtack !== 1'b0 && t < 200) begin clk7w; t = t + 1; end
-            if (t >= 200) fail("kein DTACK");
+            if (t >= 200) fail("no DTACK");
             repeat (DLY) clk7w;
             cv = a[0] ? cpu_dq[7:0] : cpu_dq[15:8];
             _as = 1; _uds = 1; _lds = 1;
@@ -106,7 +106,7 @@ module tb_cia_plip;
         end
     endtask
 
-    // ---- Rahmen
+    // ---- frames
     reg [7:0] ref_ [0:2051];
     reg [7:0] rf   [0:2051];
     reg [7:0] hrx  [0:2051];
@@ -131,10 +131,10 @@ module tb_cia_plip;
         integer k;
         begin for (k = 0; k < n; k = k + 1) begin plip_h_raddr = k; clk1; hrx[k] = plip_h_rdata; end end
     endtask
-    task wait_rx_valid; integer g; begin g = 0; while (!plip_rx_valid && g < 100000) begin clk1; g = g + 1; end if (!plip_rx_valid) fail("rx_valid fehlt"); end endtask
+    task wait_rx_valid; integer g; begin g = 0; while (!plip_rx_valid && g < 100000) begin clk1; g = g + 1; end if (!plip_rx_valid) fail("rx_valid missing"); end endtask
     task release_rx; begin plip_h_release_r = 1; clk1; plip_h_release_r = 0; end endtask
 
-    // ---- Treiber (hwburstsend / hwburstrecv)
+    // ---- driver (hwburstsend / hwburstrecv)
     reg send_ok;
     task burst_send(input integer n);
         integer w, words;
@@ -195,10 +195,10 @@ module tb_cia_plip;
         end
     endtask
 
-    // /ACK -> INT2 (ICR-Maske gesetzt)
-    task wait_int2; integer g; begin g = 0; while (!int2 && g < 400000) begin clk1; g = g + 1; end if (!int2) fail("kein INT2"); end endtask
+    // /ACK -> INT2 (ICR mask set)
+    task wait_int2; integer g; begin g = 0; while (!int2 && g < 400000) begin clk1; g = g + 1; end if (!int2) fail("no INT2"); end endtask
     task check_icr_clear;
-        begin rdb(ICRA); if (!cv[4]) fail("ICR FLG nicht gesetzt"); repeat (8) clk7w; if (int2) fail("INT2 bleibt"); end
+        begin rdb(ICRA); if (!cv[4]) fail("ICR FLG not set"); repeat (8) clk7w; if (int2) fail("INT2 stays"); end
     endtask
 
     integer i, k, n, t0, t1;
@@ -209,31 +209,31 @@ module tb_cia_plip;
         repeat (20) clk1; reset = 0;
         repeat (20) clk7w;
 
-        // serial.device: DTR/RTS als Ausgaenge, beide high; plipbox: SEL/REQ low, dann Ausgaenge
+        // serial.device: DTR/RTS as outputs, both high; plipbox: SEL/REQ low, then outputs
         wr(DDRA, 8'hC0); wr(PRA, 8'hC0);
         rdb(DDRA); t8 = cv | 8'h06; wr(DDRA, t8);
-        rdb(PRA);  if (cv[2:1] !== 2'b00) fail("PRA Rueckleseweg SEL/REQ");
-        wr(ICRA, 8'h90);                 // FLG-Interrupt freigeben
-        if (plip_rx_valid || int2) fail("Startzustand");
+        rdb(PRA);  if (cv[2:1] !== 2'b00) fail("PRA read-back path SEL/REQ");
+        wr(ICRA, 8'h90);                 // enable the FLG interrupt
+        if (plip_rx_valid || int2) fail("initial state");
 
-        $display("C1 SEND ueber echte CIA/Bridge");
+        $display("C1 SEND through the real CIA/bridge");
         for (k = 0; k < 4; k = k + 1) begin
             n = sizes[k];
             make_frame(n, 3 + k, 0);
             burst_send(n);
             if (!send_ok) fail("send");
             wait_rx_valid;
-            if (plip_rx_len !== n) begin $display("  rx_len=%0d erwartet %0d", plip_rx_len, n); fail("rx_len"); end
+            if (plip_rx_len !== n) begin $display("  rx_len=%0d expected %0d", plip_rx_len, n); fail("rx_len"); end
             host_read_rx(n);
             for (i = 0; i < n; i = i + 1) if (hrx[i] !== ref_[i]) begin
-                if (errors < 10) $display("  Byte %0d: %02x erwartet %02x", i, hrx[i], ref_[i]);
+                if (errors < 10) $display("  byte %0d: %02x expected %02x", i, hrx[i], ref_[i]);
                 errors = errors + 1;
             end
             release_rx;
             $display("  n=%0d ok", n);
         end
 
-        $display("C2 /ACK -> INT2 und RECV");
+        $display("C2 /ACK -> INT2 and RECV");
         for (k = 0; k < 4; k = k + 1) begin
             n = sizes[k];
             make_frame(n, 11 + k, 0);
@@ -242,17 +242,17 @@ module tb_cia_plip;
             check_icr_clear;
             burst_recv;
             if (!recv_ok) fail("recv");
-            if (rsize !== n) begin $display("  rsize=%0d erwartet %0d", rsize, n); fail("rsize"); end
+            if (rsize !== n) begin $display("  rsize=%0d expected %0d", rsize, n); fail("rsize"); end
             for (i = 0; i < n; i = i + 1) if (rf[i] !== ref_[i]) begin
-                if (errors < 10) $display("  Byte %0d: %02x erwartet %02x", i, rf[i], ref_[i]);
+                if (errors < 10) $display("  byte %0d: %02x expected %02x", i, rf[i], ref_[i]);
                 errors = errors + 1;
             end
             $display("  n=%0d ok", n);
         end
-        burst_recv;                      // leere Antwort
-        if (!recv_ok || rsize !== 0) fail("leerer RECV");
+        burst_recv;                      // empty reply
+        if (!recv_ok || rsize !== 0) fail("empty RECV");
 
-        $display("C3 Loopback (Ethertype $FFFD) ueber CIA");
+        $display("C3 loopback (ethertype $FFFD) through the CIA");
         plip_loop = 1;
         for (k = 0; k < 2; k = k + 1) begin
             make_frame(1514, 5 + k, 1);
@@ -264,36 +264,36 @@ module tb_cia_plip;
             t1 = $time;
             if (!recv_ok || rsize !== 1514) fail("loop recv");
             for (i = 0; i < 1514; i = i + 1) if (rf[i] !== ref_[i]) errors = errors + 1;
-            $display("  Runde %0d: %0d us, %0d KiB/s (beide Richtungen zusammen)", k, (t1 - t0) / 1000,
+            $display("  round %0d: %0d us, %0d KiB/s (both directions together)", k, (t1 - t0) / 1000,
                      (2.0 * 1514 * 1.0e9 / (t1 - t0)) / 1024.0);
         end
         plip_loop = 0;
 
-        $display("C3b Loopback ohne Host: fremde Rahmen duerfen nicht blockieren");
+        $display("C3b loopback without host: foreign frames must not block");
         plip_loop = 1; auto_rel = 1;
-        make_frame(61, 9, 0);                  // z.B. $FFFF-Online-Rahmen oder ARP: kein $FFFD
+        make_frame(61, 9, 0);                  // e.g. a $FFFF online frame or ARP: not $FFFD
         burst_send(61);
-        if (!send_ok) fail("fremder Rahmen: send");
+        if (!send_ok) fail("foreign frame: send");
         repeat (50) clk1;
-        if (plip_rx_valid) fail("rx_valid bleibt ohne Host");
+        if (plip_rx_valid) fail("rx_valid stays without host");
         make_frame(1514, 4, 1);
         burst_send(1514);
-        if (!send_ok) fail("Loopback nach fremdem Rahmen: send");
+        if (!send_ok) fail("loopback after foreign frame: send");
         wait_int2; check_icr_clear;
         burst_recv;
-        if (!recv_ok || rsize !== 1514) fail("Loopback nach fremdem Rahmen: recv");
+        if (!recv_ok || rsize !== 1514) fail("loopback after foreign frame: recv");
         for (i = 0; i < 1514; i = i + 1) if (rf[i] !== ref_[i]) errors = errors + 1;
         plip_loop = 0; auto_rel = 0;
 
-        $display("C4 Nebenwirkungen");
-        if (dtr !== 1'b1 || rts !== 1'b1) fail("DTR/RTS veraendert");
+        $display("C4 side effects");
+        if (dtr !== 1'b1 || rts !== 1'b1) fail("DTR/RTS changed");
         rdb(PRA);
         if (cv[7:6] !== 2'b11) fail("PRA Bit 7:6");
-        if (n_rd_pulse !== n_rd_drv) begin $display("  Strobes %0d, PRB-Lesezugriffe %0d", n_rd_pulse, n_rd_drv); fail("prb_rd Zaehlung"); end
-        $display("  prb_rd-Strobes %0d = PRB-Lesezugriffe %0d, CIA-Zugriffe %0d", n_rd_pulse, n_rd_drv, n_acc);
+        if (n_rd_pulse !== n_rd_drv) begin $display("  strobes %0d, PRB reads %0d", n_rd_pulse, n_rd_drv); fail("prb_rd count"); end
+        $display("  prb_rd strobes %0d = PRB reads %0d, CIA accesses %0d", n_rd_pulse, n_rd_drv, n_acc);
 
-        if (errors == 0) $display("PASS"); else $display("FAIL: %0d Fehler", errors);
+        if (errors == 0) $display("PASS"); else $display("FAIL: %0d errors", errors);
         $finish;
     end
-    initial begin #3000000000; $display("FAIL: Zeitlimit"); $finish; end   // 3 s Simulationszeit
+    initial begin #3000000000; $display("FAIL: time limit"); $finish; end   // 3 s of simulation time
 endmodule

@@ -1,20 +1,20 @@
 `timescale 1ns/100ps
-// Testbench fuer plip_peer: Treiber nach hwpar.asm (hwburstsend/hwburstrecv),
-// 1 CIA-Zugriff = 1 E-Takt = 40 Takte (28,57 MHz Takt, E = 1,40 us), bset/bclr = 2 Zugriffe.
+// Testbench for plip_peer: driver modelled on hwpar.asm (hwburstsend/hwburstrecv),
+// 1 CIA access = 1 E clock = 40 clocks (28.57 MHz clock, E = 1.40 us), bset/bclr = 2 accesses.
 module tb_plip_peer;
     parameter SLOT = 40;
-    localparam TMO_SLOTS = 20000;     // Treiber-Zeitueberschreitung (real 500 ms)
+    localparam TMO_SLOTS = 20000;     // driver timeout (500 ms on the real driver)
 
     reg clk = 0, rst = 1;
     always #17.5 clk = ~clk;
 
-    // ---- Amiga-Seite (CIA-Register)
+    // ---- Amiga side (CIA registers)
     reg        pra_sel = 0, pra_req = 0, ddra_sel = 0, ddra_req = 0;
     reg [7:0]  prb = 0, ddrb = 0;
     reg        prb_rd = 0;
     wire       rak, bus_oe, flag_n;
     wire [7:0] bus;
-    // ---- Host-Seite
+    // ---- host side
     reg        h_we = 0, h_commit = 0, h_release = 0, loop_en = 0;
     reg [10:0] h_waddr = 0, h_len = 0, h_raddr = 0;
     reg [7:0]  h_wdata = 0;
@@ -35,9 +35,9 @@ module tb_plip_peer;
     );
 
     integer errors = 0;
-    task fail(input [8*40-1:0] msg); begin errors = errors + 1; $display("FEHLER: %0s (t=%0t)", msg, $time); end endtask
+    task fail(input [8*40-1:0] msg); begin errors = errors + 1; $display("ERROR: %0s (t=%0t)", msg, $time); end endtask
 
-    // ---- Zeit
+    // ---- time
     task clk1; begin @(posedge clk); #1; end endtask
     task slot; integer k; begin for (k = 0; k < SLOT; k = k + 1) clk1; end endtask
 
@@ -45,7 +45,7 @@ module tb_plip_peer;
         pins = (ddrb == 8'hFF) ? prb : (bus_oe ? bus : 8'hEE);
     endfunction
 
-    // ---- Treiberbausteine
+    // ---- driver building blocks
     reg jitter = 0;
     task gap; integer k; begin if (jitter) for (k = {$random} % 3; k > 0; k = k - 1) slot; end endtask
     reg timeout;
@@ -62,7 +62,7 @@ module tb_plip_peer;
     endtask
 
     reg [7:0] rv;
-    task rd_prb;   // Lesezugriff auf PRB, danach prb_rd-Impuls
+    task rd_prb;   // read access to PRB, followed by a prb_rd pulse
         begin
             repeat (SLOT - 1) clk1;
             rv = pins(0);
@@ -74,7 +74,7 @@ module tb_plip_peer;
     task detach;  begin ddra_sel = 0; ddra_req = 0; pra_sel = 0; pra_req = 0; ddrb = 0; end endtask
     task exit_seq; begin slot; ddrb = 0; slot; slot; pra_req = 0; slot; slot; pra_sel = 0; end endtask
 
-    // Rahmen: fr[0..1] = Groesse, fr[2..] = Daten
+    // frame: fr[0..1] = size, fr[2..] = data
     reg [7:0] fr  [0:2051];
     reg [7:0] rcv [0:2051];
     reg [7:0] ref_ [0:2051];
@@ -87,13 +87,13 @@ module tb_plip_peer;
             for (i = 0; i < 2052; i = i + 1) begin fr[i] = 0; ref_[i] = 0; end
             fr[0] = n >> 8; fr[1] = n & 255;
             for (i = 0; i < n; i = i + 1) begin
-                ref_[i] = (i * 7 + seed) & 8'h7F;      // $FF-Bytes vermeiden, Ethertype wird extra gesetzt
+                ref_[i] = (i * 7 + seed) & 8'h7F;      // avoid $FF bytes, the ethertype is set separately
                 fr[2 + i] = ref_[i];
             end
         end
     endtask
 
-    // SEND_BURST; abort_w > 0: Treiber bricht nach abort_w Worten ab (SEL weg)
+    // SEND_BURST; abort_w > 0: the driver gives up after abort_w words (SEL released)
     reg send_ok;
     task burst_send(input integer abort_w, input [7:0] cmd);
         integer w, n, words;
@@ -202,12 +202,12 @@ module tb_plip_peer;
         begin g = 0; while (!rx_valid && g < 2000) begin clk1; g = g + 1; end end
     endtask
 
-    task wait_flag;   // wartet auf fallende /ACK-Flanke
+    task wait_flag;   // waits for the falling /ACK edge
         integer g;
-        begin g = 0; while (flag_n && g < 200000) begin clk1; g = g + 1; end if (flag_n) fail("kein /ACK-Puls"); end
+        begin g = 0; while (flag_n && g < 200000) begin clk1; g = g + 1; end if (flag_n) fail("no /ACK pulse"); end
     endtask
 
-    // Pulsmessung
+    // pulse measurement
     integer fl_cnt = 0, fl_last = 0, fl_pulses = 0;
     always @(posedge clk) begin
         if (!flag_n) fl_cnt <= fl_cnt + 1;
@@ -218,9 +218,9 @@ module tb_plip_peer;
     task idle_check(input [8*24-1:0] where);
         begin
             repeat (50) clk1;
-            if (dut.st !== 4'd0) begin $display("  Zustand %0d (%0s)", dut.st, where); fail("Automat nicht im Leerlauf"); end
-            if (rak !== 1'b0)    fail("RAK nicht 0");
-            if (bus_oe !== 1'b0) fail("Bus nicht frei");
+            if (dut.st !== 4'd0) begin $display("  state %0d (%0s)", dut.st, where); fail("state machine not idle"); end
+            if (rak !== 1'b0)    fail("RAK not 0");
+            if (bus_oe !== 1'b0) fail("bus not free");
         end
     endtask
 
@@ -239,7 +239,7 @@ module tb_plip_peer;
         repeat (5) clk1; rst = 0; repeat (5) clk1;
         attach;
 
-        // ---------- T1: Amiga sendet
+        // ---------- T1: Amiga sends
         $display("T1 SEND_BURST");
         for (t = 0; t < 5; t = t + 1) begin
             n = sizes_tx[t];
@@ -247,22 +247,22 @@ module tb_plip_peer;
             t0 = $time;
             burst_send(0, 8'h33);
             t1 = $time;
-            if (!send_ok) fail("send nicht ok");
+            if (!send_ok) fail("send not ok");
             wait_rx_valid;
-            if (!rx_valid) fail("rx_valid fehlt");
-            if (rx_len !== n) begin $display("  rx_len=%0d erwartet %0d", rx_len, n); fail("rx_len falsch"); end
+            if (!rx_valid) fail("rx_valid missing");
+            if (rx_len !== n) begin $display("  rx_len=%0d expected %0d", rx_len, n); fail("rx_len wrong"); end
             host_read_rx(n);
             for (i = 0; i < n; i = i + 1)
                 if (hrx[i] !== ref_[i]) begin
-                    if (errors < 10) $display("  Byte %0d: %02x erwartet %02x", i, hrx[i], ref_[i]);
+                    if (errors < 10) $display("  byte %0d: %02x expected %02x", i, hrx[i], ref_[i]);
                     errors = errors + 1;
                 end
             h_release = 1; clk1; h_release = 0;
-            idle_check("nach SEND");
-            $display("  n=%0d ok, %0d E-Takte", n, (t1 - t0) / 35 / SLOT);
+            idle_check("after SEND");
+            $display("  n=%0d ok, %0d E clocks", n, (t1 - t0) / 35 / SLOT);
         end
 
-        // ---------- T2: Amiga empfaengt (mit /ACK-Puls)
+        // ---------- T2: Amiga receives (with /ACK pulse)
         $display("T2 RECV_BURST");
         for (t = 0; t < 4; t = t + 1) begin
             n = sizes_rx[t];
@@ -271,51 +271,51 @@ module tb_plip_peer;
             host_write_tx(n);
             wait_flag;
             repeat (100) clk1;
-            if (fl_last !== 64) begin $display("  Pulsbreite %0d", fl_last); fail("Pulsbreite"); end
-            if (fl_pulses !== 1) fail("mehr als ein Puls");
+            if (fl_last !== 64) begin $display("  pulse width %0d", fl_last); fail("pulse width"); end
+            if (fl_pulses !== 1) fail("more than one pulse");
             burst_recv;
-            if (!recv_ok) fail("recv nicht ok");
-            if (rsize !== n) begin $display("  rsize=%0d erwartet %0d", rsize, n); fail("Groesse falsch"); end
+            if (!recv_ok) fail("recv not ok");
+            if (rsize !== n) begin $display("  rsize=%0d expected %0d", rsize, n); fail("size wrong"); end
             for (i = 0; i < n; i = i + 1)
                 if (rcv[i] !== ref_[i]) begin
-                    if (errors < 10) $display("  Byte %0d: %02x erwartet %02x", i, rcv[i], ref_[i]);
+                    if (errors < 10) $display("  byte %0d: %02x expected %02x", i, rcv[i], ref_[i]);
                     errors = errors + 1;
                 end
-            idle_check("nach RECV");
-            if (tx_valid) fail("tx_valid nicht geloescht");
+            idle_check("after RECV");
+            if (tx_valid) fail("tx_valid not cleared");
             $display("  n=%0d ok", n);
         end
         repeat (400) clk1;
-        if (fl_pulses !== 1) begin $display("  Pulse nach letztem RECV %0d", fl_pulses); fail("Puls nach RECV"); end
+        if (fl_pulses !== 1) begin $display("  pulses after the last RECV %0d", fl_pulses); fail("pulse after RECV"); end
 
-        // ---------- T3: RECV ohne wartenden Rahmen -> Groesse 0
-        $display("T3 RECV leer");
+        // ---------- T3: RECV without a waiting frame -> size 0
+        $display("T3 RECV empty");
         burst_recv;
-        if (!recv_ok || rsize !== 0) fail("leere Antwort");
-        idle_check("nach leerem RECV");
+        if (!recv_ok || rsize !== 0) fail("empty reply");
+        idle_check("after empty RECV");
 
-        // ---------- T4: Abbruch mitten im Burst, danach normaler Transfer
-        $display("T4 Abbruch");
+        // ---------- T4: abort in the middle of a burst, then a normal transfer
+        $display("T4 abort");
         make_frame(300, 3);
         burst_send(40, 8'h33);
-        idle_check("nach Abbruch");
-        if (rx_valid) fail("rx_valid nach Abbruch");
+        idle_check("after abort");
+        if (rx_valid) fail("rx_valid after abort");
         make_frame(61, 7);
         burst_send(0, 8'h33);
         wait_rx_valid; host_read_rx(61);
         for (i = 0; i < 61; i = i + 1) if (hrx[i] !== ref_[i]) errors = errors + 1;
         h_release = 1; clk1; h_release = 0;
-        idle_check("nach Abbruch+Send");
+        idle_check("after abort+send");
 
-        // ---------- T5: kein Treiber (DDRA-Bits 0), PRA-Bits trotzdem 1
-        $display("T5 ohne Treiber");
+        // ---------- T5: no driver (DDRA bits 0), PRA bits still 1
+        $display("T5 no driver");
         detach; pra_sel = 1; pra_req = 0; ddrb = 8'hFF; prb = 8'h33;
         repeat (500) clk1;
-        if (dut.st !== 4'd0 || rak !== 1'b0) fail("reagiert ohne Treiber");
+        if (dut.st !== 4'd0 || rak !== 1'b0) fail("reacts without a driver");
         pra_sel = 0; ddrb = 0; attach;
 
-        // ---------- T6: Rueckstau (rx_valid nicht freigegeben)
-        $display("T6 Rueckstau");
+        // ---------- T6: back pressure (rx_valid not released)
+        $display("T6 back pressure");
         make_frame(100, 11);
         burst_send(0, 8'h33);
         wait_rx_valid;
@@ -324,32 +324,32 @@ module tb_plip_peer;
             burst_send(0, 8'h33);
             begin
                 repeat (200 * SLOT) clk1;
-                if (rak !== 1'b0 || dut.st !== 4'd3) fail("kein Rueckstau");
-                host_read_rx(100);   // altes Paket noch intakt?
+                if (rak !== 1'b0 || dut.st !== 4'd3) fail("no back pressure");
+                host_read_rx(100);   // old packet still intact?
                 h_release = 1; clk1; h_release = 0;
             end
         join
-        if (!send_ok) fail("send nach Rueckstau");
+        if (!send_ok) fail("send after back pressure");
         wait_rx_valid;
-        if (rx_len !== 120) fail("zweiter Rahmen: Laenge");
+        if (rx_len !== 120) fail("second frame: length");
         host_read_rx(120);
         for (i = 0; i < 120; i = i + 1) if (hrx[i] !== ref_[i]) errors = errors + 1;
         h_release = 1; clk1; h_release = 0;
-        idle_check("nach Rueckstau");
+        idle_check("after back pressure");
 
-        // ---------- T7: unbekannter Befehl ($11 = langsame Variante)
-        $display("T7 Befehl $11");
+        // ---------- T7: unknown command ($11 = slow variant)
+        $display("T7 command $11");
         make_frame(60, 1);
-        burst_send(0, 8'h11);           // RAK bleibt 0, Treiber laeuft in die Zeitueberschreitung
-        if (send_ok) fail("Befehl $11 darf nicht quittiert werden");
-        idle_check("nach $11");
+        burst_send(0, 8'h11);           // RAK stays 0, the driver runs into its timeout
+        if (send_ok) fail("command $11 must not be acknowledged");
+        idle_check("after $11");
         make_frame(60, 2);
         burst_send(0, 8'h33);
-        if (!send_ok) fail("send nach $11");
+        if (!send_ok) fail("send after $11");
         wait_rx_valid; h_release = 1; clk1; h_release = 0;
-        idle_check("nach $11+Send");
+        idle_check("after $11+send");
 
-        // ---------- T8: Loopback (Ethertype $FFFD), ohne Host, Ratenmessung
+        // ---------- T8: loopback (ethertype $FFFD), no host, rate measurement
         $display("T8 Loopback");
         loop_en = 1;
         make_frame(1514, 23);
@@ -361,27 +361,27 @@ module tb_plip_peer;
             if (!recv_ok || rsize !== 1514) fail("loop recv");
             for (i = 0; i < 1514; i = i + 1)
                 if (rcv[i] !== ref_[i]) begin
-                    if (errors < 10) $display("  it %0d Byte %0d: %02x erwartet %02x", it, i, rcv[i], ref_[i]);
+                    if (errors < 10) $display("  it %0d byte %0d: %02x expected %02x", it, i, rcv[i], ref_[i]);
                     errors = errors + 1;
                 end
             fr[0] = rsize >> 8; fr[1] = rsize & 255;
             for (i = 0; i < 1514; i = i + 1) fr[2 + i] = rcv[i];
             burst_send(0, 8'h33);
             if (!send_ok) fail("loop send");
-            if (it > 0) $display("  Runde %0d: %0d Takte = %0.2f ms, %0.0f KiB/s (beide Richtungen zusammen)",
+            if (it > 0) $display("  round %0d: %0d clocks = %0.2f ms, %0.0f KiB/s (both directions together)",
                                  it, rt_clks, rt_clks * 35.0 / 1.0e6, 2.0 * 1514 / (rt_clks * 35.0e-9) / 1024);
         end
-        wait_flag;                       // der zuletzt zurueckgespielte Rahmen wartet noch
+        wait_flag;                       // the frame echoed last is still waiting
         burst_recv;
-        if (!recv_ok || rsize !== 1514) fail("Loopback: Restrahmen");
+        if (!recv_ok || rsize !== 1514) fail("loopback: remaining frame");
         repeat (200) clk1;
-        if (rx_valid) fail("Loopback hat den Host belastet");
+        if (rx_valid) fail("loopback loaded the host");
         $display("  stat_rx=%0d stat_tx=%0d", stat_rx, stat_tx);
-        if (stat_rx !== 13 || stat_tx !== 9) fail("Zaehler");
+        if (stat_rx !== 13 || stat_tx !== 9) fail("counters");
         loop_en = 0;
 
-        // ---------- T9: Luecken zwischen den CIA-Zugriffen (DMA-Wartezyklen)
-        $display("T9 Luecken im Burst");
+        // ---------- T9: gaps between CIA accesses (DMA wait cycles)
+        $display("T9 gaps in the burst");
         jitter = 1;
         for (t = 0; t < 3; t = t + 1) begin
             n = (t == 0) ? 1514 : (t == 1) ? 61 : 14;
@@ -396,7 +396,7 @@ module tb_plip_peer;
             burst_recv;
             if (!recv_ok || rsize !== n) fail("jitter recv");
             for (i = 0; i < n; i = i + 1) if (rcv[i] !== ref_[i]) errors = errors + 1;
-            idle_check("nach Luecken");
+            idle_check("after gaps");
             $display("  n=%0d ok", n);
         end
         jitter = 0;
@@ -417,7 +417,7 @@ module tb_plip_peer;
         idle_check("after 2048");
 
         $display("----");
-        if (errors == 0) $display("PASS"); else $display("FAIL: %0d Fehler", errors);
+        if (errors == 0) $display("PASS"); else $display("FAIL: %0d errors", errors);
         $finish;
     end
 
