@@ -401,6 +401,21 @@ module tb_plip_peer;
         end
         jitter = 0;
 
+        // ---------- T10: size limit (2047 bytes is the largest frame rx_len can report)
+        $display("T10 size limit");
+        make_frame(2047, 4);
+        burst_send(0, 8'h33);
+        if (!send_ok) fail("2047 byte frame refused");
+        wait_rx_valid;
+        if (rx_len !== 11'd2047) fail("rx_len of the 2047 byte frame");
+        h_release = 1; clk1; h_release = 0;
+        idle_check("after 2047");
+        make_frame(2048, 5);
+        burst_send(0, 8'h33);
+        if (send_ok) fail("2048 byte frame accepted");
+        if (rx_valid) fail("rx_valid after 2048 byte frame");
+        idle_check("after 2048");
+
         $display("----");
         if (errors == 0) $display("PASS"); else $display("FAIL: %0d Fehler", errors);
         $finish;

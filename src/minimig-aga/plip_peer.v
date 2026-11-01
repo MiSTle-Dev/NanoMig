@@ -153,7 +153,7 @@ module plip_peer #(
                      (bsel == 2'd1) ? size[7:0]  : txq;
 
     wire [11:0] size_even = (size[11:0] + 12'd1) & 12'hFFE;
-    wire        size_bad  = (size == 16'd0) || (size > 16'd2048);
+    wire        size_bad  = (size == 16'd0) || (size > 16'd2047);   // rx_len has 11 bits
 
     // ---------------------------------------------------------------- Automat
     always @(posedge clk) begin
