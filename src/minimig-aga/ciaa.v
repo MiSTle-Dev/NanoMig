@@ -96,6 +96,12 @@ module ciaa
 	output [3:0] porta_out,     // porta out
 	input  [7:0] portb_in,      // portb in
 
+`ifdef ENABLE_PLIP
+	input        plip_en,       // virtual parallel port (plipbox) active
+	input        plip_flag,     // /ACK pulse from the virtual port (active high)
+	output [7:0] plip_prb,      // PRB output register
+	output [7:0] plip_ddrb,     // DDRB
+`endif
 	input        kms_level,
 	input  [1:0] kbd_mouse_type,
 	input  [7:0] kbd_mouse_data,
@@ -269,19 +275,23 @@ assign porta_out[3:0] = {(~ddrporta[7:6] | regporta[3:2]), (~ddrporta[1:0] | reg
 //----------------------------------------------------------------------------------
 // portb
 //----------------------------------------------------------------------------------
-//reg [7:0] regportb;
+`ifdef ENABLE_PLIP
+reg [7:0] regportb;
+`endif
 reg [7:0] ddrportb;
 
-/*
+`ifdef ENABLE_PLIP
 // writing of output port
 always @(posedge clk)
   if (clk7_en) begin
     if (reset)
       regportb[7:0] <= 8'd0;
     else if (wr && prb)
-      regportb[7:0] <= (data_in[7:0]);
+      regportb[7:0] <= data_in[7:0];
   end
-*/
+assign plip_prb  = regportb;
+assign plip_ddrb = ddrportb;
+`endif
 
 // writing of ddr register
 always @(posedge clk)
@@ -296,7 +306,11 @@ always @(posedge clk)
 always @(*)
 begin
   if (!wr && prb)
+`ifdef ENABLE_PLIP
+    pb_out[7:0] = plip_en ? ((ddrportb & regportb) | (~ddrportb & portb_in[7:0])) : portb_in[7:0];
+`else
     pb_out[7:0] = portb_in[7:0];
+`endif
   else if (!wr && ddrb)
     pb_out[7:0] = (ddrportb[7:0]);
   else
@@ -323,7 +337,11 @@ cia_int cnt
   .ta(ta),
   .tb(tb),
   .alrm(alrm),
+`ifdef ENABLE_PLIP
+  .flag(plip_flag),
+`else
   .flag(1'b0),
+`endif
   .ser(keystrobe | ser_tx_irq),
   .data_in(data_in),
   .data_out(icr_out),

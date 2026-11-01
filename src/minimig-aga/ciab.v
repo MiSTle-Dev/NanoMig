@@ -18,7 +18,14 @@ module ciab
   output   irq,           // interrupt request out
   input  [5:0] porta_in,   // input port
   output   [7:6] porta_out,  // output port
-  output  [7:0] portb_out    // output port
+`ifdef ENABLE_PLIP
+  output  [7:0] portb_out,    // output port
+  input         plip_en,      // virtual parallel port (plipbox) active
+  output  [2:1] plip_pra,     // PRA output register bits 2:1 (POUT, SEL)
+  output  [2:1] plip_ddra     // DDRA bits 2:1
+`else
+  output  [7:0] portb_out     // output port
+`endif
 );
 
 // local signals
@@ -115,7 +122,15 @@ always @(posedge clk)
 always @(*)
 begin
   if (!wr && pra)
+`ifdef ENABLE_PLIP
+    // outputs read back their driven level (needed for bset/bclr on SEL/POUT)
+    pa_out[7:0] = {porta_out[7:6],porta_in2[5:3],
+                   (plip_en & ddrporta[2]) ? regporta[2] : porta_in2[2],
+                   (plip_en & ddrporta[1]) ? regporta[1] : porta_in2[1],
+                   porta_in2[0]};
+`else
     pa_out[7:0] = {porta_out[7:6],porta_in2[5:0]};
+`endif
   else if (!wr && ddra)
     pa_out[7:0] = ddrporta[7:0];
   else
@@ -124,6 +139,10 @@ end
 
 // assignment of output port while keeping in mind that the original 8520 uses pull-ups
 assign porta_out[7:6] = (~ddrporta[7:6]) | regporta[7:6];
+`ifdef ENABLE_PLIP
+assign plip_pra  = regporta[2:1];
+assign plip_ddra = ddrporta[2:1];
+`endif
 
 //----------------------------------------------------------------------------------
 // portb
