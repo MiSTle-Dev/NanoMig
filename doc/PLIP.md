@@ -3,9 +3,9 @@
 PLIP connects the Amiga to the network through the parallel port. The FPGA-Companion forwards the traffic to your WiFi/LAN, and the router does the NAT. The Amiga looks like a normal host of your network.
 
 ## Requirements
-- NanoMig core built with `ENABLE_PLIP`: uncomment ``define ENABLE_PLIP`` in `src/tang/nano20k/top.sv` (FX68K) or `top_020.sv` (TG68K/020).
-- PLIP needs about 2 BSRAM and some hundred LUTs. If the design no longer fits, disable `ENABLE_DRIVE_SOUNDS` and/or `ENABLE_AT_MODEM` (and on the 020 build also enable `NO_WS2812`).
-- On the 020 build, additionally uncomment ``define PLIP_LITE``. It drops the statistics and the loopback test, which saves logic. The `[PLIP] LOOPBACK` option then has no effect.
+- NanoMig core built with `ENABLE_PLIP` (PLIP needs about 2 BSRAM and some hundred LUTs):
+  - FX68K build (`src/tang/nano20k/top.sv`): PLIP is off by default. Uncomment `` `define ENABLE_PLIP ``. If the design no longer fits, disable `ENABLE_DRIVE_SOUNDS` and/or `ENABLE_AT_MODEM`.
+  - TG68K/020 build (`src/tang/nano20k/top_020.sv`): `` `define ENABLE_PLIP `` and `` `define PLIP_LITE `` are enabled. `PLIP_LITE` drops the statistics and the loopback test to save logic, so the `[PLIP] LOOPBACK` option has no effect. This build is very tight on the GW2AR-18: `ENABLE_DRIVE_SOUNDS` and `ENABLE_AT_MODEM` are off, and if the design does not fit, enable `NO_WS2812` as well.
 - FPGA-Companion firmware with PLIP support (branch `plip`), running on a Pico W or Pico 2 W that is connected to your WiFi.
 - Roadshow on the Amiga, plus `plipbox.device`.
 
