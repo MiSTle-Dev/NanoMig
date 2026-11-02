@@ -93,13 +93,13 @@ wire [54:0] htiming0 =
 	    htiming0n;   
    
 // native progressive video: frame size follows the amiga, 576 visible lines
-// unless the frame is too short for that (e.g. 525 line DblNTSC modes). No CEA
+// unless the frame is too short for that (e.g. 525 line DblNTSC modes, < 589 lines). No CEA
 // video id (0) as these timings are not part of any CEA mode.
 wire        nat = NATIVE && native;
 wire [54:0] htiming_n = (screen==2'd2)?{ 11'd0, native_width, 11'd832, 11'd24, 11'd48 }:
                         (screen==2'd1)?{ 11'd0, native_width, 11'd768, 11'd24, 11'd72 }:
                                        { 11'd0, native_width, 11'd720, 11'd24, 11'd72 };
-wire [39:0] vtiming_n = { native_height, (native_height >= 10'd600)?10'd576:10'd480, 10'd5, 10'd5 };
+wire [39:0] vtiming_n = { native_height, (native_height >= 10'd589)?10'd576:10'd480, 10'd5, 10'd5 };
 
 wire [102:0]  timing = nat      ?{ htiming_n, vtiming_n, 8'd0 }:
                        pal_mode ?{  htiming0, vtiming0, cea0 }:
