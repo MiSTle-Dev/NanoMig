@@ -110,12 +110,15 @@ always @(posedge clk) begin
     // account for back porches to adjust image position within the
     // HDMI frame. Center screen according to screen type standard (0),
     // overscan (1) or wide (2). Native video is not compressed by the
-    // scandoubler, so it has longer back porches. The window starts 234 clocks
+    // scandoubler, so it has longer back porches. The window starts 270 clocks
     // (hsync + back porch of the HDMI timing) after hsync and 10 lines after vsync
-    // (both measured on hardware, DblPAL 625p). The position of the picture within
-    // the line is set by the Amiga (DIWSTRT/overscan prefs), the HBSTRT/HBSTOP
-    // tooltypes of the monitor driver did not move it in tests.
-    if( hcnt == (nat ? ((screen==2'd2)?178:(screen==2'd1)?210:234) :
+    // (measured on hardware, DblPAL 625p). 270 = 234 + 36: with the 720 clock window
+    // the display window (DIWSTRT) of the Amiga starts about 36 clocks after the old
+    // window start, so the right 36 pixels of a 720 pixel screen were cut off.
+    // The position of the picture within the line is set by the Amiga
+    // (DIWSTRT/overscan prefs), the HBSTRT/HBSTOP tooltypes of the monitor driver
+    // did not move it in tests.
+    if( hcnt == (nat ? ((screen==2'd2)?214:(screen==2'd1)?246:270) :
                        ((screen==2'd2)? 88:(screen==2'd1)?120:162)) &&
         vcnt == (nat ? 10 : 46) && changed) begin
         vreset <= 1'b1;
