@@ -21,7 +21,6 @@
 `define DENISE_EBR   // block ram based bitplane and sprite buffers, saves logic
 `define DISABLE_ROM_LOADER // drop the rom loader to make room 
 // `define ENABLE_AT_MODEM // serial port <-> virtual AT modem of the FPGA Companion (replaces the midi_in pin)
-// `define ENABLE_DRIVE_SOUNDS
 // `define HQ_DRIVE_SOUNDS // drive sounds: with = tone bursts (drive_sounds_hq), without = single click (drive_sounds_min, fewer LEs)
 
 module top(
@@ -1179,7 +1178,6 @@ ELVDS_OBUF tmds_bufds [3:0] (
 );
 
 // ========================= Drive Sounds =========================
-`ifdef ENABLE_DRIVE_SOUNDS	
 `ifdef HQ_DRIVE_SOUNDS
 drive_sounds_hq drive_sounds_inst (
     .clk     (clk_pixel),
@@ -1200,7 +1198,6 @@ drive_sounds_min drive_sounds_inst (
     .buzzer  (buzzer)
 );
 `endif // HQ_DRIVE_SOUNDS
-`endif
    
 endmodule
 
