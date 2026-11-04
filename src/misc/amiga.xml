@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Amiga/NanoMig configuration -->
-<config name="NanoMig" version="0">
+<config name="NanoMig" version="0" core_version="v0.19-beta">
   <actions>
     <!-- the init action is being executed immediately -->
     <!-- when this file has been loaded -->
@@ -41,7 +41,10 @@
 	<!--IS tang_nano20k_020 -->
   		<menu label="NanoMig 1200">
   	<!--END-->
-	<!--NOT tang_nano20k tang_nano20k_020 -->
+	<!--IS tang_nano20k_lcd -->
+  		<menu label="NanoMig 1200 LCD">
+  	<!--END-->
+	<!--NOT tang_nano20k tang_nano20k_020 tang_nano20k_lcd -->
   		<menu label="NanoMig">
   	<!--END-->
 			
