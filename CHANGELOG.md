@@ -19,7 +19,7 @@
 
 - Modem and PPP serial connection to the Companions WiFi
 
-### NanoMig Release v0.16-beta - Config Selector 
+### NanoMig Release v0.16-beta - WiFi
 
 - working **WiFi** for Pi-Pico W and Pico2 W
 - Companion FTP server
