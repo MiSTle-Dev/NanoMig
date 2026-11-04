@@ -178,7 +178,7 @@
       </list>
 	  <!--END-->
 	  <!-- Companion on Pi Pico W: serial port is either a hayes (AT) modem or a PPP server -->
-      <!--IS tang_nano20k_020 tang_nano20k --> 
+      <!--IS tang_nano20k_PPP --> 
       <list label="Serial:" id="N" default="0">
     <listentry label="AT modem" value="0"/>
     <listentry label="PPP" value="1"/>
