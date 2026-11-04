@@ -98,6 +98,7 @@ module cpu_wrapper
 	output		  cpu_clkena  // the tg68k advances on this enable (bus handshake consumption)
 );
 
+reg         skip_fetch;
 wire cpu_req = cpustate != 2'b01 && !skip_fetch;
 
 reg  [31:0] cpu_addr;
@@ -228,6 +229,7 @@ assign fastchip_rnw = wr;
 wire	  sel_autoconfig;
 reg [1:0] autocfg_card;
 reg [3:0] autocfg_data;
+reg  [15:0] chip_data;
 
 wire [15:0] cpu_din = ramsel ? ramdat :
 `ifdef FASTCHIP_DEPRECATED
@@ -235,9 +237,7 @@ wire [15:0] cpu_din = ramsel ? ramdat :
 `endif
 	    {sel_autoconfig ? autocfg_data : chip_data[15:12], chip_data[11:0]};
 
-reg         skip_fetch;
 wire        skip_fetch_i;
-reg  [15:0] chip_data;
 
 wire [15:0] cpu_dout_o;
 wire [23:1] cpu_addr_o;

@@ -1201,8 +1201,8 @@ ELVDS_OBUF tmds_bufds [3:0] (
 );
 
 // ========================= Drive Sounds =========================
-`ifdef ENABLE_DRIVE_SOUNDS	
-drive_sounds drive_sounds_inst (
+`ifdef HQ_DRIVE_SOUNDS
+drive_sounds_hq drive_sounds_inst (
     .clk     (clk_pixel),
     .aclk_tick (aclk_tick),
 	.enable  (osd_drive_sounds),
@@ -1211,7 +1211,16 @@ drive_sounds drive_sounds_inst (
 	.fdd_step_n (fdd_step_n),
     .buzzer  (buzzer)
 );
-`endif
+`else
+drive_sounds_min drive_sounds_inst (
+    .clk     (clk_pixel),
+    .aclk_tick (aclk_tick),
+	.enable  (osd_drive_sounds),
+    .hdd_led (leds[2]),
+	.fdd_step_n (fdd_step_n),
+    .buzzer  (buzzer)
+);
+`endif // HQ_DRIVE_SOUNDS
    
 endmodule
 
