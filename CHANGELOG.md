@@ -14,9 +14,12 @@
 ### NanoMig Release v0.18-beta - Config Selector 
 
 - **Config Management**, create, modify or delete unlimited numbers of configurations  
-  
 
-### NanoMig Release v0.17-beta - Config Selector 
+### NanoMig Release v0.1-beta - AT-Modem
+
+- Modem and PPP serial connection to the Companions WiFi
+
+### NanoMig Release v0.16-beta - Config Selector 
 
 - working **WiFi** for Pi-Pico W and Pico2 W
 - Companion FTP server
