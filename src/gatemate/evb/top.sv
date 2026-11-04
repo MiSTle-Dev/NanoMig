@@ -424,6 +424,7 @@ wire [1:0] kbd_mouse_type;
 wire [7:0] kbd_mouse_data;  
 
 wire keyboard_ack;
+wire vs_n;
 
 hid hid (
         .clk(clk_28m),
@@ -494,7 +495,7 @@ sysctrl sysctrl (
 );
    
 // digital 12 bit video
-wire hs_n, vs_n;
+wire hs_n;
 wire [3:0] red;
 wire [3:0] green;
 wire [3:0] blue;

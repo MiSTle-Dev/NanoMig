@@ -56,6 +56,10 @@ reg [1:0] keyboard_vsync_d;
 reg keyboard_busy;
 reg keyboard_aged;
 
+reg [3:0] state;
+reg [7:0] command;
+wire [6:0] amiga_keycode;
+
 wire mouse_event = data_in_strobe && !data_in_start &&
                    command == 8'd2 && state >= 4'd1 && state <= 4'd3;
 
@@ -115,8 +119,6 @@ always @(posedge clk) begin
    end
 end
 
-reg [3:0] state;
-reg [7:0] command;
 reg [7:0] device;   // used for joystick
 
 reg irq_enable;
@@ -130,7 +132,6 @@ reg ramiga_down;
 reg kbd_combo_prev;
 wire kbd_combo_now;
 
-wire [6:0] amiga_keycode;
 keymap keymap (
  .code  ( data_in[6:0]  ),
  .amiga ( amiga_keycode )
