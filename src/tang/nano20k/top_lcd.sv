@@ -21,7 +21,10 @@
 // `define NO_WS2812   // drop the rgb status led to make room for cache + ide
 `define DENISE_EBR   // block ram based bitplane and sprite buffers, saves logic
 `define DISABLE_ROM_LOADER // drop the rom loader to make room 
-// `define ENABLE_DRIVE_SOUNDS
+// `define ENABLE_AT_MODEM // serial port <-> virtual AT modem of the FPGA Companion (replaces the midi_in pin)
+// `define ENABLE_PLIP // virtual parallel port: network via plipbox.device and the FPGA Companion, see doc/PLIP.md
+// `define PLIP_LITE   // PLIP without statistics and loopback test, saves logic (needed for the 020 build)
+// `define HQ_DRIVE_SOUNDS // drive sounds: with = tone bursts (drive_sounds_hq), without = single click (drive_sounds_min, fewer LEs)
 
 module top(
   input			clk,
@@ -1078,17 +1081,26 @@ assign hp_ws = nanomig_reset?1'b0:audio_bit_cnt[4];
 assign hp_din = nanomig_reset?1'b0:audio[15-audio_bit_cnt[3:0]];
 
 // ========================= Drive Sounds =========================
-`ifdef ENABLE_DRIVE_SOUNDS
-drive_sounds drive_sounds_inst (
+`ifdef HQ_DRIVE_SOUNDS
+drive_sounds_hq drive_sounds_inst (
     .clk     (clk_pixel),
     .aclk_tick (aclk_tick),
 	.enable  (osd_drive_sounds),
     //.fdd_led (leds[1]),
     .hdd_led (leds[2]),
-    .fdd_step_n (fdd_step_n),
+	.fdd_step_n (fdd_step_n),
     .buzzer  (buzzer)
 );
-`endif
+`else
+drive_sounds_min drive_sounds_inst (
+    .clk     (clk_pixel),
+    .aclk_tick (aclk_tick),
+	.enable  (osd_drive_sounds),
+    .hdd_led (leds[2]),
+	.fdd_step_n (fdd_step_n),
+    .buzzer  (buzzer)
+);
+`endif // HQ_DRIVE_SOUNDS
    
 endmodule
 
