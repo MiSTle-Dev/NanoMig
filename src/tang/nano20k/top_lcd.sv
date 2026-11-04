@@ -1081,17 +1081,26 @@ assign hp_ws = nanomig_reset?1'b0:audio_bit_cnt[4];
 assign hp_din = nanomig_reset?1'b0:audio[15-audio_bit_cnt[3:0]];
 
 // ========================= Drive Sounds =========================
-`ifdef ENABLE_DRIVE_SOUNDS
+`ifdef HQ_DRIVE_SOUNDS
 drive_sounds_hq drive_sounds_inst (
     .clk     (clk_pixel),
     .aclk_tick (aclk_tick),
 	.enable  (osd_drive_sounds),
     //.fdd_led (leds[1]),
     .hdd_led (leds[2]),
-    .fdd_step_n (fdd_step_n),
+	.fdd_step_n (fdd_step_n),
     .buzzer  (buzzer)
 );
-`endif
+`else
+drive_sounds_min drive_sounds_inst (
+    .clk     (clk_pixel),
+    .aclk_tick (aclk_tick),
+	.enable  (osd_drive_sounds),
+    .hdd_led (leds[2]),
+	.fdd_step_n (fdd_step_n),
+    .buzzer  (buzzer)
+);
+`endif // HQ_DRIVE_SOUNDS
    
 endmodule
 
