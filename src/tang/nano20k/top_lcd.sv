@@ -168,6 +168,17 @@ wire 	   osd_drive_sounds;   	// 0 = disabled, 1 = enabled
 
 // wire	   rom_download_in_progress;
 	
+// kbd_reset is a single clk_28m pulse. Stretch it so the core sees a
+// reset of about 2.3 ms (same as the former reset_cnt)
+reg [15:0] kbd_rst_cnt = 16'd0;
+
+always @(posedge clk_28m) begin
+    if (kbd_reset)
+        kbd_rst_cnt <= 16'hffff;
+    else if (kbd_rst_cnt != 16'd0)
+        kbd_rst_cnt <= kbd_rst_cnt - 16'd1;
+end
+
 // this is the reset that goes into the nanomig itself
 reg nanomig_reset = 1;
 
@@ -175,7 +186,7 @@ always @(posedge clk_28m, posedge rst_28m) begin
     if (rst_28m)
         nanomig_reset <= 1'b1;
     else
-        nanomig_reset <= !rom_done || reset || osd_reset || kbd_reset
+        nanomig_reset <= !rom_done || reset || osd_reset || (kbd_rst_cnt != 16'd0)
 `ifndef DISABLE_ROM_LOADER
                              || rom_download_in_progress
 `endif
