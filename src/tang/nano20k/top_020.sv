@@ -21,7 +21,6 @@
 `define DENISE_EBR   // block ram based bitplane and sprite buffers, saves logic
 `define DISABLE_ROM_LOADER // drop the rom loader to make room 
 // `define ENABLE_AT_MODEM // serial port <-> virtual AT modem of the FPGA Companion (replaces the midi_in pin)
-// `define ENABLE_DRIVE_SOUNDS
 `define ENABLE_PLIP // virtual parallel port: network via plipbox.device and the FPGA Companion, see doc/PLIP.md
 `define PLIP_LITE   // PLIP without statistics and loopback test, saves logic (needed for the 020 build)
 
