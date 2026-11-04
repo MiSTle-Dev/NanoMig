@@ -35,16 +35,7 @@
     </action>      
   </actions>
 
-  	<!--NOT tang_nano20k tang_nano20k_020 -->
-  		<menu label="NanoMig">
-  	<!--END-->
-	<!--IS tang_nano20k -->
-  		<menu label="NanoMig 500+">
-  	<!--END-->
-	<!--NOT tang_nano20k_020 -->
-  		<menu label="NanoMig 1200">
-  	<!--END-->
-	
+	<menu label="NanoMig">	
     <fileselector label="Floppy DF0:" ext="adf" index="0"/>
 	<cfgselector label="Config" ext="amiga.ini" default="amiga.ini"/>
     <menu label="System">
