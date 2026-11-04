@@ -219,10 +219,6 @@ always @(posedge clk) begin
 end
 
 assign rdram = bplcon2[8] & aga;
-assign rgb_out = (reg_address_in[8:6] == COLORBASE[8:6]) && rdram
-                   ? {4'b0000, loct ? {clut_rgb[19:16], clut_rgb[11:8], clut_rgb[3:0]}
-                                    : {clut_rgb[23:20], clut_rgb[15:12], clut_rgb[7:4]}}
-                   : 16'h0000;
 assign killehb = bplcon2[9] & ecs;
 
 // BPLCON3 register
@@ -236,6 +232,13 @@ wire          brdntran;   // border area is non-transparent; disabled when ECSEN
 wire          zdclken;    // zd pin ??
 wire          brdsprt;    // enable srpites outside the display window; disabled when ECSENA is low
 wire          extblken;   // causes blank output to be programmable; disabled when ECSENA is low
+
+wire  [24-1:0] clut_rgb;    // colour table rgb data out
+
+assign rgb_out = (reg_address_in[8:6] == COLORBASE[8:6]) && rdram
+                   ? {4'b0000, loct ? {clut_rgb[19:16], clut_rgb[11:8], clut_rgb[3:0]}
+                                    : {clut_rgb[23:20], clut_rgb[15:12], clut_rgb[7:4]}}
+                   : 16'h0000;
 
 always @(posedge clk) begin
   if (clk7_en) begin
@@ -481,7 +484,6 @@ denise_spritepriority spm0
 );
 
 // instantiate colour look up table
-wire  [24-1:0] clut_rgb;    // colour table rgb data out
 wire           ehb_en;      // ehb enable
 
 assign ehb_en = !killehb && !a1k && !ham && !dpf && (l_bpu == 4'd6);
