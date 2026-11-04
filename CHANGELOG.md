@@ -19,5 +19,8 @@
 **NanoMig Release v0.17-beta** - Config Selector 
 
 - working **WiFi** for Pi-Pico W and Pico2 W
+- Companion FTP server
+- Telnet Debugging
+- NTP sync
 - SD write bug fixed
   
