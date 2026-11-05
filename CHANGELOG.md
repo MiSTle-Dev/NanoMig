@@ -1,6 +1,6 @@
 ### NanoMig Release v0.19-beta - Fast Internet
 
-- A1200: **plipbox.device** parallel connection for fast networking, 10x speedup over serial
+- A1200: **plipbox.device** parallel connection for fast networking, 10x speedup over serial  
   supports NTP, FTP, SMB, Telnet, E-Mail, WWW etc.
 - A500+: **ppp-serial.device** for PPP and AT-Modem support
 - support for **Double PAL** and **Double NTSC** screenmodes, bypassing the Scandoubler
