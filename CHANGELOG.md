@@ -15,7 +15,7 @@
 
 - **Config Management**, create, modify or delete unlimited numbers of configurations  
 
-### NanoMig Release v0.1-beta - AT-Modem
+### NanoMig Release v0.17-beta - AT-Modem
 
 - Modem and PPP serial connection to the Companions WiFi
 
