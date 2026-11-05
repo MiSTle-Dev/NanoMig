@@ -5,8 +5,6 @@
 //   copper and other dma runs on hpos[0] == 1
 //   cpu runs in hpos[0] == 0
 // -> run cpu on unused hpos[0] == 1 for turbo
-// TODO:
-// - check IDE head adressing heads[0] vs heads[drive]
 module nanomig (
    input	 clk_sys,
    input	 reset,
@@ -730,7 +728,7 @@ always @(posedge clk_sys) begin
          // should prevent that
          $display("IDE%0d RD %0d/%0d/%0d -> %0d", ide_drv,
                   ide_cylinder, ide_head, ide_sector,
-                  (ide_cylinder * heads[0] + ide_head) * sectors[0] +
+                  (ide_cylinder * heads[ide_drv] + ide_head) * sectors[ide_drv] +
                   ide_sector - 1);
 
          ide_sdc_rd[ide_drv] <= 1'b1;
@@ -744,7 +742,7 @@ always @(posedge clk_sys) begin
 
          $display("IDE%0d WR %0d/%0d/%0d -> %0d", ide_drv,
                   ide_cylinder, ide_head, ide_sector,
-                  (ide_cylinder * heads[0] + ide_head) * sectors[0] +
+                  (ide_cylinder * heads[ide_drv] + ide_head) * sectors[ide_drv] +
                   ide_sector - 1);
 
          ide_sdc_wr[ide_drv] <= 1'b1;
@@ -922,11 +920,11 @@ always @(posedge clk_sys, posedge reset) begin
 	      // advance to next sector
 	      // ide_sector goes from 1 to sectors,
 	      // ide_head goes from 0 to heads-1
-	      if ( ide_sector < sectors[0] )
+	      if ( ide_sector < sectors[ide_drv] )
 		ide_sector <= ide_sector + 8'd1;
 	      else begin
 		 ide_sector <= 8'd1;
-		 if( ide_head < heads[0]-1 )
+		 if( ide_head < heads[ide_drv]-1 )
 		   ide_head <= ide_head + 8'd1;
 		 else begin
 		    ide_head <= 8'd0;
