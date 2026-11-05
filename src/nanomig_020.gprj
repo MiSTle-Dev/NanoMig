@@ -42,6 +42,8 @@
         <File path="minimig-aga/cia_timerd.v" type="file.verilog" enable="1"/>
         <File path="minimig-aga/ciaa.v" type="file.verilog" enable="1"/>
         <File path="minimig-aga/ciab.v" type="file.verilog" enable="1"/>
+        <File path="minimig-aga/plip_peer.v" type="file.verilog" enable="1"/>
+        <File path="misc/plip_host.v" type="file.verilog" enable="1"/>
         <File path="minimig-aga/cpu_cache_new.v" type="file.verilog" enable="1"/>
         <File path="minimig-aga/cpu_wrapper.v" type="file.verilog" enable="1"/>
         <File path="minimig-aga/denise.v" type="file.verilog" enable="1"/>

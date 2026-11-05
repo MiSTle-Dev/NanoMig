@@ -55,6 +55,16 @@ module nanomig (
    // explicit ACK after consuming keyboard event
    output       keyboard_ack,
 
+`ifdef ENABLE_PLIP
+   // virtual parallel port (plipbox): frames to/from the MCU, SPI target 5
+   input	 net_strobe,
+   input	 net_start,
+   input [7:0]	 net_din,
+   output [7:0]	 net_dout,
+   output	 net_irq,
+   input	 net_iack,
+`endif
+
    // UART/RS232 for e.g. DiagROM or MIDI
    output	 uart_tx,
    input	 uart_rx,
@@ -1485,6 +1495,41 @@ uart_port uart_port (
 );
 `endif
 
+`ifdef ENABLE_PLIP
+wire        plip_en, plip_loop, plip_h_we, plip_h_commit, plip_h_release;
+wire        plip_tx_valid, plip_rx_valid;
+wire [10:0] plip_h_waddr, plip_h_len, plip_h_raddr, plip_rx_len;
+wire [7:0]  plip_h_wdata, plip_h_rdata;
+wire [31:0] plip_stat_rx, plip_stat_tx, plip_rt_clks;
+
+plip_host plip_host (
+	.clk          (clk_sys        ),
+	.reset        (por            ),
+	.data_strobe  (net_strobe     ),
+	.data_start   (net_start      ),
+	.data_in      (net_din        ),
+	.data_out     (net_dout       ),
+	.irq          (net_irq        ),
+	.iack         (net_iack       ),
+	.plip_en      (plip_en        ),
+	.plip_loop    (plip_loop      ),
+	.h_we         (plip_h_we      ),
+	.h_waddr      (plip_h_waddr   ),
+	.h_wdata      (plip_h_wdata   ),
+	.h_commit     (plip_h_commit  ),
+	.h_len        (plip_h_len     ),
+	.tx_valid     (plip_tx_valid  ),
+	.h_raddr      (plip_h_raddr   ),
+	.h_rdata      (plip_h_rdata   ),
+	.rx_valid     (plip_rx_valid  ),
+	.rx_len       (plip_rx_len    ),
+	.h_release    (plip_h_release ),
+	.stat_rx      (plip_stat_rx   ),
+	.stat_tx      (plip_stat_tx   ),
+	.rt_clks      (plip_rt_clks   )
+);
+`endif
+
 minimig minimig
 (
 	//m68k pins
@@ -1549,6 +1594,25 @@ minimig minimig
 	.dsr          (1'b1             ), // RS232 Data Set Ready (1=ready)
 	.cd           (1'b1             ), // RS232 Carrier Detect (1=carrier detected)
 	.ri           (1'b1             ), // RS232 Ring Indicator (1=idle/not ringing)
+`ifdef ENABLE_PLIP
+	// virtual parallel port, host side from plip_host (MCU)
+	.plip_en        (plip_en        ),
+	.plip_loop      (plip_loop      ),
+	.plip_h_we      (plip_h_we      ),
+	.plip_h_waddr   (plip_h_waddr   ),
+	.plip_h_wdata   (plip_h_wdata   ),
+	.plip_h_commit  (plip_h_commit  ),
+	.plip_h_len     (plip_h_len     ),
+	.plip_tx_valid  (plip_tx_valid  ),
+	.plip_h_raddr   (plip_h_raddr   ),
+	.plip_h_rdata   (plip_h_rdata   ),
+	.plip_rx_valid  (plip_rx_valid  ),
+	.plip_rx_len    (plip_rx_len    ),
+	.plip_h_release (plip_h_release ),
+	.plip_stat_rx   (plip_stat_rx   ),
+	.plip_stat_tx   (plip_stat_tx   ),
+	.plip_rt_clks   (plip_rt_clks   ),
+`endif
 
 	//I/O
 	._joy1        (~JOY0            ), // joystick 1 [fire4,fire3,fire2,fire,up,down,left,right] (default mouse port)

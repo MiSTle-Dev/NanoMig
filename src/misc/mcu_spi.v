@@ -19,11 +19,17 @@ module mcu_spi (
   output       mcu_hid_strobe, // byte strobe for HID target  
   output       mcu_osd_strobe, // byte strobe for OSD target
   output       mcu_sdc_strobe, // byte strobe for SD card target
+`ifdef ENABLE_PLIP
+  output       mcu_net_strobe, // byte strobe for network (virtual parallel port) target
+`endif
   output       mcu_start,
   input  [7:0] mcu_sys_din,
   input  [7:0] mcu_hid_din,
   input  [7:0] mcu_osd_din,
   input  [7:0] mcu_sdc_din,
+`ifdef ENABLE_PLIP
+  input  [7:0] mcu_net_din,
+`endif
   output [7:0] mcu_dout
 );
    
@@ -74,6 +80,9 @@ assign mcu_sys_strobe = spi_in_strobe && spi_target == 8'd0;
 assign mcu_hid_strobe = spi_in_strobe && spi_target == 8'd1;
 assign mcu_osd_strobe = spi_in_strobe && spi_target == 8'd2; 
 assign mcu_sdc_strobe = spi_in_strobe && spi_target == 8'd3; 
+`ifdef ENABLE_PLIP
+assign mcu_net_strobe = spi_in_strobe && spi_target == 8'd5;
+`endif
 
 reg [3:0] spi_in_cnt;
 reg [7:0] spi_in_data;
@@ -109,6 +118,9 @@ wire [7:0] in_byte =
 	   (spi_target == 8'd1)?mcu_hid_din:
 	   (spi_target == 8'd2)?mcu_osd_din:
 	   (spi_target == 8'd3)?mcu_sdc_din:
+`ifdef ENABLE_PLIP
+	   (spi_target == 8'd5)?mcu_net_din:
+`endif
 	   8'h00;   
    
 // setup data on rising edge of spi clock

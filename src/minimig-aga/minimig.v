@@ -200,6 +200,25 @@ module minimig
 	input	      dsr, // rs232 Data Set Ready
 	input	      cd, // rs232 Carrier Detect
 	input	      ri, // rs232 Ring Indicator
+`ifdef ENABLE_PLIP
+	// virtual parallel port (plipbox.device peer), host side e.g. SPI companion
+	input	      plip_en,
+	input	      plip_loop,         // $FFFD frames are echoed without host
+	input	      plip_h_we,
+	input [10:0]  plip_h_waddr,
+	input [7:0]   plip_h_wdata,
+	input	      plip_h_commit,
+	input [10:0]  plip_h_len,
+	output	      plip_tx_valid,
+	input [10:0]  plip_h_raddr,
+	output [7:0]  plip_h_rdata,
+	output	      plip_rx_valid,
+	output [10:0] plip_rx_len,
+	input	      plip_h_release,
+	output [31:0] plip_stat_rx,
+	output [31:0] plip_stat_tx,
+	output [31:0] plip_rt_clks,
+`endif
 
 	//I/O
 	input [15:0]  _joy1, // joystick 1 [fire2,fire,up,down,left,right] (default mouse port)
@@ -612,6 +631,51 @@ denise DENISE1
 	.shres(shres)
 );
 
+`ifdef ENABLE_PLIP
+// ---- virtual parallel port: peer of plipbox.device on CIA-A PRB / CIA-B PRA
+wire [2:1] plip_pra, plip_ddra;
+wire [7:0] plip_prb, plip_ddrb;
+wire       plip_rak, plip_bus_oe, plip_flag_n, plip_prb_rd;
+wire [7:0] plip_bus;
+
+// End of a CPU read cycle on $BFE101: one pulse per access. cpu_rd toggles with
+// cck while the cycle is waiting for DTACK, so rd_cyc (high during the whole
+// cycle) is used instead; the data was latched before AS is released.
+wire plip_prb_acc = sel_cia_a & rd_cyc & (cpu_address_out[11:8] == 4'h1);
+reg  plip_prb_acc_q, plip_prb_rd_r;
+always @(posedge clk) begin
+	plip_prb_rd_r <= 1'b0;
+	if (clk7_en) begin
+		plip_prb_acc_q <= plip_prb_acc;
+		plip_prb_rd_r  <= plip_prb_acc_q & ~plip_prb_acc;
+	end
+end
+assign plip_prb_rd = plip_prb_rd_r;
+
+// /ACK is edge triggered on a real 8520 (cia_int is level triggered): a single
+// pulse that is sampled by exactly one clk7_en, so an ICR read during the /ACK
+// pulse cannot set FLG a second time
+reg plip_ack_q, plip_ack_p;
+always @(posedge clk) begin
+	plip_ack_q <= plip_flag_n;
+	if (plip_ack_q & ~plip_flag_n) plip_ack_p <= 1'b1;
+	else if (clk7_en)              plip_ack_p <= 1'b0;
+end
+
+plip_peer PLIP1 (
+	.clk(clk), .rst(reset | ~plip_en),
+	.sel_o(plip_pra[2]), .sel_oe(plip_ddra[2]),
+	.req_o(plip_pra[1]), .req_oe(plip_ddra[1]),
+	.prb_o(plip_prb), .ddrb_out(&plip_ddrb), .prb_rd(plip_prb_rd),
+	.rak(plip_rak), .bus(plip_bus), .bus_oe(plip_bus_oe), .flag_n(plip_flag_n),
+	.h_we(plip_h_we), .h_waddr(plip_h_waddr), .h_wdata(plip_h_wdata),
+	.h_commit(plip_h_commit), .h_len(plip_h_len), .tx_valid(plip_tx_valid),
+	.h_raddr(plip_h_raddr), .h_rdata(plip_h_rdata),
+	.rx_valid(plip_rx_valid), .rx_len(plip_rx_len), .h_release(plip_h_release),
+	.loop_en(plip_loop), .stat_rx(plip_stat_rx), .stat_tx(plip_stat_tx), .rt_clks(plip_rt_clks)
+);
+`endif
+
 //instantiate cia A
 wire [3:0] porta_out;
 assign {_fire1_dat,_fire0_dat,_led} = porta_out[3:1];
@@ -633,7 +697,15 @@ ciaa CIAA1
 	.irq(int2),
 	.porta_in({_fire1,_fire0,_ready,_track0,_wprot,_change}),
 	.porta_out(porta_out),
+`ifdef ENABLE_PLIP
+	.plip_en(plip_en),
+	.plip_flag(plip_en & plip_ack_p),
+	.plip_prb(plip_prb),
+	.plip_ddrb(plip_ddrb),
+	.portb_in(plip_bus_oe ? plip_bus : {_joy4[0],_joy4[1],_joy4[2],_joy4[3],_joy3[0],_joy3[1],_joy3[2],_joy3[3]}),
+`else
 	.portb_in({_joy4[0],_joy4[1],_joy4[2],_joy4[3],_joy3[0],_joy3[1],_joy3[2],_joy3[3]}),
+`endif
 	.kbd_mouse_type(kbd_mouse_type),
 	.kms_level(kms_level),
 	.kbd_mouse_data(kbd_mouse_data), 
@@ -658,7 +730,14 @@ ciab CIAB1
 	.eclk(eclk[8]),
 	.irq(int6),
 	.flag(index),
+`ifdef ENABLE_PLIP
+	.porta_in({cd,cts,dsr,ri&_joy3[4],1'b1,plip_en ? plip_rak : _joy4[4]}),
+	.plip_en(plip_en),
+	.plip_pra(plip_pra),
+	.plip_ddra(plip_ddra),
+`else
 	.porta_in({cd,cts,dsr,ri&_joy3[4],1'b1,_joy4[4]}),
+`endif
 	.porta_out({dtr,rts}),
 	.portb_out({_motor,_sel3,_sel2,_sel1,_sel0,side,direc,_step})
 );
