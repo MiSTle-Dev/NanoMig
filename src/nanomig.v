@@ -671,6 +671,13 @@ reg [15:0] cylinders[DRIVES];
 reg [7:0] sectors[DRIVES];
 reg [4:0] heads[DRIVES];
 
+// next block of the image to be searched for the RDB (0..15). Counts
+// up with every request and wraps to 0 after block 15.
+reg [3:0] rdb_blk[DRIVES];
+
+// expected 'RDSK' header character at sdc_byte_addr 0..3
+wire [7:0] rdsk_chr = sdc_byte_addr[1]?(sdc_byte_addr[0]?"K":"S"):(sdc_byte_addr[0]?"D":"R");
+
 // total sectors could be calculated from cylinders * sectors * heads
 // which requires DSP units. Instead we simply use the image size
 // divided by 512
@@ -698,13 +705,18 @@ always @(posedge clk_sys) begin
          end
       end
 
-      // check if drive is in state IDE_DRV_STATE_MNT and no sd read is in progress
+      // check if drive is in state IDE_DRV_STATE_MNT and no sd read is in progress.
+      // Request block rdb_blk, one drive at a time as sector and rd are shared.
       if(!ide_sdc_rd && !sdc_busy) begin
-         if(ide_drv_state[drv] == IDE_DRV_STATE_MNT) begin
-            ide_sdc_sector <= 32'd0;
+         if(ide_drv_state[drv] == IDE_DRV_STATE_MNT &&
+            (drv == 0 || ide_drv_state[0] != IDE_DRV_STATE_MNT)) begin
+            ide_sdc_sector <= { 28'd0, rdb_blk[drv] };
             ide_sdc_rd[drv] <= 1'b1;
          end
       end
+
+      // restart the rdb search for the next image
+      if(ide_drv_state[drv] == IDE_DRV_STATE_NONE) rdb_blk[drv] <= 4'd0;
 
       // check if amiga wants to read a sector
       if(!sdc_busy && !ide_sdc_rd && ide_exec == IDE_EXEC_READ_SECTOR ) begin
@@ -742,7 +754,10 @@ always @(posedge clk_sys) begin
 
          // parse rdb unless the amiga has requested this sector
          if( ide_exec != IDE_EXEC_READ_SECTOR )
-            if( ide_sdc_rd[drv]) ide_drv_state[drv] <= IDE_DRV_STATE_PARSE;
+            if( ide_sdc_rd[drv]) begin
+               ide_drv_state[drv] <= IDE_DRV_STATE_PARSE;
+               rdb_blk[drv] <= rdb_blk[drv] + 4'd1;
+            end
       end
 
       // sd card has accepted write request
@@ -752,16 +767,15 @@ always @(posedge clk_sys) begin
       // ...
       end
 
-      // parsing the rdb in sector 0 of the harddisk image
+      // parsing the rdb in one of the first 16 blocks of the harddisk image
       // gives the cylinders, heads and sectors to be used
       if ( (ide_drv_state[drv] == IDE_DRV_STATE_PARSE) && sdc_byte_in_strobe ) begin
-         case ( sdc_byte_addr )
-            // check for 'RDSK' header and stop parsing if that fails
-            0: if ( sdc_byte_in_data != "R") ide_drv_state[drv] <= IDE_DRV_STATE_NONE;
-            1: if ( sdc_byte_in_data != "D") ide_drv_state[drv] <= IDE_DRV_STATE_NONE;
-            2: if ( sdc_byte_in_data != "S") ide_drv_state[drv] <= IDE_DRV_STATE_NONE;
-            3: if ( sdc_byte_in_data != "K") ide_drv_state[drv] <= IDE_DRV_STATE_NONE;
+         // no 'RDSK' header in this block: try the next block or give up
+         // if rdb_blk has wrapped to 0, i.e. block 15 was the last one
+         if ( sdc_byte_addr[8:2] == 7'd0 && sdc_byte_in_data != rdsk_chr )
+            ide_drv_state[drv] <= (rdb_blk[drv] == 4'd0)?IDE_DRV_STATE_NONE:IDE_DRV_STATE_MNT;
 
+         case ( sdc_byte_addr )
             // long word 16 contains cylinders
             16*4+2: cylinders[drv][15:8] <= sdc_byte_in_data;
             16*4+3: cylinders[drv][ 7:0] <= sdc_byte_in_data;
