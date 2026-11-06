@@ -5,9 +5,12 @@
 //   copper and other dma runs on hpos[0] == 1
 //   cpu runs in hpos[0] == 0
 // -> run cpu on unused hpos[0] == 1 for turbo
-// TODO:
-// - check IDE head adressing heads[0] vs heads[drive]
-module nanomig (
+module nanomig #(
+   // 1: bypass the scandoubler for native progressive video (programmed beam,
+   // e.g. DblPAL). Only for boards whose video path supports it (video_analyzer
+   // and hdmi with NATIVE=1); all other boards keep the scandoubler always on.
+   parameter NATIVE = 0
+) (
    input	 clk_sys,
    input	 reset,
    input	 por,
@@ -28,6 +31,8 @@ module nanomig (
    output [3:0]	 r,
    output [3:0]	 g,
    output [3:0]	 b,
+   output	 native,       // 1: video is native progressive (short lines), scandoubler bypassed
+   output [10:0] native_width, // native line length in 28MHz clocks
 
    input [7:0]	 memory_config,
    input [2:0]	 fastram_config,
@@ -673,6 +678,13 @@ reg [15:0] cylinders[DRIVES];
 reg [7:0] sectors[DRIVES];
 reg [4:0] heads[DRIVES];
 
+// next block of the image to be searched for the RDB (0..15). Counts
+// up with every request and wraps to 0 after block 15.
+reg [3:0] rdb_blk[DRIVES];
+
+// expected 'RDSK' header character at sdc_byte_addr 0..3
+wire [7:0] rdsk_chr = sdc_byte_addr[1]?(sdc_byte_addr[0]?"K":"S"):(sdc_byte_addr[0]?"D":"R");
+
 // total sectors could be calculated from cylinders * sectors * heads
 // which requires DSP units. Instead we simply use the image size
 // divided by 512
@@ -700,13 +712,18 @@ always @(posedge clk_sys) begin
          end
       end
 
-      // check if drive is in state IDE_DRV_STATE_MNT and no sd read is in progress
+      // check if drive is in state IDE_DRV_STATE_MNT and no sd read is in progress.
+      // Request block rdb_blk, one drive at a time as sector and rd are shared.
       if(!ide_sdc_rd && !sdc_busy) begin
-         if(ide_drv_state[drv] == IDE_DRV_STATE_MNT) begin
-            ide_sdc_sector <= 32'd0;
+         if(ide_drv_state[drv] == IDE_DRV_STATE_MNT &&
+            (drv == 0 || ide_drv_state[0] != IDE_DRV_STATE_MNT)) begin
+            ide_sdc_sector <= { 28'd0, rdb_blk[drv] };
             ide_sdc_rd[drv] <= 1'b1;
          end
       end
+
+      // restart the rdb search for the next image
+      if(ide_drv_state[drv] == IDE_DRV_STATE_NONE) rdb_blk[drv] <= 4'd0;
 
       // check if amiga wants to read a sector
       if(!sdc_busy && !ide_sdc_rd && ide_exec == IDE_EXEC_READ_SECTOR ) begin
@@ -718,7 +735,7 @@ always @(posedge clk_sys) begin
          // should prevent that
          $display("IDE%0d RD %0d/%0d/%0d -> %0d", ide_drv,
                   ide_cylinder, ide_head, ide_sector,
-                  (ide_cylinder * heads[0] + ide_head) * sectors[0] +
+                  (ide_cylinder * heads[ide_drv] + ide_head) * sectors[ide_drv] +
                   ide_sector - 1);
 
          ide_sdc_rd[ide_drv] <= 1'b1;
@@ -732,7 +749,7 @@ always @(posedge clk_sys) begin
 
          $display("IDE%0d WR %0d/%0d/%0d -> %0d", ide_drv,
                   ide_cylinder, ide_head, ide_sector,
-                  (ide_cylinder * heads[0] + ide_head) * sectors[0] +
+                  (ide_cylinder * heads[ide_drv] + ide_head) * sectors[ide_drv] +
                   ide_sector - 1);
 
          ide_sdc_wr[ide_drv] <= 1'b1;
@@ -744,7 +761,10 @@ always @(posedge clk_sys) begin
 
          // parse rdb unless the amiga has requested this sector
          if( ide_exec != IDE_EXEC_READ_SECTOR )
-            if( ide_sdc_rd[drv]) ide_drv_state[drv] <= IDE_DRV_STATE_PARSE;
+            if( ide_sdc_rd[drv]) begin
+               ide_drv_state[drv] <= IDE_DRV_STATE_PARSE;
+               rdb_blk[drv] <= rdb_blk[drv] + 4'd1;
+            end
       end
 
       // sd card has accepted write request
@@ -754,16 +774,15 @@ always @(posedge clk_sys) begin
       // ...
       end
 
-      // parsing the rdb in sector 0 of the harddisk image
+      // parsing the rdb in one of the first 16 blocks of the harddisk image
       // gives the cylinders, heads and sectors to be used
       if ( (ide_drv_state[drv] == IDE_DRV_STATE_PARSE) && sdc_byte_in_strobe ) begin
-         case ( sdc_byte_addr )
-            // check for 'RDSK' header and stop parsing if that fails
-            0: if ( sdc_byte_in_data != "R") ide_drv_state[drv] <= IDE_DRV_STATE_NONE;
-            1: if ( sdc_byte_in_data != "D") ide_drv_state[drv] <= IDE_DRV_STATE_NONE;
-            2: if ( sdc_byte_in_data != "S") ide_drv_state[drv] <= IDE_DRV_STATE_NONE;
-            3: if ( sdc_byte_in_data != "K") ide_drv_state[drv] <= IDE_DRV_STATE_NONE;
+         // no 'RDSK' header in this block: try the next block or give up
+         // if rdb_blk has wrapped to 0, i.e. block 15 was the last one
+         if ( sdc_byte_addr[8:2] == 7'd0 && sdc_byte_in_data != rdsk_chr )
+            ide_drv_state[drv] <= (rdb_blk[drv] == 4'd0)?IDE_DRV_STATE_NONE:IDE_DRV_STATE_MNT;
 
+         case ( sdc_byte_addr )
             // long word 16 contains cylinders
             16*4+2: cylinders[drv][15:8] <= sdc_byte_in_data;
             16*4+3: cylinders[drv][ 7:0] <= sdc_byte_in_data;
@@ -908,11 +927,11 @@ always @(posedge clk_sys, posedge reset) begin
 	      // advance to next sector
 	      // ide_sector goes from 1 to sectors,
 	      // ide_head goes from 0 to heads-1
-	      if ( ide_sector < sectors[0] )
+	      if ( ide_sector < sectors[ide_drv] )
 		ide_sector <= ide_sector + 8'd1;
 	      else begin
 		 ide_sector <= 8'd1;
-		 if( ide_head < heads[0]-1 )
+		 if( ide_head < heads[ide_drv]-1 )
 		   ide_head <= ide_head + 8'd1;
 		 else begin
 		    ide_head <= 8'd0;
@@ -1619,6 +1638,31 @@ minimig minimig
  	.sdc_byte_out_data  ( sdc_byte_out_data_fdc ) 
 );
 
+// Native progressive video: a programmed beam with short lines (BEAMCON0, e.g.
+// the DblPAL monitor driver, 31kHz) is already scandoubled by the chipset, so
+// the scandoubler is bypassed. A normal PAL/NTSC line has 227 colour clocks.
+assign native       = (NATIVE != 0) && (htotal[8:1] < 8'd180);
+assign native_width = ({3'b000, htotal[8:1]} + 11'd1) << 3;  // 8 clocks per colour clock
+
+reg [3:0] nat_r, nat_g, nat_b;
+reg	  nat_hs = 1'b1, nat_vs = 1'b1;
+always @(posedge clk_sys) begin
+	nat_r  <= r_in;
+	nat_g  <= g_in;
+	nat_b  <= b_in;
+	nat_hs <= hs_in;
+	nat_vs <= vs_in;
+end
+
+wire [3:0] amb_r, amb_g, amb_b;
+wire	   amb_hs, amb_vs;
+
+assign r  = native ? nat_r  : amb_r;
+assign g  = native ? nat_g  : amb_g;
+assign b  = native ? nat_b  : amb_b;
+assign hs = native ? nat_hs : amb_hs;
+assign vs = native ? nat_vs : amb_vs;
+
 Amber AMBER
 (
 	.clk28m(clk_sys),
@@ -1634,11 +1678,11 @@ Amber AMBER
 	._hsync_in(hs_in),		//horizontal synchronisation in
 	._vsync_in(vs_in),		//vertical synchronisation in
 	._csync_in(1'b1),		//composite synchronization in, only used if dblscan==0
-	.red_out(r), 		        //red componenent video out
-	.green_out(g),  	        //green component video out
-	.blue_out(b),		        //blue component video out
-	._hsync_out(hs),		//horizontal synchronisation out
-	._vsync_out(vs)			//vertical synchronisation out
+	.red_out(amb_r), 	        //red componenent video out
+	.green_out(amb_g),  	        //green component video out
+	.blue_out(amb_b),		//blue component video out
+	._hsync_out(amb_hs),		//horizontal synchronisation out
+	._vsync_out(amb_vs)		//vertical synchronisation out
  );
     
 endmodule

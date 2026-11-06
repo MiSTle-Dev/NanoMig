@@ -345,7 +345,9 @@ assign deniseid_out = reg_address_in[8:1]==DENISEID[8:1] ? aga ? 16'h00f8 : ecs 
 
 always @(posedge clk)
   if (clk7_en) begin
-    if (hpos[8:0]==hdiwstrt[8:0])
+    if (strhor && hpos < 9'd300)
+      window <= 0; // short (native 31kHz) line: DIWSTOP is never reached, so close the window at the end of the line
+    else if (hpos[8:0]==hdiwstrt[8:0])
       window <= 1;
     else if (hpos[8:0]==hdiwstop[8:0])
       window <= 0;
