@@ -804,9 +804,8 @@ always @(posedge clk_28m, posedge rst_28m) begin
 end
 
 /* -------------- state machine copying data from flash to sdram ---------------- */
-reg  [21:0] flash_addr = 22'h200000;
 reg  [17:0] flash_ram_addr = 18'h0;
-reg  [31:0] word_count = 32'h40000;
+reg   [1:0] flash_ks = 2'b01;           // kickstart selection latched at start of copy
 
 wire [15:0] flash_dout;
 reg         flash_cs;
@@ -814,8 +813,13 @@ wire        flash_data_strobe;
 wire        flash_busy;
 reg         flash_ram_write;
 
-// once the copy counter has run to zero, all rom has been copied
-wire        rom_done = (word_count == 0);
+// flash word address: the 256k word (512kBytes) kickstart images sit at
+// 4,0 MB (3.1, default), 7,0 MB (1.3) and 7,5 MB (3.2)
+wire [21:0] flash_addr = { 1'b1, ~flash_ks[0], ~flash_ks[0], flash_ks == 2'b10, flash_ram_addr };
+
+// set once all rom has been copied (carry out of the 18 bit word counter)
+reg         rom_done = 1'b0;
+wire [18:0] flash_ram_addr_next = {1'b0, flash_ram_addr} + 19'd1;
 
 `ifdef DISABLE_ROM_LOADER
 assign leds[3] = !rom_done;
@@ -848,14 +852,9 @@ always @(posedge clk_28m, posedge rst_28m, posedge reset) begin
     case (flash_state)
       FLASH_STATE_INIT: begin
         if (clk7n_en && flash_ready_d2) begin
-          case(osd_kickstart)
-                  2'b00: flash_addr <= 22'h380000; // Kickstart 1.3 (at 7,0 MB)
-                  2'b01: flash_addr <= 22'h200000; // Kickstart 3.1 (at 4,0 MB)
-                  2'b10: flash_addr <= 22'h3C0000; // Kickstart 3.2 (at 7,5 MB)
-                  default: flash_addr <= 22'h200000;
-          endcase
+          flash_ks       <= osd_kickstart;
           flash_ram_addr <= 18'h0;
-          word_count     <= 32'h40000;
+          rom_done       <= 1'b0;
 
           flash_cs        <= 0;
           flash_ram_write <= 0;
@@ -863,7 +862,7 @@ always @(posedge clk_28m, posedge rst_28m, posedge reset) begin
         end
       end
       FLASH_STATE_READ: begin
-        if (word_count != 0) begin
+        if (!rom_done) begin
           flash_cs    <= 1;
           flash_state <= FLASH_STATE_WAIT;
         end
@@ -883,10 +882,9 @@ always @(posedge clk_28m, posedge rst_28m, posedge reset) begin
       FLASH_STATE_NEXT: begin
         if (clk7n_en) begin
           flash_ram_write <= 0;
-          flash_ram_addr  <= flash_ram_addr + 1;
-          flash_addr      <= flash_addr + 1;
+          flash_ram_addr  <= flash_ram_addr_next[17:0];
           flash_state     <= FLASH_STATE_READ;
-          word_count      <= word_count - 1;
+          if (flash_ram_addr_next[18]) rom_done <= 1'b1;
         end
       end
       default: begin
