@@ -4,7 +4,7 @@
 // To use Kick Switch Lite, the ROMs must be flashed like this:
 //
 // 0x400000 Kickstart 3.1 / 512k (default)
-// 0x700000 Kickstart 1.3 / 256k 
+// 0x700000 Kickstart 1.2 / 256k 
 // 0x740000 Kickstart 1.3 / 256k 
 // 0x780000 Kickstart 3.2 / 512k 
 //
@@ -813,7 +813,8 @@ reg         flash_cs;
 wire        flash_data_strobe;
 wire        flash_busy;
 reg         flash_ram_write;
-
+reg         flash_256k;      // 256k rom, read twice to fill the 512k area
+	
 // once the copy counter has run to zero, all rom has been copied
 wire        rom_done = (word_count == 0);
 
@@ -849,11 +850,12 @@ always @(posedge clk_28m, posedge rst_28m, posedge reset) begin
       FLASH_STATE_INIT: begin
         if (clk7n_en && flash_ready_d2) begin
           case(osd_kickstart)
-                  2'b00: flash_addr <= 22'h380000; // Kickstart 1.3 (at 7,0 MB)
+                  2'b00: flash_addr <= 22'h380000; // Kickstart 1.3 (at 7,25 MB, 256k)
                   2'b01: flash_addr <= 22'h200000; // Kickstart 3.1 (at 4,0 MB)
                   2'b10: flash_addr <= 22'h3C0000; // Kickstart 3.2 (at 7,5 MB)
-                  default: flash_addr <= 22'h200000;
+			  	  2'b11: flash_addr <= 22'h380000; // Kickstart 1.2 (at 7,0 MB, 256k)
           endcase
+		  flash_256k     <= (osd_kickstart == 2'b00) || (osd_kickstart == 2'b11); // 1.3 and 1.2
           flash_ram_addr <= 18'h0;
           word_count     <= 32'h40000;
 
@@ -884,7 +886,12 @@ always @(posedge clk_28m, posedge rst_28m, posedge reset) begin
         if (clk7n_en) begin
           flash_ram_write <= 0;
           flash_ram_addr  <= flash_ram_addr + 1;
-          flash_addr      <= flash_addr + 1;
+		  // 256k roms start on a 256k boundary, so wrapping the lower
+          // 17 address bits reads the same rom a second time
+          if (flash_256k)
+            flash_addr[16:0] <= flash_addr[16:0] + 17'd1;
+          else	
+            flash_addr      <= flash_addr + 1;
           flash_state     <= FLASH_STATE_READ;
           word_count      <= word_count - 1;
         end
