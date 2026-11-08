@@ -1,36 +1,108 @@
-# Networking with NanoMig 1200
+# Networking with the NanoMig 1200
 
 Please read [Networking](https://github.com/MiSTle-Dev/FPGA-Companion/tree/main/NETWORKING.md) first!  
 
-To use the Internet with the NanoMig a **Pi-Pico W** or **Pi-Pico2 W** is mandatory.  
+To use the Internet with the NanoMig a **Pi-Pico W** or **Pi-Pico2 W** is recommended as MCU.
 
-Make sure **PPP** is selected in the Settings menu under Serial:
+The Amiga talks to the Companion over its parallel port (PLIP).  
+The Companion joins your WiFi, and your router does the NAT. 
 
-<img width="600" height="459" alt="IMG_20261028_224427434_HDR" src="https://github.com/user-attachments/assets/300808a9-0d48-4f19-9910-21a3476032c1" />
+**Example addresses:**  
+Router `192.168.0.254`  
+Companion `192.168.0.33` (static or dhcp)   
+Amiga `192.168.0.66`  
 
+The Amiga's address must be unused in your LAN.
 
-Download and install [**Roadshow**](http://roadshow.apc-tcp.de/index-en.php).  
-Copy the **ppp-serial.device** from Storage to **Workbench:Devs/Networks/**
+### 1. Connect the Companion to your network by editing config.ini on the SD-Card
 
-<img width="600" height="447" alt="IMG_20261028_222322933" src="https://github.com/user-attachments/assets/2e174276-568b-4afa-945d-76e532c7c2be" />
+```
+; network settings
+[NETWORK]
+MODE=manual          ; manual or dhcp
+IP=192.168.0.33
+MASK=255.255.255.0
+GW=192.168.0.254
+DNS=1.1.1.1          ; name server, only with MODE=manual
 
-Copy the **PPP Netinterface** from Storage to **Workbench:Devs/Netinterfaces/**
+[NTP]
+;IP=192.53.103.108,192.53.103.104,192.53.103.103
+;TIMEZONE=+1         ; UTC+1
 
-<img width="600" height="462" alt="IMG_20261028_222343967" src="https://github.com/user-attachments/assets/25107f3e-9ef1-45eb-8d1c-9431d49c650c" />
+[WIFI]
+SSID=MyWiFi
+PASS=MyPassword
 
-Place a **PPP** configuration file anywhere you like. For example **S:** or **Preferences**
+[PLIP]
+ENABLE=1
+PEER=192.168.0.66    ; the Amiga's address, unused in your LAN
+```
 
-<img width="600" height="453" alt="IMG_20261028_222526108_HDR" src="https://github.com/user-attachments/assets/3b9504f6-7107-4003-af21-c4c4522ae266" />
+### 2. Dowmload and install Roadshow 
 
-Call the config file with **ppp_dialer**
+The demo version is fully functional but has a time limit.
 
-<img width="600" height="447" alt="IMG_20261028_222608031_HDR" src="https://github.com/user-attachments/assets/f8d68899-137f-4e5c-a2a0-58b25120ac50" />
+edit **DEVS:Internet/routes** in TextEdit 
 
+```
+DEFAULT 192.168.0.254
+```
 
+edit **DEVS:Internet/name_resolution** in TextEdit 
 
+```
+NAMESERVER 1.1.1.1
+```
 
+### 3. Amiga: Plipbox
 
+download and unzip **plipbox-0.6.zip**  
 
+copy **plipbox.device_RELEASE_020** to **Workbench:Devs/Networks**
+rename it to **plipbox.device**
+
+copy **plipbox** from **Storage/NetInterfaces** to **Devs/NetInterfaces**
+open **plipbox** in TextEdit
+
+```
+device=plipbox.device
+address=192.168.0.66
+netmask=255.255.255.0
+#configure=dhcp
+```
+
+- **address** must equal **PEER** in **config.ini**.  
+- Do not use **configure=dhcp**, **#** comments it out
+
+reboot the Amiga!
+
+### 4. Ping
+
+From the Amiga shell, in this order:
+
+```
+ping 192.168.0.33     ; the Companion
+ping 192.168.0.254    ; your router
+ping 1.1.1.1          ; the internet
+```
+
+If the first ping works and the others fail, check the gateway entry.  
+From a PC, **ping 192.168.0.66** reaches the Amiga and **ping 192.168.0.33** the Companion
+
+### 5. FTP and Telnet to the Companion
+
+Use the Companion's LAN address **`192.168.0.33**. 
+Both work from the Amiga over PLIP and from a PC on the LAN.
+
+- **FTP** (port 21) gives access to the Companion's SD card.  
+- Any user name and password are accepted. Passive mode only:  
+  ```
+  ftp 192.168.0.33
+  ```
+- **Telnet** (port 23) shows the Companion's log and debug output:
+  ```
+  telnet 192.168.0.33
+  ```
 
 
 
