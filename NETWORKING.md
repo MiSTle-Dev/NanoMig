@@ -91,15 +91,15 @@ From a PC, **ping 192.168.0.66** reaches the Amiga and **ping 192.168.0.33** the
 
 ### 5. FTP and Telnet to the Companion
 
-Use the Companion's LAN address **`192.168.0.33**. 
-Both work from the Amiga over PLIP and from a PC on the LAN.
+Use the Companion's LAN address **`192.168.0.33**.  
+Both work from the Amiga over PLIP and from a PC on the LAN.  
 
-- **FTP** (port 21) gives access to the Companion's SD card.  
-- Any user name and password are accepted. Passive mode only:  
+**FTP** (port 21) gives access to the Companion's SD card.  
+Any user name and password are accepted. Passive mode only:  
   ```
   ftp 192.168.0.33
   ```
-- **Telnet** (port 23) shows the Companion's log and debug output:
+**Telnet** (port 23) shows the Companion's log and debug output:
   ```
   telnet 192.168.0.33
   ```
