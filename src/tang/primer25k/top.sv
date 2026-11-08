@@ -521,31 +521,13 @@ nanomig nanomig
 wire           flash_ready;
 wire           mem_ready = sdram_ready && flash_ready && pll_lock;
 
-reg            start_rom_copy;
-reg            mem_ready_D;
-
-// geneate a start_rom_copy signal once flash and SDRAM are initialized
-always @(posedge clk_28m or negedge pll_lock) begin
-   if(!pll_lock || bl616_jtagsel) begin
-      start_rom_copy <= 1'b0;
-      mem_ready_D <= 1'b0;
-
-   end else begin
-      mem_ready_D <= mem_ready;
-      start_rom_copy <= 1'b0;
-
-      if(mem_ready && !mem_ready_D)
-          start_rom_copy <= 1'b1;
-   end
-end
-
 /* -------------- state machine copying data from flash to sdram ---------------- */
 reg [21:0]  flash_addr;
 wire [15:0] flash_dout;
 reg [15:0]  flash_doutD;
 reg		    flash_cs;
-reg [31:0]  word_count;
-reg [4:0]   state;
+reg [31:0]  word_count = 32'h40000;
+reg [2:0]   flash_state = 3'd0;
 wire        flash_data_strobe;
 wire        flash_busy;
 
@@ -554,51 +536,47 @@ wire		rom_done = (word_count == 0);
 
 reg [21:0]  flash_ram_addr;
 reg         flash_ram_write;
-reg [5:0]   flash_cnt;
 
-always @(posedge clk_85m or negedge mem_ready) begin
-    if(!mem_ready || bl616_jtagsel) begin
-       flash_addr <= 22'h200000;          // 4MB flash offset (word address), with the 8MB offset in the
-	                                      // flash driver this results in the flash address being c00000
-       flash_ram_addr <= { 4'hf, 18'h0 }; // write into 512k sdram segment used for kick rom
-       word_count <= 22'h40001;           // 512k bytes ROM data = 256k words
-
-       state <= 5'h0;
-       flash_ram_write <= 1'b0;
-       flash_cs <= 1'b0;
-       flash_cnt <= 6'd0;
-    end else begin
-        if((start_rom_copy || state == 23) && (word_count != 0)) begin
-            flash_cs <= 1'b1;
-            flash_cnt <= 6'd45; // >= 45 @ 85MHz
-        end else begin
-            if(flash_cnt != 0) flash_cnt <= flash_cnt - 6'd1;
-            if(flash_busy)     flash_cs <= 1'b0;
-
-            // ... static timing with fixed counter
-            if(flash_cnt == 6'd1) begin
-               state <= 1;
-               flash_addr <= flash_addr + 22'd1;
-               word_count <= word_count - 22'd1;
-
-               if ((flash_addr == 22'h2000aa || flash_addr == 22'h2200aa) && flash_dout == 16'h6678)
-				 // transform bne.b to bra.b in Kickstart ROM 1.2/1.3 @ $f80154 (mirror) and $fc0154
-				 // this forces memory detection on every reset
-				 flash_doutD <= flash_dout & 16'hf0ff;
-               else
-                 // we don't necessarily need to latch the data. But latching it here
-                 // allows to exactly determine the real access time by adjusting flash_cnt
-                 // to the lowest value that gives a stable image
-                 flash_doutD <= flash_dout;
-            end
-        end
-
-        // advance ram write state
-        if(state != 0)  state <= state + 5'd1;
-        if(state == 3)  flash_ram_write <= 1'b1;
-        if(state == 18)  flash_ram_write <= 1'b0;
-        if(state == 21)  flash_ram_addr <= flash_ram_addr + 22'd1;
-    end
+// sdram.sv starts a cycle after the falling edge of sync, so it is driven by
+// clk7_en and the write request is held across a whole bus cycle
+always @(posedge clk_28m) begin
+  if(!mem_ready || bl616_jtagsel) begin
+    flash_state     <= 3'd0;
+    flash_addr      <= 22'h200000;        // 4MB flash offset (word address), with the 8MB offset in the
+                                          // flash driver this results in the flash address being c00000
+    flash_ram_addr  <= { 4'hf, 18'h0 };   // write into 512k sdram segment used for kick rom
+    word_count      <= 32'h40000;         // 512k bytes ROM data = 256k words
+    flash_cs        <= 1'b0;
+    flash_ram_write <= 1'b0;
+  end else case(flash_state)
+    3'd0: if(clk7n_en) flash_state <= 3'd1;
+    3'd1: if(word_count != 0) begin
+            flash_cs    <= 1'b1;
+            flash_state <= 3'd2;
+          end
+    3'd2: if(flash_busy) begin
+            flash_cs    <= 1'b0;
+            flash_state <= 3'd3;
+          end
+    3'd3: if(!flash_busy && clk7_en) begin
+            // transform bne.b to bra.b in Kickstart ROM 1.2/1.3 @ $f80154 (mirror) and $fc0154
+            // this forces memory detection on every reset
+            if((flash_addr == 22'h2000aa || flash_addr == 22'h2200aa) && flash_dout == 16'h6678)
+              flash_doutD <= flash_dout & 16'hf0ff;
+            else
+              flash_doutD <= flash_dout;
+            flash_ram_write <= 1'b1;
+            flash_state     <= 3'd4;
+          end
+    3'd4: if(clk7n_en) begin
+            flash_ram_write <= 1'b0;
+            flash_ram_addr  <= flash_ram_addr + 22'd1;
+            flash_addr      <= flash_addr + 22'd1;
+            word_count      <= word_count - 32'd1;
+            flash_state     <= 3'd1;
+          end
+    default: flash_state <= 3'd0;
+  endcase
 end
 
 // ----------------------------- SDRAM ---------------------------------
@@ -606,18 +584,12 @@ end
 // there's a total of 16 sdram segments of 512kBytes. The last
 // one is being used to store the kick rom
 
-// run a counter at 28Mhz synchonous to the 7Mhz bus cycle
-reg	    [1:0] cyc;
-always @(posedge clk_28m)
-  if(clk7_en) cyc <= 2'd0;
-  else        cyc <= cyc + 2'd1;
-
 wire        sdram_access  = (!ram_oe_n || !ram_we_n);
 wire	    sdram_rw      = !ram_we_n;
 
 wire		sdram_cs      = rom_done?sdram_access:flash_ram_write;
 
-wire        sdram_sync    = rom_done?!cyc:flash_ram_write;
+wire        sdram_sync    = clk7_en;
 
 wire		sdram_refresh = rom_done?ram_refresh:1'b0;
 
@@ -626,7 +598,7 @@ wire [15:0] sdram_din     = rom_done?ram_dout:flash_doutD;
 wire [1:0]  sdram_be      = rom_done?ram_be:2'b00;
 wire		sdram_we      = rom_done?sdram_rw:flash_ram_write;
 
-sdram sdram (
+sdram #(.SYNC_DELAY(2)) sdram (
 	.sd_data    ( IO_sdram_dq   ), // 32 bit bidirectional data bus
 	.sd_addr    ( O_sdram_addr  ), // 11 bit multiplexed address bus
 	.sd_dqm     ( O_sdram_dqm   ), // two byte masks
