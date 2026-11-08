@@ -38,7 +38,7 @@ ENABLE=1
 PEER=192.168.0.66    ; the Amiga's address, unused in your LAN
 ```
 
-### 2. Dowmload and install Roadshow 
+### 2. Download and install Roadshow 
 
 The demo version is fully functional but has a time limit.
 
