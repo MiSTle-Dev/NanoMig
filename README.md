@@ -77,18 +77,23 @@ These youtube shorts mainly document the progress:
 The necessary binaries can be found in the [project releases](https://github.com/MiSTle-Dev/NanoMig/releases).
 
 ## TANG NANO 20K
-  * ```nanomig.fs``` needs to be flashed to the FPGA's flash memory
+  * ```nanomig.fs``` or ```nanomig.bin``` needs to be flashed to the FPGA's flash memory
     * ```openFPGALoader -f nanomig.fs```
     * Currently supported are Tang Nano 20k with HDMI (```nanomig.fs```), Tang Nano 20k with RGB LCD (```nanomig_lcd.fs```), Tang Primer 25k (```nanomig_tp25k.fs```), Tang Mega 138k Pro (```nanomig_tm128k.fs```), Tang Console 60k (```nanomig_tc60k.fs```) and Tang Console 138k (```nanomig_tc128k_bl616.fs```)
   * On Nano 20k, Primer 25k and Console 60K 256kByte Kickstart 1.3 ```kick13.rom``` needs to be flashed to offset 0x400000 _and_ 0x440000 (identical file). On 138k boards use addresses 0x600000 and 0x640000 instead.  
 
-    * ```openFPGALoader --external-flash -o 0x400000 kick31.rom``` or ```0x600000 for 138k.``` 
-    * ```openFPGALoader --external-flash -o 0x700000 kick13.rom```
-    * ```openFPGALoader --external-flash -o 0x740000 kick13.rom```
-    * ```openFPGALoader --external-flash -o 0x780000 kick32.rom``` 
-    See here for [checksums of known working Kickstart roms.](https://github.com/MiSTle-Dev/NanoMig/blob/main/doc/KICKSTART_ROMS.md)
-  * For IDE HDD support 512kB Kickstart 3.1 ```kick31.rom``` needs to be flashed at offset 0x400000 (138k: 0x600000) only.
-    * ```openFPGALoader --external-flash -o 0x400000 kick31.rom```
+    * ```openFPGALoader --external-flash -o 0x400000 kick31.rom``` (512k)  
+    * ```openFPGALoader --external-flash -o 0x700000 kick13.rom``` (256k)  
+    * ```openFPGALoader --external-flash -o 0x740000 kick13.rom``` (256k)  
+    * ```openFPGALoader --external-flash -o 0x780000 kick32.rom``` (512k)   
+     
+  * For OS 1.3 **IDE HDD** support **512k Kickstart 1.3** ```kick13-HDD-Boot.rom``` needs to be flashed at offset 0x700000.
+    
+    * ```openFPGALoader --external-flash -o 0x400000 kick31.rom``` (512k)   
+    * ```openFPGALoader --external-flash -o 0x700000 kick13-HDD-Boot.rom``` (512k)  
+    * ```openFPGALoader --external-flash -o 0x780000 kick32.rom``` (512k)    
+
+See here for [checksums of known working Kickstart roms.](https://github.com/MiSTle-Dev/NanoMig/blob/main/doc/KICKSTART_ROMS.md)
 
 
 ## ICEPI-ZERO 
@@ -103,7 +108,7 @@ Change the target driver to WinUSB and click Replace Driver (or Install Driver).
 3.) flash Kickstart  
 
 ```openFPGALoader -c ft231X --pins=7:3:5:6 -f -o 0x400000 kick31.rom```   
-```openFPGALoader -c ft231X --pins=7:3:5:6 -f -o 0x700000 kick13.rom```  
+```openFPGALoader -c ft231X --pins=7:3:5:6 -f -o 0x700000 kick13.rom``` or ```512k Kick 1.3 HDD Boot Rom```
 ```openFPGALoader -c ft231X --pins=7:3:5:6 -f -o 0x740000 kick13.rom```  
 ```openFPGALoader -c ft231X --pins=7:3:5:6 -f -o 0x780000 kick32.rom```  
   
