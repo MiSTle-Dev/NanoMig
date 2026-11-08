@@ -2,7 +2,7 @@
 
 Please read [Networking](https://github.com/MiSTle-Dev/FPGA-Companion/tree/main/NETWORKING.md) first!  
 
-To use the Internet with the NanoMig a **Pi-Pico W** or **Pi-Pico2 W** is recommended as MCU.
+To use the Internet with the NanoMig a **Pi-Pico W** or **Pi-Pico2 W** is required as MCU.
 
 The Amiga talks to the Companion over its parallel port (PLIP).  
 The Companion joins your WiFi, and your router does the NAT. 
