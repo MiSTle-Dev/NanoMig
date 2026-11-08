@@ -540,7 +540,9 @@ always @(posedge clk, negedge rstn) begin
 			// $display("sd_card.v: MCU start byte received: %0d", data_in);
 			
 			byte_cnt <= 4'd0;	    
-			data_out <= { card_stat, card_type, 1'b0, mcu_wr_err };
+			// bit 1: card busy with a request of the core (see SPI.md), the MCU
+			// uses this to wait before it swaps images or reads sectors itself
+			data_out <= { card_stat, card_type, (core_request != CORE_REQ_IDLE), mcu_wr_err };
 		 end else begin
 			// SDC CMD 1: STATUS
 			if(command == 8'd1) begin
