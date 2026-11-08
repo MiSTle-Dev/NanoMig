@@ -87,7 +87,7 @@ The necessary binaries can be found in the [project releases](https://github.com
     * ```openFPGALoader --external-flash -o 0x740000 kick13.rom``` (256k)  
     * ```openFPGALoader --external-flash -o 0x780000 kick32.rom``` (512k)   
      
-  * For **IDE HDD** support **512k Kickstart 1.3** ```kick13-HDD-Boot.rom``` needs to be flashed at offset 0x700000.
+  * For OS 1.3 **IDE HDD** support **512k Kickstart 1.3** ```kick13-HDD-Boot.rom``` needs to be flashed at offset 0x700000.
     
     * ```openFPGALoader --external-flash -o 0x400000 kick31.rom``` (512k)   
     * ```openFPGALoader --external-flash -o 0x700000 kick13-HDD-Boot.rom``` (512k)  
