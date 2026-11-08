@@ -58,7 +58,7 @@ NAMESERVER 1.1.1.1
 
 download and unzip **plipbox-0.6.zip**  
 
-copy **plipbox.device_RELEASE_020** to **Workbench:Devs/Networks**
+copy **plipbox.device_RELEASE_020** to **Workbench:Devs/Networks**  
 rename it to **plipbox.device**
 
 copy **plipbox** from **Storage/NetInterfaces** to **Devs/NetInterfaces**
