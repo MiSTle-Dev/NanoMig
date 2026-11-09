@@ -151,6 +151,8 @@ Only for the TN20K: **Use JTAG as regular IO** must be unselected in Gowin EDA C
 | 4 | SD-READ       | x     | -     |   - |x         |-|
 | 5 | SD-WRITE      | x     | -     |   - |x         |-|
 
+**Tang Primer 25K boot diagnostics:** with a PMOD-LEDx8 in the companion PMOD, build `build_tp25k_dbg.tcl` (68020: `build_tp25k_020_dbg.tcl`). LEDs 0-7: heartbeat, SDRAM ready, Kickstart copied, verify done, first verify pass OK, all verify passes OK, CPU running, vsync running. Needs the on-board BL616 as companion.
+
 
 ## Amiga specific key mappings
 
