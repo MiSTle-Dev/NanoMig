@@ -417,6 +417,7 @@ agnus_copper cp1
 	.reqdma(req_cop),
 	.ackdma(ack_cop),
 	.enadma(ena_cop),
+	.copen(copen),
 	.sof(sof),
 	.blit_busy(blit_busy),
 	.vpos(vpos[7:0]),
