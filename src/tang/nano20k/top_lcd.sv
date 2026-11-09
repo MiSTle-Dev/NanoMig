@@ -65,6 +65,9 @@ module top(
   output [5:0]  lcd_g,  // lcd green
   output [4:0]  lcd_b,  // lcd blue
 
+  // BUZZER
+  output		buzzer,
+
   // SD card slot
   output		sd_clk,
   inout			sd_cmd, // MOSI
