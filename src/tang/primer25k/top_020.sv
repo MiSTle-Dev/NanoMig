@@ -48,11 +48,15 @@ module top(
   // give explicit directions for pmod1 as it's being used for the
   // FPGA Companion and this allows for clock buffering. Clock glitches
   // were observed when using inouts for the companion
+`ifdef DEBUG_LEDS
+  output [7:0]	dbg_led, // PMOD-LEDx8 on the companion PMOD, active low
+`else
   input			pmod_companion_din,
   output		pmod_companion_dout,
   input			pmod_companion_clk,
   input			pmod_companion_ss,
   output		pmod_companion_intn,
+`endif
 
   // SD card slot
   output		sd_clk,
@@ -122,6 +126,15 @@ wire	clk7n_en;
 
 // ========================== Startup control ===========================
 
+`ifdef DEBUG_LEDS
+// the LED module occupies the companion PMOD, only the on-board BL616 can be used
+wire pmod_companion_din = 1'b0;
+wire pmod_companion_clk = 1'b0;
+wire pmod_companion_ss  = 1'b1;
+wire pmod_companion_dout;
+wire pmod_companion_intn;
+`endif
+
 reg	spi_ext = 1'b0;       // set when the external SPI interface on PMOD is active
 reg boot_button_detected = 1'b1;
 always @(posedge pll_lock)
@@ -149,10 +162,18 @@ wire       osd_joy_swap;        // 0=off, 1=on
 wire [2:0] osd_volume;          // Mute=0, 1=25%, 2=50%, 3=75%, 4=100%
 wire       osd_stereo_mix;      // 0=off, 1=on
 
+`ifdef DEBUG_LEDS
+reg verify_done = 1'b0;
+`endif
+
 // generate a reset for some time after rom has been initialized
 reg [15:0] reset_cnt = 16'hffff;
 always @(posedge clk_28m) begin
+`ifdef DEBUG_LEDS
+    if(bl616_jtagsel || !pll_lock || !rom_done || !verify_done || reset || osd_reset || kbd_reset)
+`else
     if(bl616_jtagsel || !pll_lock || !rom_done || reset || osd_reset || kbd_reset)
+`endif
         reset_cnt <= 16'hffff;
     else if(reset_cnt != 0)
         reset_cnt <= reset_cnt - 16'd1;
@@ -623,6 +644,22 @@ end
 wire        sdram_access  = (!ram_oe_n || !ram_we_n);
 wire	    sdram_rw      = !ram_we_n;
 
+`ifdef DEBUG_LEDS
+// reads the Kickstart back from SDRAM before the cpu is released
+reg  [18:0] verify_cnt = 19'd0;
+wire        verify_active = mem_ready && rom_done && !verify_done;
+
+wire		sdram_cs      = verify_active?1'b1:(rom_done?sdram_access:flash_ram_write);
+
+wire        sdram_sync    = clk7_en;
+
+wire		sdram_refresh = verify_active?1'b0:(rom_done?ram_refresh:1'b0);
+
+wire [21:0] sdram_addr    = verify_active?{4'hf,verify_cnt[17:0]}:(rom_done?ram_a[22:1]:flash_ram_addr);
+wire [15:0] sdram_din     = rom_done?ram_dout:flash_doutD;
+wire [1:0]  sdram_be      = verify_active?2'b00:(rom_done?ram_be:2'b00);
+wire		sdram_we      = verify_active?1'b0:(rom_done?sdram_rw:flash_ram_write);
+`else
 wire		sdram_cs      = rom_done?sdram_access:flash_ram_write;
 
 wire        sdram_sync    = clk7_en;
@@ -633,6 +670,7 @@ wire [21:0] sdram_addr    = rom_done?ram_a[22:1]:flash_ram_addr;
 wire [15:0] sdram_din     = rom_done?ram_dout:flash_doutD;
 wire [1:0]  sdram_be      = rom_done?ram_be:2'b00;
 wire		sdram_we      = rom_done?sdram_rw:flash_ram_write;
+`endif
 
 sdram #(.SYNC_DELAY(2), .CHIP48_BURST(1)) sdram (
 	.sd_data    ( IO_sdram_dq   ), // 32 bit bidirectional data bus
@@ -825,6 +863,67 @@ ELVDS_OBUF tmds_bufds [3:0] (
         .O({tmds_clk_p, tmds_d_p}),
         .OB({tmds_clk_n, tmds_d_n})
 );
+
+`ifdef DEBUG_LEDS
+// ------------------------ PMOD-LEDx8 boot diagnostics ------------------------
+// The sum of all words written to SDRAM is compared to the sum read back in
+// eight passes, so this works with any Kickstart.
+
+reg [15:0] flash_sum = 16'd0;
+always @(posedge clk_28m)
+  if(!mem_ready || bl616_jtagsel)            flash_sum <= 16'd0;
+  else if(flash_state == 3'd4 && clk7n_en)   flash_sum <= flash_sum + flash_doutD;
+
+// counter at 28 MHz synchronous to the 7 MHz bus cycle
+reg [1:0] cyc = 2'd0;
+always @(posedge clk_28m)
+  if(clk7_en) cyc <= 2'd0;
+  else        cyc <= cyc + 2'd1;
+
+reg [15:0] verify_sum = 16'd0;
+reg [3:0]  verify_pass = 4'd0;
+reg        verify_first_ok = 1'b0, verify_all_ok = 1'b1;
+wire [15:0] verify_next = verify_sum + sdram_dout;
+
+// At cyc == 2 dout holds the word read during the previous bus cycle, so the
+// address counter runs one step ahead of the data being summed.
+always @(posedge clk_28m)
+  if(!mem_ready || !rom_done) begin
+    verify_done <= 1'b0; verify_cnt <= 19'd0; verify_sum <= 16'd0; verify_pass <= 4'd0;
+    verify_first_ok <= 1'b0; verify_all_ok <= 1'b1;
+  end else if(!verify_done && cyc == 2'd2) begin
+    if(verify_cnt >= 19'd1) verify_sum <= verify_next;
+    if(verify_cnt == 19'h40000) begin
+      if(verify_pass == 4'd0 && verify_next == flash_sum) verify_first_ok <= 1'b1;
+      if(verify_next != flash_sum) verify_all_ok <= 1'b0;
+      if(verify_pass == 4'd7) verify_done <= 1'b1;
+      verify_pass <= verify_pass + 4'd1;
+      verify_cnt  <= 19'd0;
+      verify_sum  <= 16'd0;
+    end else
+      verify_cnt <= verify_cnt + 19'd1;
+  end
+
+reg [25:0] heartbeat = 26'd0;
+always @(posedge clk) heartbeat <= heartbeat + 26'd1;
+
+reg        vs_d = 1'b0;
+reg [24:0] vs_seen = 25'd0;
+always @(posedge clk_28m) begin
+  vs_d <= vs_n;
+  if(vs_d != vs_n)      vs_seen <= 25'h1ffffff;
+  else if(vs_seen != 0) vs_seen <= vs_seen - 25'd1;
+end
+
+assign dbg_led = ~{ |vs_seen,                     // 7: Amiga vsync is running
+                    !cpu_reset,                   // 6: cpu released from reset
+                    verify_done && verify_all_ok, // 5: all eight passes matched
+                    verify_first_ok,              // 4: first pass matched
+                    verify_done,                  // 3: verify finished
+                    rom_done,                     // 2: Kickstart copied to SDRAM
+                    mem_ready,                    // 1: SDRAM, flash and PLL ready
+                    heartbeat[25] };              // 0: core is running
+`endif
 
 endmodule
 
