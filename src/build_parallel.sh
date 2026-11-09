@@ -20,7 +20,7 @@ JOBS=${JOBS:-$(nproc)}
 export QT_QPA_PLATFORM=${QT_QPA_PLATFORM:-minimal}
 
 # logo (skipped if the file is not next to this script)
-cat "$SRC/mistle_100x40_color.ansi.txt" 2>/dev/null
+cat "$SRC/scripts/mistle_100x40_color.ansi.txt" 2>/dev/null
 
 if [ "$*" = all ]; then
     set -- $(cd "$SRC/scripts" && ls build*.tcl | sed 's/^build_\?//; s/\.tcl$//; s/^$/default/')
