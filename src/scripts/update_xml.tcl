@@ -11,6 +11,11 @@ puts "MiSTle XML Tool, board = $board, config = $config"
 # here as e.g. OUTPUT_BASE_NAME would nice to distinguish which
 # board we are building for
 
+if {[catch {exec git describe --tags --always --dirty} tag]} {
+    set tag "unknown"
+}
+puts "Version: $tag"
+
 # Function to read the entire file content
 proc readFile {filename} {
     # Check if file exists and is readable
@@ -75,6 +80,9 @@ set data_xml [ readFile $filename_xml ]
 puts [ format "Read %d bytes from $filename_xml" [ string length $data_xml ] ]
 
 # ===== the data loaded into memory can now be processed =====
+
+# replace the version string
+regsub -all {version="unset"} $data_xml "version=\"$tag\"" data_xml
 
 # mark parts to be kept or removed based in the board name ...
 regsub -all -line "<!--IS.*? $board .*?-->" $data_xml "<!--KEEP-->" data_xml

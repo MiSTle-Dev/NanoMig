@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Amiga/NanoMig configuration -->
-<config name="NanoMig" version="v0.19-beta">
+<config name="NanoMig" version="unset">
   <actions>
     <!-- the init action is being executed immediately -->
     <!-- when this file has been loaded -->

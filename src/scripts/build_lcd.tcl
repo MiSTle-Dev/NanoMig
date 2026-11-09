@@ -76,6 +76,10 @@ add_file misc/sd_rw.v
 add_file misc/sdcmd_ctrl.v
 add_file misc/amiga_keymap.v
 add_file misc/flash_dspi.v
+add_file misc/drive_sounds_hq.v
+add_file misc/drive_sounds_min.v
+add_file misc/io_fifo.v
+add_file misc/uart_port.v
 add_file tang/nano20k/amigaclks.v
 add_file tang/nano20k/gowin_dpb/sector_dpram.v
 add_file tang/nano20k/gowin_dpb/ide_dpram.v
