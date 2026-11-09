@@ -105,7 +105,7 @@ add_file tg68k/TG68KdotC_Kernel.vhd
 add_file misc/amiga_xml.hex
 
 set_option -synthesis_tool gowinsynthesis
-set_option -output_base_name nanomig
+set_option -output_base_name nanomig_20
 set_option -verilog_std sysv2017
 set_option -top_module top
 set_option -use_mspi_as_gpio 1
