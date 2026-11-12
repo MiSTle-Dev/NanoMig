@@ -1,13 +1,16 @@
 {
- "OUTPUT_BASE_NAME" : "nanomig_mistle_gw5a_25",
- "MSPI" : true,
- "SSPI" : true,
- "CPU" : true,
- "Place_Option" : "1",
- "Synthesize_tool" : "GowinSyn",
- "Verilog_Standard" : "Vlg_Std_Sysv2017",
- "TopModule" : "top",
- "Multi_Boot" : false,
- "MSPI_JUMP" : false,
- "TclPre" : "../scripts/update_xml_mistle_gw5a_25.tcl"
+    "Process_Configuration_Verion": "1.0",
+    "OUTPUT_BASE_NAME": "nanomig_mistle_gw5a_25",
+    "MSPI": true,
+    "SSPI": true,
+    "CPU": true,
+    "DOWNLOAD_SPEED": "210/3",
+    "Place_Option": "1",
+    "Synthesize_tool": "GowinSyn",
+    "Verilog_Standard": "Vlg_Std_Sysv2017",
+    "TopModule": "top",
+    "Promote_Physical_Constraint_Warning_to_Error": true,
+    "Multi_Boot": false,
+    "MSPI_JUMP": false,
+    "TclPre": "../scripts/update_xml_mistle_gw5a_25.tcl"
 }

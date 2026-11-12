@@ -104,12 +104,13 @@ proc write_process_json { board } {
     lappend table [list "-output_base_name"  "OUTPUT_BASE_NAME" "str"] 
     lappend table [list "-use_mspi_as_gpio"  "MSPI" "bool"] 
     lappend table [list "-use_sspi_as_gpio"  "SSPI" "bool"] 
-    lappend table [list "-use_jtag_as_gpio"  "JTAG" "bool"] 
-    lappend table [list "-loading_rate"      "" "str"] 
+    lappend table [list "-use_jtag_as_gpio"  "JTAG" "bool"]
+    # the possible loading speed values inside the json are somewhat odd. So we only support a few of them ...
+    lappend table [list "-loading_rate"      "DOWNLOAD_SPEED"  [list [list "25.0" "250/10" ] [list "70.0" "210/3" ]] ] ] 
     lappend table [list "-synthesis_tool"    "Synthesize_tool" [list [list "gowinsynthesis" "GowinSyn" ]] ] 
     lappend table [list "-verilog_std"       "Verilog_Standard"  [list [list "sysv2017" "Vlg_Std_Sysv2017" ]] ]
     lappend table [list "-top_module"        "TopModule"  "str" ]
-    lappend table [list "-cst_warn_to_error" "" "bool" ]
+    lappend table [list "-cst_warn_to_error" "Promote_Physical_Constraint_Warning_to_Error" "bool" ]
     lappend table [list "-multi_boot"        "Multi_Boot" "bool" ]
     lappend table [list "-mspi_jump"         "MSPI_JUMP" "bool" ]
     lappend table [list "-use_cpu_as_gpio"   "CPU" "bool" ]
@@ -117,6 +118,9 @@ proc write_process_json { board } {
 
     set f [open "gowin_prj/impl/nanomig_${board}_process_config.json" w]
     puts $f "{"
+
+    # the "Verion" (sic!) is needed
+    puts $f "    \"Process_Configuration_Verion\": \"1.0\","
     
     foreach option $gprj_options {
 	set name [lindex $option 0]
@@ -148,16 +152,16 @@ proc write_process_json { board } {
 			}
 			
 			# we have the translated value
-			puts $f " \"${json_name}\" : \"$result\","
+			puts $f "    \"${json_name}\": \"$result\","
 			
 		    } elseif { $type == "str" } {	    
-			puts $f " \"${json_name}\" : \"$value\","
+			puts $f "    \"${json_name}\": \"$value\","
 		    } elseif { $type == "bool" } {
 			set bool_str "false"
 		    if { $value } {
 			set bool_str "true"
 		    }
-			puts $f " \"${json_name}\" : $bool_str,"
+			puts $f "    \"${json_name}\": $bool_str,"
 		    } else {
 			puts "What's this???"
 			exit -1
@@ -172,7 +176,7 @@ proc write_process_json { board } {
 	}	    
 	
     }    
-    puts $f " \"TclPre\" : \"../scripts/update_xml_${board}.tcl\""
+    puts $f "    \"TclPre\": \"../scripts/update_xml_${board}.tcl\""
     
     puts $f "}"
     close $f

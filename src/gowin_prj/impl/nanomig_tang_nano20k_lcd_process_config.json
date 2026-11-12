@@ -1,12 +1,15 @@
 {
- "OUTPUT_BASE_NAME" : "nanomig_tang_nano20k_lcd",
- "MSPI" : true,
- "SSPI" : true,
- "JTAG" : false,
- "Synthesize_tool" : "GowinSyn",
- "Verilog_Standard" : "Vlg_Std_Sysv2017",
- "TopModule" : "top",
- "Multi_Boot" : false,
- "MSPI_JUMP" : false,
- "TclPre" : "../scripts/update_xml_tang_nano20k_lcd.tcl"
+    "Process_Configuration_Verion": "1.0",
+    "OUTPUT_BASE_NAME": "nanomig_tang_nano20k_lcd",
+    "MSPI": true,
+    "SSPI": true,
+    "JTAG": false,
+    "DOWNLOAD_SPEED": "250/10",
+    "Synthesize_tool": "GowinSyn",
+    "Verilog_Standard": "Vlg_Std_Sysv2017",
+    "TopModule": "top",
+    "Promote_Physical_Constraint_Warning_to_Error": true,
+    "Multi_Boot": false,
+    "MSPI_JUMP": false,
+    "TclPre": "../scripts/update_xml_tang_nano20k_lcd.tcl"
 }
