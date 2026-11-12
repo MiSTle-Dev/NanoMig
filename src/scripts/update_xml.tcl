@@ -111,6 +111,7 @@ puts [ format "Cleaned up to %d bytes" [ string length $data_xml ] ]
 # step 3: gzip compress
 set data_gzip [zlib gzip $data_xml]
 # hexdump $data_gzip
+set gzip_len [string length $data_gzip]
 
 # step 4: convert binary to hex
 set data_hex [ string2hex $data_gzip ]

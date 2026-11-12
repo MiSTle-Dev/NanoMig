@@ -1,0 +1,130 @@
+// do not edit, auto generated from:
+// tang/nano20k/nanomig_common.cst
+// tang/nano20k/nanomig_lcd.cst
+
+// nanomig.cst - pins used by all nano20k build variants
+
+IO_LOC "clk" 4;
+IO_PORT "clk" IO_TYPE=LVCMOS33 PULL_MODE=UP;
+
+// two on-board buttons
+IO_LOC "user" 88;
+IO_PORT "user" IO_TYPE=LVCMOS33 PULL_MODE=DOWN;
+IO_LOC "reset" 87;
+IO_PORT "reset" IO_TYPE=LVCMOS33 PULL_MODE=DOWN;
+
+// the six on-board leds
+IO_LOC "leds_n[5]" 20;
+IO_PORT "leds_n[5]" PULL_MODE=UP DRIVE=8 IO_TYPE=LVCMOS33;
+IO_LOC "leds_n[4]" 19;
+IO_PORT "leds_n[4]" PULL_MODE=UP DRIVE=8 IO_TYPE=LVCMOS33;
+IO_LOC "leds_n[3]" 18;
+IO_PORT "leds_n[3]" PULL_MODE=UP DRIVE=8 IO_TYPE=LVCMOS33;
+IO_LOC "leds_n[2]" 17;
+IO_PORT "leds_n[2]" PULL_MODE=UP DRIVE=8 IO_TYPE=LVCMOS33;
+IO_LOC "leds_n[1]" 16;
+IO_PORT "leds_n[1]" PULL_MODE=UP DRIVE=8 IO_TYPE=LVCMOS33;
+IO_LOC "leds_n[0]" 15;
+IO_PORT "leds_n[0]" PULL_MODE=UP DRIVE=8 IO_TYPE=LVCMOS33;
+
+// ws2812 led
+IO_LOC "ws2812" 79;
+IO_PORT "ws2812" DRIVE=8 IO_TYPE=LVCMOS33;
+
+// SPI flash
+IO_LOC "mspi_wp" 57;
+IO_PORT "mspi_wp" PULL_MODE=DOWN IO_TYPE=LVCMOS33;
+IO_LOC "mspi_clk" 59;
+IO_PORT "mspi_clk" PULL_MODE=NONE DRIVE=8 IO_TYPE=LVCMOS33;
+IO_LOC "mspi_cs" 60;
+IO_PORT "mspi_cs" PULL_MODE=UP IO_TYPE=LVCMOS33;
+IO_LOC "mspi_di" 61;
+IO_PORT "mspi_di" PULL_MODE=NONE DRIVE=8 IO_TYPE=LVCMOS33;
+IO_LOC "mspi_do" 62;
+IO_PORT "mspi_do" PULL_MODE=NONE DRIVE=8 IO_TYPE=LVCMOS33;
+IO_LOC "mspi_hold" 63;
+IO_PORT "mspi_hold" PULL_MODE=NONE IO_TYPE=LVCMOS33;
+
+// SD card
+IO_LOC "sd_clk" 83;
+IO_PORT "sd_clk" PULL_MODE=NONE IO_TYPE=LVCMOS33; 
+IO_LOC "sd_cmd" 82;        // MOSI
+IO_PORT "sd_cmd" PULL_MODE=NONE IO_TYPE=LVCMOS33;
+IO_LOC "sd_dat[0]" 84;       // MISO
+IO_PORT "sd_dat[0]" PULL_MODE=NONE IO_TYPE=LVCMOS33;
+IO_LOC "sd_dat[1]" 85;
+IO_PORT "sd_dat[1]" PULL_MODE=NONE IO_TYPE=LVCMOS33;
+IO_LOC "sd_dat[2]" 80;
+IO_PORT "sd_dat[2]" PULL_MODE=NONE IO_TYPE=LVCMOS33;
+IO_LOC "sd_dat[3]" 81;
+IO_PORT "sd_dat[3]" PULL_MODE=NONE IO_TYPE=LVCMOS33;
+
+// connections to the internal BL616 controller
+IO_LOC "spi_csn" 86;
+IO_PORT "spi_csn" PULL_MODE=UP IO_TYPE=LVCMOS33;
+IO_LOC "spi_sclk" 13;
+IO_PORT "spi_sclk" PULL_MODE=UP IO_TYPE=LVCMOS33;
+IO_LOC "spi_dat" 76;
+IO_PORT "spi_dat" PULL_MODE=UP IO_TYPE=LVCMOS33;
+IO_LOC "spi_dir" 75;
+IO_PORT "spi_dir" PULL_MODE=NONE DRIVE=8 IO_TYPE=LVCMOS33;
+IO_LOC "spi_irqn" 69; // USB-C UART TX output
+IO_PORT "spi_irqn" PULL_MODE=NONE DRIVE=8 IO_TYPE=LVCMOS33;
+// nanomig_lcd.cst - pins available in the lcd variants only
+
+// internal LCD
+IO_LOC "lcd_dclk" 77;
+IO_PORT "lcd_dclk" IO_TYPE=LVCMOS33;
+IO_LOC "lcd_hs" 25;
+IO_PORT "lcd_hs" IO_TYPE=LVCMOS33;
+IO_LOC "lcd_vs" 26;
+IO_PORT "lcd_vs" IO_TYPE=LVCMOS33;
+IO_LOC "lcd_de" 48;
+IO_PORT "lcd_bl" PULL_MODE=DOWN IO_TYPE=LVCMOS33;
+IO_LOC "lcd_bl" 49;
+IO_PORT "lcd_de" IO_TYPE=LVCMOS33;
+
+IO_LOC "lcd_r[0]" 42;
+IO_PORT "lcd_r[0]" IO_TYPE=LVCMOS33 DRIVE=24;
+IO_LOC "lcd_r[1]" 41;
+IO_PORT "lcd_r[1]" IO_TYPE=LVCMOS33 DRIVE=24;
+IO_LOC "lcd_r[2]" 40;
+IO_PORT "lcd_r[2]" IO_TYPE=LVCMOS33 DRIVE=24;
+IO_LOC "lcd_r[3]" 39;
+IO_PORT "lcd_r[3]" IO_TYPE=LVCMOS33 DRIVE=24;
+IO_LOC "lcd_r[4]" 38;
+IO_PORT "lcd_r[4]" IO_TYPE=LVCMOS33 DRIVE=24;
+
+IO_LOC "lcd_g[0]" 37;
+IO_PORT "lcd_g[0]" IO_TYPE=LVCMOS33 DRIVE=24;
+IO_LOC "lcd_g[1]" 36;
+IO_PORT "lcd_g[1]" IO_TYPE=LVCMOS33 DRIVE=24;
+IO_LOC "lcd_g[2]" 35;
+IO_PORT "lcd_g[2]" IO_TYPE=LVCMOS33 DRIVE=24;
+IO_LOC "lcd_g[3]" 34;
+IO_PORT "lcd_g[3]" IO_TYPE=LVCMOS33 DRIVE=24;
+IO_LOC "lcd_g[4]" 33;
+IO_PORT "lcd_g[4]" IO_TYPE=LVCMOS33 DRIVE=24;
+IO_LOC "lcd_g[5]" 32;
+IO_PORT "lcd_g[5]" IO_TYPE=LVCMOS33 DRIVE=24;
+
+IO_LOC "lcd_b[0]" 31;
+IO_PORT "lcd_b[0]" IO_TYPE=LVCMOS33 DRIVE=24;
+IO_LOC "lcd_b[1]" 30;
+IO_PORT "lcd_b[1]" IO_TYPE=LVCMOS33 DRIVE=24;
+IO_LOC "lcd_b[2]" 29;
+IO_PORT "lcd_b[2]" IO_TYPE=LVCMOS33 DRIVE=24;
+IO_LOC "lcd_b[3]" 28;
+IO_PORT "lcd_b[3]" IO_TYPE=LVCMOS33 DRIVE=24;
+IO_LOC "lcd_b[4]" 27;
+IO_PORT "lcd_b[4]" IO_TYPE=LVCMOS33 DRIVE=24;
+
+// audio amplifier
+IO_LOC "pa_en" 51;
+IO_PORT "pa_en" PULL_MODE=UP DRIVE=8 IO_TYPE=LVCMOS33;
+IO_LOC "hp_din" 54;
+IO_PORT "hp_din" PULL_MODE=UP DRIVE=8 IO_TYPE=LVCMOS33;
+IO_LOC "hp_ws" 55;
+IO_PORT "hp_ws" PULL_MODE=UP DRIVE=8 IO_TYPE=LVCMOS33;
+IO_LOC "hp_bck" 56;
+IO_PORT "hp_bck" PULL_MODE=UP DRIVE=8 IO_TYPE=LVCMOS33;

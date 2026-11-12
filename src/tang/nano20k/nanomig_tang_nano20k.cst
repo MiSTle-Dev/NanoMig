@@ -1,12 +1,17 @@
-// digital video
-IO_LOC "tmds_clk_p" 33,34;
-IO_PORT "tmds_clk_p" PULL_MODE=NONE DRIVE=8;
-IO_LOC "tmds_d_p[0]" 35,36;
-IO_PORT "tmds_d_p[0]" PULL_MODE=NONE DRIVE=8;
-IO_LOC "tmds_d_p[1]" 37,38;
-IO_PORT "tmds_d_p[1]" PULL_MODE=NONE DRIVE=8;
-IO_LOC "tmds_d_p[2]" 39,40;
-IO_PORT "tmds_d_p[2]" PULL_MODE=NONE DRIVE=8;
+// do not edit, auto generated from:
+// tang/nano20k/nanomig_common.cst
+// tang/nano20k/nanomig_hdmi.cst
+
+// nanomig.cst - pins used by all nano20k build variants
+
+IO_LOC "clk" 4;
+IO_PORT "clk" IO_TYPE=LVCMOS33 PULL_MODE=UP;
+
+// two on-board buttons
+IO_LOC "user" 88;
+IO_PORT "user" IO_TYPE=LVCMOS33 PULL_MODE=DOWN;
+IO_LOC "reset" 87;
+IO_PORT "reset" IO_TYPE=LVCMOS33 PULL_MODE=DOWN;
 
 // the six on-board leds
 IO_LOC "leds_n[5]" 20;
@@ -54,6 +59,29 @@ IO_PORT "sd_dat[2]" PULL_MODE=NONE IO_TYPE=LVCMOS33;
 IO_LOC "sd_dat[3]" 81;
 IO_PORT "sd_dat[3]" PULL_MODE=NONE IO_TYPE=LVCMOS33;
 
+// connections to the internal BL616 controller
+IO_LOC "spi_csn" 86;
+IO_PORT "spi_csn" PULL_MODE=UP IO_TYPE=LVCMOS33;
+IO_LOC "spi_sclk" 13;
+IO_PORT "spi_sclk" PULL_MODE=UP IO_TYPE=LVCMOS33;
+IO_LOC "spi_dat" 76;
+IO_PORT "spi_dat" PULL_MODE=UP IO_TYPE=LVCMOS33;
+IO_LOC "spi_dir" 75;
+IO_PORT "spi_dir" PULL_MODE=NONE DRIVE=8 IO_TYPE=LVCMOS33;
+IO_LOC "spi_irqn" 69; // USB-C UART TX output
+IO_PORT "spi_irqn" PULL_MODE=NONE DRIVE=8 IO_TYPE=LVCMOS33;
+// nanomig_hdmi.cst - pins available in the hdmi variants only
+
+// digital video
+IO_LOC "tmds_clk_p" 33,34;
+IO_PORT "tmds_clk_p" PULL_MODE=NONE DRIVE=8;
+IO_LOC "tmds_d_p[0]" 35,36;
+IO_PORT "tmds_d_p[0]" PULL_MODE=NONE DRIVE=8;
+IO_LOC "tmds_d_p[1]" 37,38;
+IO_PORT "tmds_d_p[1]" PULL_MODE=NONE DRIVE=8;
+IO_LOC "tmds_d_p[2]" 39,40;
+IO_PORT "tmds_d_p[2]" PULL_MODE=NONE DRIVE=8;
+
 // generic IO pins used for DB9 port 1 (mouse & joystick)
 IO_LOC "js0[0]" 27;
 IO_PORT "js0[0]" PULL_MODE=UP IO_TYPE=LVCMOS33;
@@ -93,26 +121,6 @@ IO_LOC "m0s[3]" 54;
 IO_PORT "m0s[3]" PULL_MODE=UP IO_TYPE=LVCMOS33;
 IO_LOC "m0s[4]" 51;
 IO_PORT "m0s[4]" PULL_MODE=UP IO_TYPE=LVCMOS33;
-//IO_LOC "m0s[5]" 48;
-//IO_PORT "m0s[5]" PULL_MODE=UP IO_TYPE=LVCMOS33;
-
-// connections to the internal BL616 controller
-IO_LOC "spi_csn" 86;
-IO_PORT "spi_csn" PULL_MODE=UP IO_TYPE=LVCMOS33;
-IO_LOC "spi_sclk" 13;
-IO_PORT "spi_sclk" PULL_MODE=UP IO_TYPE=LVCMOS33;
-IO_LOC "spi_dat" 76;
-IO_PORT "spi_dat" PULL_MODE=UP IO_TYPE=LVCMOS33;
-IO_LOC "spi_dir" 75;
-IO_PORT "spi_dir" PULL_MODE=NONE DRIVE=8 IO_TYPE=LVCMOS33;
-IO_LOC "spi_irqn" 69; // USB-C UART TX output
-IO_PORT "spi_irqn" PULL_MODE=NONE DRIVE=8 IO_TYPE=LVCMOS33;
-
-// two on-board buttons
-IO_LOC "user" 88;
-IO_PORT "user" IO_TYPE=LVCMOS33 PULL_MODE=DOWN;
-IO_LOC "reset" 87;
-IO_PORT "reset" IO_TYPE=LVCMOS33 PULL_MODE=DOWN;
 
 // MIDI
 IO_LOC "midi_out" 71;
@@ -123,6 +131,3 @@ IO_PORT "midi_in" IO_TYPE=LVCMOS33 PULL_MODE=DOWN;
 // BUZZER for floppy & HDD drive sounds
 IO_LOC "buzzer" 53;
 IO_PORT "buzzer" IO_TYPE=LVCMOS33 DRIVE=8 PULL_MODE=DOWN;
-
-IO_LOC "clk" 4;
-IO_PORT "clk" IO_TYPE=LVCMOS33 PULL_MODE=UP;

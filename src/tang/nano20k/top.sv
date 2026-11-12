@@ -11,25 +11,11 @@
 // for example: openFPGALoader --external-flash -o 0x400000 kick31.rom
 // =========================================================================
 
-// `define ENABLE_TG68K
-// `define ENABLE_AGA   // offer the AGA chipset in the menu
-// `define CPU_SLOW14   // run TG68K at 14MHz effective (A1200 speed) for timing closure
-// `define ENABLE_CACHE // MiSTer cpu cache between the cpu and the sdram (cached kickstart + fast ram)
-// `define CHIPRAM_CACHE
-// `define DISABLE_IDE  // v32 experiment: cache + ide together
-// `define NO_WS2812   // drop the rgb status led to make room for cache + ide
-// `define DENISE_EBR   // block ram based bitplane and sprite buffers, saves logic
-`define DISABLE_ROM_LOADER // drop the rom loader to make room 
-// `define ENABLE_AT_MODEM // serial port <-> virtual AT modem of the FPGA Companion (replaces the midi_in pin)
-// `define ENABLE_PLIP // virtual parallel port: network via plipbox.device and the FPGA Companion, see doc/PLIP.md
-// `define PLIP_LITE   // PLIP without statistics and loopback test, saves logic (needed for the 020 build)
-`define HQ_DRIVE_SOUNDS // drive sounds: with = tone bursts (drive_sounds_hq), without = single click (drive_sounds_min, fewer LEs)
-
 module top(
   input			clk,
 
-  input			reset, // button S2
-  input			user,  // button S1
+  input			reset,		   // button S2
+  input			user,		   // button S1
 
   output [5:0]	leds_n,
   output		ws2812,
@@ -49,51 +35,84 @@ module top(
   output		O_sdram_cas_n, // columns address select
   output		O_sdram_ras_n, // row address select
   output		O_sdram_wen_n, // write enable
-  inout [31:0]	IO_sdram_dq, // 32 bit bidirectional data bus
-  output [10:0]	O_sdram_addr, // 11 bit multiplexed address bus
-  output [1:0]	O_sdram_ba, // two banks
-  output [3:0]	O_sdram_dqm, // 32/4
+  inout [31:0]	IO_sdram_dq,   // 32 bit bidirectional data bus
+  output [10:0]	O_sdram_addr,  // 11 bit multiplexed address bus
+  output [1:0]	O_sdram_ba,	   // two banks
+  output [3:0]	O_sdram_dqm,   // 32/4
 
+`ifndef DISABLE_DB9
   // generic IO, used for mouse & joystick
   input [5:0]	js0,
 
   // spare IO, used for 2nd joystick
-  input [5:0]   js1,
-
+  input [5:0]	js1,
+`endif
+		   
+`ifndef DISABLE_EXTERNAL_COMPANION
   // interface to external BL616/M0S
   inout [4:0]	m0s,
-
+`endif
+		   
+`ifndef DISABLE_MIDI
   // MIDI/UART
   input			midi_in,
   output		midi_out,
+`endif
 
+`ifdef ENABLE_DRIVE_SOUNDS	   
   // BUZZER
   output		buzzer,
-
+`endif
+		   
   // SD card slot
   output		sd_clk,
-  inout			sd_cmd, // MOSI
-  inout [3:0]	sd_dat, // 0: MISO
+  inout			sd_cmd,		   // MOSI
+  inout [3:0]	sd_dat,		   // 0: MISO
 	   
+`ifndef DISABLE_HDMI
+  // hdmi/tdms
+  output		tmds_clk_n,
+  output		tmds_clk_p,
+  output [2:0]	tmds_d_n,
+  output [2:0]	tmds_d_p,
+`endif
+
+`ifdef ENABLE_LCD
+  // audio
+  output		hp_bck,
+  output		hp_ws,
+  output		hp_din,
+  output		pa_en,
+
+  // internal lcd
+  output		lcd_dclk,
+  output		lcd_hs,		   // lcd horizontal synchronization
+  output		lcd_vs,		   // lcd vertical synchronization        
+  output		lcd_bl,		   // lcd backlight enable
+  output		lcd_de,		   // lcd data enable     
+  output [4:0]	lcd_r,		   // lcd red
+  output [5:0]	lcd_g,		   // lcd green
+  output [4:0]	lcd_b,		   // lcd blue		   
+`endif
+		   
   // SPI connection to ob-board BL616. By default an external
   // connection is used with a M0S Dock
   input			spi_sclk,
   input			spi_csn,
   output		spi_dir,
   input			spi_dat,
-  output		spi_irqn,
-
-  // hdmi/tdms
-  output		tmds_clk_n,
-  output		tmds_clk_p,
-  output [2:0]	tmds_d_n,
-  output [2:0]	tmds_d_p
+  output		spi_irqn
 );
 `default_nettype none
   
+`ifndef DISABLE_DB9
 // physcial dsub9 joystick & mouse port 1 and 2
 wire [5:0] db9_joy0 = { !js0[5], !js0[0], !js0[2], !js0[1], !js0[4], !js0[3] };   
 wire [5:0] db9_joy1 = { !js1[5], !js1[0], !js1[2], !js1[1], !js1[4], !js1[3] }; 
+`else
+wire [5:0] db9_joy0 = 6'b000000;
+wire [5:0] db9_joy1 = 6'b000000;
+`endif
    
 wire [5:0]	leds;
 wire fdd_step_n;
@@ -175,11 +194,18 @@ wire [1:0] osd_video_scanlines;
 wire [2:0] osd_turbo;           // 001=turbochip, 010=turbokick, 100=chipcache
 wire       osd_joy_swap;        // 0=off, 1=on
 wire [2:0] osd_volume;          // Mute=0, 1=25%, 2=50%, 3=75%, 4=100%
+`ifndef DISABLE_HDMI
 wire       osd_stereo_mix;      // 0=off, 1=on
+`endif
 wire [1:0] osd_kickstart;       // 1=1.3, 2=3.1, 3=3.2
 wire 	   osd_drive_sounds;   	// 0 = disabled, 1 = enabled
-
-// wire	   rom_download_in_progress;	
+`ifdef ENABLE_LCD
+wire [7:0] osd_lcd_v_pos;       // -20 .. 20 vertical offset for lcd adjustment
+`endif
+   
+`ifndef DISABLE_ROM_LOADER
+wire	   rom_download_in_progress;	
+`endif
 
 // this is the reset that goes into the nanomig itself
 reg nanomig_reset = 1;
@@ -195,17 +221,18 @@ always @(posedge clk_28m, posedge rst_28m) begin
                              ;
 end
 
+wire spi_io_dout;
+wire spi_intn;   
+assign spi_dir = spi_io_dout;
+assign spi_irqn = spi_intn;
+   
+`ifndef DISABLE_EXTERNAL_COMPANION
 // -------------------------- M0S MCU interface -----------------------
 // intn and dout are outputs driven by the FPGA to the MCU
 // din, ss and clk are inputs coming from the MCU
 // onboard connection to on-board BL616
 
-wire spi_io_dout;
-wire spi_intn;   
-   
-assign spi_dir = spi_io_dout;
 assign m0s[4:0] = { spi_intn, 3'bzzz, spi_io_dout };
-assign spi_irqn = spi_intn;
 
 // by default the internal SPI is being used. Once there is
 // a select from the external spi, then the connection is
@@ -230,7 +257,13 @@ end
 wire spi_io_din = spi_ext?m0s[1]:spi_dat;
 wire spi_io_ss = spi_ext?m0s[2]:spi_csn;
 wire spi_io_clk = spi_ext?m0s[3]:spi_sclk;
+`else // !`ifndef DISABLE_EXTERNAL_COMPANION
+wire spi_io_din = spi_dat;
+wire spi_io_ss = spi_csn;
+wire spi_io_clk = spi_sclk;
+`endif
 
+   
 // connect to ws2812 led. The rgb status led costs ~150 luts which the cache
 // plus ide combination needs, so it is dropped when space is tight.
 wire [23:0] ws2812_color;
@@ -308,7 +341,6 @@ reg         sd_ready;
 
 `ifndef DISABLE_ROM_LOADER
 // state machine handling kickstart upload from Companion
-wire		 rom_download_in_progress;
 reg [2:0]	 kick_upload_state = 3'd0;
 reg		     kick_is_256k; 
 assign	     rom_download_in_progress = kick_upload_state >= 3'd1 && kick_upload_state <= 3'd3;
@@ -546,7 +578,13 @@ sysctrl #(
 	.system_turbo(osd_turbo),
 	.system_joy_swap(osd_joy_swap),
 	.system_volume(osd_volume),
+`ifndef DISABLE_HDMI
+	// only hdmi has stereo output
 	.system_stereo_mix(osd_stereo_mix),
+`endif
+`ifdef ENABLE_LCD
+    .system_lcd_v_pos(osd_lcd_v_pos),
+`endif
   	.system_kickstart(osd_kickstart),
 	.system_drive_sounds(osd_drive_sounds),
 
@@ -673,7 +711,14 @@ assign ram_din = sdram_dout;
 
 // pack config values into minimig config
 wire [5:0] chipset_config = { 1'b0,osd_chipset,osd_video_mode,1'b0 };
+
+`ifdef DISABLE_TG68K_010
+// disabling the ability to select 010 cpu saves some luts
+wire [1:0] cpu_config = { |osd_cpu ? 2'b11 : 2'b00 };
+`else
 wire [1:0] cpu_config = { osd_cpu };
+`endif
+   
 wire [7:0] memory_config = { 4'b0_000, osd_slowmem, osd_chipmem };   
 wire [2:0] fastram_config = { 1'b0, osd_fastmem };   
 wire [2:0] turbo_config = { osd_turbo };
@@ -723,8 +768,14 @@ nanomig nanomig
  .audio_right(audio_right),
 
  // uart interface 
+`ifndef DISABLE_MIDI
  .uart_rx(midi_in),
  .uart_tx(midi_out),
+`else
+ .uart_rx(1'b1),
+ .uart_tx(),
+`endif
+ 
 `ifdef ENABLE_AT_MODEM
  .serial_status(serial_status),
  .serial_tx_available(serial_tx_available),
@@ -977,10 +1028,21 @@ localparam CHIP48_BURST = 0
 `endif
 ;
 
+// if no cpu is explicitely enabled, then the fx68k is being used
+`ifndef ENABLE_TG68K
+  `ifndef ENABLE_FX68K
+    `define ENABLE_FX68K
+  `endif
+`endif
+   
 sdram #(
     .DATA_WIDTH(32),
     .RAS_WIDTH(11),
     .CAS_WIDTH(8),
+`ifndef ENABLE_FX68K
+	// TODO: investigate why fx68k would not run with this set 
+	.SYNC_DELAY(4),               // increased delay to relax timing and make the core fit
+`endif
     .CHIP48_BURST(CHIP48_BURST)   // the wide 64 bit fetch AGA or cache needs
 ) sdram (
 	.sd_data    ( IO_sdram_dq   ), // 32 bit bidirectional data bus
@@ -1039,8 +1101,23 @@ flash flash (
     .mspi_do   ( mspi_do     )
 );
 
-/* -------------------- HDMI video and audio -------------------- */
+/* -------------------- video and audio -------------------- */
+wire vreset, vpal, interlace, short_frame;
 
+video_analyzer video_analyzer (
+    .clk         ( clk_28m   ),
+    .hs          ( hs_n      ),
+    .vs          ( vs_n      ),
+    .pal         ( vpal      ),
+    .short_frame ( short_frame ),
+    .screen      ( osd_video_screen ),
+    .interlace   ( interlace ),
+    .vreset      ( vreset    )
+);
+
+`ifndef DISABLE_HDMI
+/* -------------------- HDMI video and audio -------------------- */
+   
 // latch audio, so it's stable during 48khz transfer
 reg [15:0] audio_reg [2]; // 16 bit signed audio for HDMI
 
@@ -1136,19 +1213,6 @@ end
 wire [2:0] tmds;
 wire tmds_clock;
 
-wire vreset, vpal, interlace, short_frame;
-
-video_analyzer video_analyzer (
-    .clk         ( clk_28m   ),
-    .hs          ( hs_n      ),
-    .vs          ( vs_n      ),
-    .pal         ( vpal      ),
-    .short_frame ( short_frame ),
-    .screen      ( osd_video_screen ),
-    .interlace   ( interlace ),
-    .vreset      ( vreset    )
-);
-
 hdmi #(
     .AUDIO_RATE(AUDIO_RATE),
     .AUDIO_BIT_WIDTH(16),
@@ -1177,8 +1241,9 @@ ELVDS_OBUF tmds_bufds [3:0] (
         .O({tmds_clk_p, tmds_d_p}),
         .OB({tmds_clk_n, tmds_d_n})
 );
-
+      
 // ========================= Drive Sounds =========================
+`ifdef ENABLE_DRIVE_SOUNDS
 `ifdef HQ_DRIVE_SOUNDS
 drive_sounds_hq drive_sounds_inst (
     .clk     (clk_pixel),
@@ -1199,6 +1264,132 @@ drive_sounds_min drive_sounds_inst (
     .buzzer  (buzzer)
 );
 `endif // HQ_DRIVE_SOUNDS
+`endif //  `ifdef ENABLE_DRIVE_SOUNDS
+`else // !`ifndef DISABLE_HDMI   
+`ifdef ENABLE_DRIVE_SOUNDS	   
+   $error("Drive sounds are not supported without HDMI");
+`endif
+
+`endif //  `ifndef DISABLE_HDMI
+
+
+`ifdef ENABLE_LCD
+/* -------------------- LCD video and audio -------------------- */
+
+assign lcd_dclk = clk_pixel;
+assign lcd_hs = hs_n;
+assign lcd_vs = vs_n;
+assign lcd_bl = !nanomig_reset;   // enable display backlight once cpu is out of reset
+
+reg [9:0] hcnt;   // max 1023
+reg [9:0] vcnt;   // max 626
+
+// generate the 800x480 pixel display enable signal 
+assign lcd_de = (hcnt < 10'd800) && (vcnt < 10'd480);
+
+always @(posedge clk_pixel) begin
+   reg       last_vs_n, last_hs_n;
+
+   last_hs_n <= lcd_hs;   
+
+   // rising edge/end of hsync
+   if(lcd_hs && !last_hs_n) begin
+      hcnt <= 10'd980;
+
+      last_vs_n <= lcd_vs;   
+      if(lcd_vs && !last_vs_n) begin
+         vcnt <= 10'd946 - { {2{osd_lcd_v_pos[7]}}, osd_lcd_v_pos };
+      end else
+        vcnt <= vcnt + 10'd1;    
+   end else
+      hcnt <= hcnt + 10'd1;    
+end
+   
+/* ------------------- audio processing --------------- */
+
+// MAX98357A
+   
+// EN is actually the /SD_MODE of the MAX98357A and driving it high selects
+// left channel only. For stereo mixing there would have to be a "large" 
+// resistor as a pullup which isn't there on the TN20k
+
+assign pa_en = !nanomig_reset;   // simply enable amplifier with left channel
+
+// latch audio, so it's stable during 48khz transfer
+reg [14:0] scaled_audio_left;
+reg [14:0] scaled_audio_right;
+
+reg clk_audio;
+reg [7:0] aclk_cnt;
+always @(posedge clk_28m) begin
+    if(aclk_cnt < 28375160 / (24000*32) / 2 - 1)
+        aclk_cnt <= aclk_cnt + 8'd1;
+    else begin
+        aclk_cnt <= 8'd0;
+        clk_audio <= ~clk_audio;
+
+	    // Scale values and Assign scaled values to the HDMI registers
+        case (osd_volume) 
+            3'b100: begin // 100%
+                scaled_audio_left  <= audio_left;
+                scaled_audio_right <= audio_right;
+            end
+            3'b011: begin // 75%
+                scaled_audio_left  <= ($signed(audio_left)  >>> 1) + ($signed(audio_left)  >>> 2);
+                scaled_audio_right <= ($signed(audio_right) >>> 1) + ($signed(audio_right) >>> 2);
+            end
+            3'b010: begin // 50%
+                scaled_audio_left  <= $signed(audio_left)  >>> 1;
+                scaled_audio_right <= $signed(audio_right) >>> 1;
+            end
+            3'b001: begin // 25%
+                scaled_audio_left  <= $signed(audio_left)  >>> 2;
+                scaled_audio_right <= $signed(audio_right) >>> 2;
+            end
+            3'b000: begin // Mute
+                scaled_audio_left  <= 15'd0;
+                scaled_audio_right <= 15'd0;
+            end
+            default: begin
+                scaled_audio_left  <= $signed(audio_left)  >>> 1;
+                scaled_audio_right <= $signed(audio_right) >>> 1;
+            end
+        endcase
+    end
+end
+
+// sign expand and add both channels
+wire [15:0] audio_mix = { scaled_audio_left[14], scaled_audio_left} + { scaled_audio_right[14], scaled_audio_right };
+
+// shift audio down to reduce amp output volume to a sane range
+localparam AUDIO_SHIFT = 3;   
+wire [15:0] audio_scaled = { { AUDIO_SHIFT+1{audio_mix[15]}}, audio_mix[14:AUDIO_SHIFT] };   
+
+// count 32 bits, 16 left and 16 right channel. MAX samples
+// on rising edge
+reg [15:0] audio;
+reg [4:0] audio_bit_cnt;
+always @(posedge clk_audio) begin
+   if(nanomig_reset) audio_bit_cnt <= 5'd0;
+   else              audio_bit_cnt <= audio_bit_cnt + 5'd1;
+
+   // latch data so it's stable during transmission
+   if(audio_bit_cnt == 5'd31)
+	 audio <= audio_scaled;
+end
+
+// generate i2s signals
+assign hp_bck = !clk_audio;
+assign hp_ws = nanomig_reset?1'b0:audio_bit_cnt[4];
+assign hp_din = nanomig_reset?1'b0:audio[15-audio_bit_cnt[3:0]];
+
+// map to rgb565
+assign lcd_r = video_red[5:1];
+assign lcd_g = video_green;
+assign lcd_b = video_blue[5:1];  
+
+`endif //  `ifdef ENABLE_LCD
+   
    
 endmodule
 

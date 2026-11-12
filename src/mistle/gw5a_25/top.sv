@@ -2,23 +2,6 @@
     top.sv - Minimig on GW5A-LV25-LQ144-C1/I0
 */
 
-`define GOWIN
-
-`define ENABLE_AGA
-`define ENABLE_RAM32
-`define ENABLE_TG68K  // required for AGA as that expects a 020 cpu
-`define CPU_SLOW14    // run TG68K at 14MHz effective (A1200 speed) for timing closure
-//`define DENISE_EBR    // block ram based bitplane and sprite buffers, saves logic
-`define ENABLE_CACHE  // required for AGA as the 020 has caches
-`define CHIPRAM_CACHE // cache chip ram instruction fetches too (a1200 68ec020 style) with chip bus snooping
-//`define NO_WS2812     // drop the rgb status led to make room for cache + ide
-`define ENABLE_RTC
-`define DISABLE_ROM_IMAGE
-
-//`define ENABLE_INT_ROM
-//`define ENABLE_INT_RAM
-//`define ENABLE_INT_ROM_FLASH_READ
-
 module top(
   input			clk, // 50 MHz in
 

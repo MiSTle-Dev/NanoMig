@@ -1,0 +1,12 @@
+{
+ "OUTPUT_BASE_NAME" : "nanomig_tang_nano20k",
+ "MSPI" : true,
+ "SSPI" : true,
+ "JTAG" : false,
+ "Synthesize_tool" : "GowinSyn",
+ "Verilog_Standard" : "Vlg_Std_Sysv2017",
+ "TopModule" : "top",
+ "Multi_Boot" : false,
+ "MSPI_JUMP" : false,
+ "TclPre" : "../scripts/update_xml_tang_nano20k.tcl"
+}
