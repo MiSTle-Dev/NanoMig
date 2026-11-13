@@ -9,6 +9,7 @@ if {$argc == 0} {
     puts "       device: nano20k, gw5a_25"
     puts "       options:"
     puts "               nano20k: aga, lcd   - build aga+020 and/or rgblcd variant"
+    puts "               all:     dryrun     - generate files only, don't run synthesis"
     exit 1
 }
 
@@ -96,6 +97,19 @@ proc set_option_int { name value } {
     set_option $name $value
 }
 
+# we cannot pass parameters into the tcl script invoked by
+# the gprj/ide build process. Thus custom wrapper scripts
+# are written for each variant. This is the script that is
+# being referenced in the json via option TclPre
+proc write_xml_updater { board } {
+    puts "NOTE Creating \"scripts/update_xml_${board}.tcl\""
+    set f [open "scripts/update_xml_${board}.tcl" w]
+    puts $f "set board \"$board\""
+    puts $f "set config \"amiga\""
+    puts $f "scripts/update_xml.tcl"
+    close $f
+}
+
 # impl/nanomig_process_config.json 
 proc write_process_json { board } {
     global gprj_options
@@ -106,7 +120,7 @@ proc write_process_json { board } {
     lappend table [list "-use_sspi_as_gpio"  "SSPI" "bool"] 
     lappend table [list "-use_jtag_as_gpio"  "JTAG" "bool"]
     # the possible loading speed values inside the json are somewhat odd. So we only support a few of them ...
-    lappend table [list "-loading_rate"      "DOWNLOAD_SPEED"  [list [list "25.0" "250/10" ] [list "70.0" "210/3" ]] ] ] 
+    lappend table [list "-loading_rate"      "DOWNLOAD_SPEED"  [list [list "25.0" "250/10" ] [list "70.0" "210/3" ]] ] 
     lappend table [list "-synthesis_tool"    "Synthesize_tool" [list [list "gowinsynthesis" "GowinSyn" ]] ] 
     lappend table [list "-verilog_std"       "Verilog_Standard"  [list [list "sysv2017" "Vlg_Std_Sysv2017" ]] ]
     lappend table [list "-top_module"        "TopModule"  "str" ]
@@ -116,6 +130,7 @@ proc write_process_json { board } {
     lappend table [list "-use_cpu_as_gpio"   "CPU" "bool" ]
     lappend table [list "-place_option"      "Place_Option" "str" ]
 
+    puts "NOTE Creating \"gowin_prj/impl/nanomig_${board}_process_config.json\""
     set f [open "gowin_prj/impl/nanomig_${board}_process_config.json" w]
     puts $f "{"
 
@@ -190,6 +205,7 @@ proc write_gprj { board } {
     global file_cst
     global file_sdc
     
+    puts "NOTE Creating \"gowin_prj/nanomig_${board}.gprj\""
     set f [open "gowin_prj/nanomig_${board}.gprj" w]
     puts $f "<?xml version=\"1\" encoding=\"UTF-8\"?>"
     puts $f "<!DOCTYPE gowin-fpga-project>"
@@ -537,5 +553,9 @@ set_option_int -mspi_jump 0
 # (re-)generate the gprj to make
 write_gprj $board
 write_process_json $board
+write_xml_updater $board
 
-run all
+# run synthesis unless option "dryrun" was given
+if {[lsearch -exact $options "dryrun"] < 0} {
+    run all
+}
