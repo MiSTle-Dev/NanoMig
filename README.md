@@ -130,7 +130,7 @@ Change the target driver to WinUSB and click Replace Driver (or Install Driver).
 
 ## Rigid Disk Block Info
 ~~Please make sure to use RDB (Rigid Disk Block) images with a **Start Offset 0**.  
-If unallocated space is present before the RDB, the HDF image won't be recognized.~~
+If unallocated space is present before the RDB, the HDF image won't be recognized.~~  
 Fixed in the latest build!
 
 ## Build setting (Tang Nano 20K only!)
