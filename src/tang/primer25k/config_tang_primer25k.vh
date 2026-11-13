@@ -3,4 +3,4 @@
 `define ENABLE_FX68K
 `define ENABLE_RTC
 `define DISABLE_ROM_IMAGE
-`define XML_GZIP_LEN 968
+`define XML_GZIP_LEN 971

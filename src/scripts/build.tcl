@@ -4,9 +4,12 @@
 # board variants. It also generates config files, cst and sdc files and it creates
 # GPRJ and JSON files to be used with the IDE.
 
+# TODO:
+# - document the options
+
 if {$argc == 0} {
     puts "Usage: $argv0 <device> <optons...>"
-    puts "       device: nano20k, tp25k, gw5a_25"
+    puts "       device: nano20k, tp25k, gw5a_25, gw3a_20"
     puts "       options:"
     puts "               nano20k: aga, lcd   - build aga+020 and/or rgblcd variant"
     puts "               tp25k:   aga, dbg   - build aga and or debug variant"
@@ -360,10 +363,25 @@ if {$dev eq "nano20k"} {
     # remove the FX68K support to save some space
     set defines [lsearch -inline -all -not -exact $defines "ENABLE_FX68K"]
 
-    lappend defines "ENABLE_RAM32" "CHIPRAM_CACHE" "ENABLE_RTC" "DISABLE_ROM_IMAGE"
+    lappend defines "ENABLE_RAM32" "ENABLE_RTC" "DISABLE_ROM_IMAGE"
     lappend defines "ENABLE_TG68K" "ENABLE_AGA" "CPU_SLOW14" "ENABLE_CACHE" "DENISE_EBR"
 
     set dev_path "mistle/gw5a_25"
+
+} elseif {$dev eq "gw3a_20"} {
+    set board "mistle_gw3a_20"
+    set_device_info "GW3A-LV20LQ144C1/I0" "" "GW3A-20A" "gw3a20a-010"
+    set_option_int -output_base_name nanomig_mistle_gw3a_20
+
+    # remove the FX68K support to save some space
+    set defines [lsearch -inline -all -not -exact $defines "ENABLE_FX68K"]
+
+    lappend defines "PLL_NO_MDCLK" "DISABLE_IDE1"
+    lappend defines "ENABLE_RAM32" "CHIPRAM_CACHE" "DISABLE_ROM_IMAGE" 
+    lappend defines "ENABLE_TG68K" "ENABLE_AGA" "CPU_SLOW14" "DENISE_EBR"
+
+    set dev_path "mistle/gw3a_20"
+
 } else {
     puts "Error, unknown device $dev"
     exit 1
@@ -421,6 +439,7 @@ if {$dev eq "nano20k"} {
     set_option_int -use_ready_as_gpio 1
     set_option_int -use_jtag_as_gpio 1
     set_option_int -loading_rate 70.000
+
 } elseif {$dev eq "gw5a_25"} {
     add_file_v mistle/gw5a_25/top.sv
     add_file_v tang/primer25k/gowin_clkdiv/gowin_clkdiv.v
@@ -433,6 +452,27 @@ if {$dev eq "nano20k"} {
     # there are no gw5a variants, so use the single cst and sdc
     # files directly
     
+    add_file_cst mistle/gw5a_25/nanomig.cst
+    add_file_sdc mistle/gw5a_25/nanomig.sdc
+
+    set_option_int -use_mspi_as_gpio 1
+    set_option_int -use_sspi_as_gpio 1
+    set_option_int -use_cpu_as_gpio 1
+    set_option_int -loading_rate 70.000
+    set_option_int -place_option 1
+
+} elseif {$dev eq "gw3a_20"} {
+
+    # the GW3A uses the same board as tge GW5A and thus shares a
+    # lot of files and settings
+    
+    add_file_v mistle/gw5a_25/top.sv
+    add_file tang/primer25k/gowin_clkdiv/gowin_clkdiv.v
+    add_file_v mistle/gw3a_20/gowin_pll/pll_142m.v
+    add_file_v mistle/gw3a_20/gowin_dp/sector_dpram.v
+    add_file_v mistle/gw3a_20/gowin_dp/ide_dpram.v
+
+    # re-use files from gw5a
     add_file_cst mistle/gw5a_25/nanomig.cst
     add_file_sdc mistle/gw5a_25/nanomig.sdc
 

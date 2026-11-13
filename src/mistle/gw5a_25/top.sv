@@ -96,7 +96,9 @@ pll_142m pll_hdmi (
     .clkout0(clk_pixel_x5),
     .clkout1(clk_85m),
     .clkout2(clk_85m_shifted),   // 270deg phase shifted
+`ifndef PLL_NO_MDCLK
     .mdclk(clk),
+`endif
     .lock(pll_lock),
     .clkin(clk)
 );
