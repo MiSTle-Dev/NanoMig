@@ -129,8 +129,9 @@ Change the target driver to WinUSB and click Replace Driver (or Install Driver).
   * Use ADF-Opus to create and modify ADF images under Windows [ADFOpus2025](https://github.com/chironb/ADFOpus2025)
 
 ## Rigid Disk Block Info
-Please make sure to use RDB (Rigid Disk Block) images with a **Start Offset 0**.  
-If unallocated space is present before the RDB, the HDF image won't be recognized.
+~~Please make sure to use RDB (Rigid Disk Block) images with a **Start Offset 0**.  
+If unallocated space is present before the RDB, the HDF image won't be recognized.~~
+Fixed in the latest build!
 
 ## Build setting (Tang Nano 20K only!)
 The core needs to be able to react on bl616 jtagsel Signal (all boards except tn20k).  
