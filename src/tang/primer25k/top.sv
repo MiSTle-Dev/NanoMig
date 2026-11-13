@@ -137,7 +137,7 @@ wire [1:0] osd_floppy_drives;
 wire       osd_floppy_turbo;
 wire       osd_floppy_wrprot;
 wire       osd_ide_enable;
-wire [1:0] osd_chipset;         // 0=OCS-A500, 1=OCS-A1000, 2=ECS, 6=AGA
+wire [2:0] osd_chipset;         // 0=OCS-A500, 1=OCS-A1000, 2=ECS, 6=AGA
 wire       osd_video_mode;      // PAL (0=PAL, 1=NTSC)
 wire [1:0] osd_video_screen;    // 0=normal, 1=overscan, 2=wide screen (jailbars)
 wire [1:0] osd_video_filter;
@@ -467,13 +467,35 @@ wire [7:0] memory_config = { 4'b0_000, osd_slowmem, osd_chipmem };
 wire [2:0] fastram_config = { 1'b0, osd_fastmem };
 wire [3:0] floppy_config = { osd_floppy_drives, osd_floppy_wrprot, osd_floppy_turbo };
 wire [3:0] video_config = { osd_video_filter, osd_video_scanlines };
+`ifdef ENABLE_AGA
+// the AGA menu has no CPU entry (see amiga.xml), so the CPU is always the
+// 68020. A constant lets synthesis drop the unused 68000 path (238 cells).
+wire [1:0] cpu_config = 2'b11;
+`else
 wire [1:0] cpu_config = { osd_cpu };
+`endif
 wire [2:0] turbo_config = { osd_turbo };
  // bit 5 keeps GAYLE off the fast chipset bus used with the 68020
 wire [5:0] ide_config = { 5'b10000, osd_ide_enable };
 
+`ifdef VID31_PASSTHROUGH
+// 31 kHz pass-through, see misc/video_timing.v
+wire        vid31;
+wire        vid_act_start, vid_act_ok;
+wire [10:0] vid_act_w, vid_act_off, vid_hlen;
+wire [9:0]  vid_act_h, vid_vlen;
+wire        vid_geo = vid31 && vid_act_ok;
+`endif
 nanomig nanomig
 (
+`ifdef VID31_PASSTHROUGH
+ .vid31(vid31),
+ .vid_act_start(vid_act_start),
+ .vid_act_w(vid_act_w),
+ .vid_act_off(vid_act_off),
+ .vid_act_h(vid_act_h),
+ .vid_act_ok(vid_act_ok),
+`endif
  .clk_sys(clk_28m),
  .reset(cpu_reset),
  .por(!pll_lock),
@@ -704,6 +726,14 @@ flash flash (
 
 wire vreset, vpal, interlace, short_frame;
 video_analyzer video_analyzer (
+`ifdef VID31_PASSTHROUGH
+    .fast        ( vid31     ),
+    .geo         ( vid_geo   ),
+    .geo_start   ( vid_act_start ),
+    .geo_size    ( { vid_act_off, vid_act_w, vid_act_h } ),
+    .hlen        ( vid_hlen  ),
+    .vlen        ( vid_vlen  ),
+`endif
     .clk         ( clk_28m   ),
     .hs          ( hs_n      ),
     .vs          ( vs_n      ),
@@ -814,6 +844,15 @@ hdmi #(
     .VENDOR_NAME( { "MiSTle", 16'd0} ),
     .PRODUCT_DESCRIPTION( {"Nanomig", 72'd0} )
 ) hdmi(
+`ifdef VID31_PASSTHROUGH
+  .fast(vid31),
+  .fast_width(vid_hlen),
+  .fast_height(vid_vlen),
+  .geo(vid_geo),
+  .geo_width(vid_act_w),
+  .geo_offset(vid_act_off),
+  .geo_height(vid_act_h),
+`endif
   .clk_pixel_x5(clk_pixel_x5),
   .clk_pixel(clk_pixel),
   .clk_audio(clk_audio),
