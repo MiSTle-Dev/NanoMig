@@ -55,6 +55,14 @@ module nanomig (
 
    // UART/RS232 for e.g. DiagROM or MIDI
    output	 uart_tx,
+`ifdef VID31_PASSTHROUGH
+   output       vid31,   // Amiga is in a 31 kHz mode: video bypasses the scandoubler
+   output        vid_act_start, // first visible pixel of the frame (from blanking)
+   output [10:0] vid_act_w,     // width of the display window in clocks
+   output [10:0] vid_act_off,   // clocks from the end of blanking to the display window
+   output [9:0]  vid_act_h,     // visible lines per frame
+   output        vid_act_ok,    // blanking gives a usable frame start
+`endif
    input	 uart_rx,
 
 `ifdef ENABLE_AT_MODEM
@@ -1384,6 +1392,7 @@ assign sdc_byte_out_data = sdc_byte_out_data_fdc;
 // encoder does its own blanking. But it's nice for simulation
 wire [7:0] red, green, blue;   
 wire	   hbl, vbl;
+wire	   hde;   // horizontal display window
 wire [8:0] htotal;   
 wire [3:0] r_in = (hbl||vbl)?4'h0:red[7:4];
 wire [3:0] g_in = (hbl||vbl)?4'h0:green[7:4];
@@ -1592,6 +1601,7 @@ minimig minimig
 	.blue         (blue             ), // blue
 	.hblank       (hbl              ),
 	.vblank       (vbl              ),
+	.hde_out      (hde              ),
 	.res          (res              ),
         .htotal       (htotal           ),
         .ce_pix       (                 ),
@@ -1631,6 +1641,39 @@ minimig minimig
  	.sdc_byte_out_data  ( sdc_byte_out_data_fdc ) 
 );
 
+wire       hs_amb, vs_amb;
+wire [3:0] r_amb, g_amb, b_amb;
+`ifdef VID31_PASSTHROUGH
+// measures the Amiga's raw sync timing and blanking (see video_timing.v)
+video_timing video_timing ( .clk(clk_sys), .hs(hs_in), .vs(vs_in), .fast(vid31),
+                            .hbl(hbl), .vbl(vbl), .hde(hde),
+                            .act_start(vid_act_start), .act_w(vid_act_w), .act_off(vid_act_off),
+                            .act_h(vid_act_h), .act_ok(vid_act_ok) );
+
+// 31 kHz modes (DblPAL etc.) must not be line-doubled again: send the raw
+// Amiga video past Amber. One register stage keeps sync and colour aligned.
+reg        hs_raw, vs_raw;
+reg  [3:0] r_raw, g_raw, b_raw;
+always @(posedge clk_sys) begin
+   hs_raw <= hs_in;
+   vs_raw <= vs_in;
+   r_raw  <= r_in;
+   g_raw  <= g_in;
+   b_raw  <= b_in;
+end
+assign hs = vid31 ? hs_raw : hs_amb;
+assign vs = vid31 ? vs_raw : vs_amb;
+assign r  = vid31 ? r_raw  : r_amb;
+assign g  = vid31 ? g_raw  : g_amb;
+assign b  = vid31 ? b_raw  : b_amb;
+`else
+assign hs = hs_amb;
+assign vs = vs_amb;
+assign r  = r_amb;
+assign g  = g_amb;
+assign b  = b_amb;
+`endif
+
 Amber AMBER
 (
 	.clk28m(clk_sys),
@@ -1646,11 +1689,11 @@ Amber AMBER
 	._hsync_in(hs_in),		//horizontal synchronisation in
 	._vsync_in(vs_in),		//vertical synchronisation in
 	._csync_in(1'b1),		//composite synchronization in, only used if dblscan==0
-	.red_out(r), 		        //red componenent video out
-	.green_out(g),  	        //green component video out
-	.blue_out(b),		        //blue component video out
-	._hsync_out(hs),		//horizontal synchronisation out
-	._vsync_out(vs)			//vertical synchronisation out
+	.red_out(r_amb), 		//red componenent video out
+	.green_out(g_amb),  	        //green component video out
+	.blue_out(b_amb),		//blue component video out
+	._hsync_out(hs_amb),		//horizontal synchronisation out
+	._vsync_out(vs_amb)		//vertical synchronisation out
  );
     
 endmodule
