@@ -6,10 +6,11 @@
 
 if {$argc == 0} {
     puts "Usage: $argv0 <device> <optons...>"
-    puts "       device: nano20k, gw5a_25"
+    puts "       device: nano20k, tp25k, gw5a_25"
     puts "       options:"
     puts "               nano20k: aga, lcd   - build aga+020 and/or rgblcd variant"
-    puts "               all:     dryrun     - generate files only, don't run synthesis"
+    puts "               tp25k:   aga, dbg   - build aga and or debug variant"
+    puts "               all:     nosyn      - generate files only, don't run synthesis"
     exit 1
 }
 
@@ -116,9 +117,12 @@ proc write_process_json { board } {
 
     set table [list]
     lappend table [list "-output_base_name"  "OUTPUT_BASE_NAME" "str"] 
-    lappend table [list "-use_mspi_as_gpio"  "MSPI" "bool"] 
-    lappend table [list "-use_sspi_as_gpio"  "SSPI" "bool"] 
-    lappend table [list "-use_jtag_as_gpio"  "JTAG" "bool"]
+    lappend table [list "-use_mspi_as_gpio"  "MSPI"  "bool"] 
+    lappend table [list "-use_sspi_as_gpio"  "SSPI"  "bool"] 
+    lappend table [list "-use_jtag_as_gpio"  "JTAG"  "bool"]
+    lappend table [list "-use_done_as_gpio"  "DONE"  "bool"]
+    lappend table [list "-use_i2c_as_gpio"   "I2C"   "bool"]
+    lappend table [list "-use_ready_as_gpio" "READY" "bool"]
     # the possible loading speed values inside the json are somewhat odd. So we only support a few of them ...
     lappend table [list "-loading_rate"      "DOWNLOAD_SPEED"  [list [list "25.0" "250/10" ] [list "70.0" "210/3" ]] ] 
     lappend table [list "-synthesis_tool"    "Synthesize_tool" [list [list "gowinsynthesis" "GowinSyn" ]] ] 
@@ -302,6 +306,52 @@ if {$dev eq "nano20k"} {
     # set the core name to include the variant built
     set_option_int -output_base_name nanomig_$board
 
+} elseif {$dev eq "tp25k"} {
+    set board "tang_primer25k"
+    set_device_info "GW5A-LV25MG121NC1/I0" "" "GW5A-25A" "gw5a25a-002"
+    set_option_int -output_base_name nanomig_tang_primer25k
+
+    # we use more than one sdc file, so add them
+    # to the lists to be concatenated later
+    lappend sdc tang/primer25k/nanomig_common.sdc
+
+    lappend defines "ENABLE_RTC" "DISABLE_ROM_IMAGE"
+    
+    # board is used in amiga.xml to enable/disable stuff
+    set board "tang_primer25k"
+    set dev_path "tang/primer25k"
+
+    # AGA option
+    if {[lsearch -exact $options "aga"] >= 0} {
+	puts "Building AGA variant"
+	append board "_aga"
+	
+	# the nano20k does not have enough capacity for both CPUs. So disable
+	# fx68k if tg68k is being included
+	set defines [lsearch -inline -all -not -exact $defines "ENABLE_FX68K"]
+	
+	lappend defines "ENABLE_TG68K" "ENABLE_AGA" "CPU_SLOW14" "ENABLE_CACHE"
+	lappend defines "NO_WS2812" "ENABLE_RAM32" "CHIPRAM_CACHE"
+
+	# options that may be worth testing
+	# lappend defines "DENISE_EBR"
+	
+	# once tg68k is enabled add its timing constraints.
+	lappend sdc tang/primer25k/nanomig_tg68k.sdc
+    }
+	
+    # debug option
+    if {[lsearch -exact $options "dbg"] >= 0} {
+	puts "Building Debug variant"
+	append board "_dbg"
+
+	lappend defines "ENABLE_DEBUG"
+    }
+
+    # set the core name to include the variant built
+    set_option_int -output_base_name nanomig_$board
+
+    
 } elseif {$dev eq "gw5a_25"} {
     set board "mistle_gw5a_25"
     set_device_info "GW5A-LV25LQ144C1/I0" "" "GW5A-25A" "gw5a25a-036"
@@ -352,6 +402,25 @@ if {$dev eq "nano20k"} {
     set_option_int -use_sspi_as_gpio 1
     set_option_int -use_jtag_as_gpio 0
     set_option_int -loading_rate 25.000
+} elseif {$dev eq "tp25k"} {
+    add_file_v tang/primer25k/top.sv
+    add_file_v tang/primer25k/gowin_clkdiv/gowin_clkdiv.v
+    add_file_v tang/primer25k/gowin_pll/pll_142m.v
+    add_file_v tang/primer25k/gowin_pll/pll_142m_mod.v
+    add_file_v tang/primer25k/gowin_pll/pll_init.v
+    add_file_v tang/primer25k/gowin_dpb/sector_dpram.v
+    add_file_v tang/primer25k/gowin_dpb/ide_dpram.v
+    
+    add_file_cst tang/primer25k/nanomig.cst
+    
+    set_option_int -use_mspi_as_gpio 1
+    set_option_int -use_sspi_as_gpio 1
+    set_option_int -use_done_as_gpio 1
+    set_option_int -use_cpu_as_gpio 1
+    set_option_int -use_i2c_as_gpio 1
+    set_option_int -use_ready_as_gpio 1
+    set_option_int -use_jtag_as_gpio 1
+    set_option_int -loading_rate 70.000
 } elseif {$dev eq "gw5a_25"} {
     add_file_v mistle/gw5a_25/top.sv
     add_file_v tang/primer25k/gowin_clkdiv/gowin_clkdiv.v
@@ -555,7 +624,7 @@ write_gprj $board
 write_process_json $board
 write_xml_updater $board
 
-# run synthesis unless option "dryrun" was given
-if {[lsearch -exact $options "dryrun"] < 0} {
+# run synthesis unless option "nosyn" was given
+if {[lsearch -exact $options "nosyn"] < 0} {
     run all
 }

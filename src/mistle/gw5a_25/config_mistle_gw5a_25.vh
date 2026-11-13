@@ -9,4 +9,4 @@
 `define CPU_SLOW14
 `define ENABLE_CACHE
 `define DENISE_EBR
-`define XML_GZIP_LEN 980
+`define XML_GZIP_LEN 981

@@ -46,7 +46,7 @@
     <fileselector label="Floppy DF0:" ext="adf" index="0"/>
 	<cfgselector label="Config" ext="amiga.ini" default="amiga.ini"/>
     <menu label="System">
-      <!--IS mistle_gw5a_25 -->
+      <!--IS mistle_gw5a_25 tang_primer25k -->
       <list label="CPU:" id="T" default="2" action="reset">
 	<listentry label="68000" value="0"/>
 	<listentry label="68010" value="1"/>
@@ -63,7 +63,7 @@
 	<listentry label="OCS-A500" value="0"/>
 	<listentry label="OCS-A1000" value="1"/>
 	<listentry label="ECS" value="2"/>
-	<!--IS mistle_gw5a_25 tang_nano20k_aga tang_nano20k_aga_lcd -->
+	<!--IS mistle_gw5a_25 tang_nano20k_aga tang_nano20k_aga_lcd tang_primer25k_aga -->
 	<listentry label="AGA" value="3"/>
 	<!--END-->
       </list>

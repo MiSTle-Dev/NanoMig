@@ -10,3 +10,5 @@ src/impl/pnr/**
 impl/gwsynthesis/**
 impl/temp/**
 impl/pnr/**
+
+src/misc/amiga_xml.hex
