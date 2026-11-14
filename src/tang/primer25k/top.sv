@@ -137,7 +137,7 @@ wire [1:0] osd_floppy_drives;
 wire       osd_floppy_turbo;
 wire       osd_floppy_wrprot;
 wire       osd_ide_enable;
-wire [1:0] osd_chipset;         // 0=OCS-A500, 1=OCS-A1000, 2=ECS, 6=AGA
+wire [2:0] osd_chipset;         // 0=OCS-A500, 1=OCS-A1000, 2=ECS, 6=AGA
 wire       osd_video_mode;      // PAL (0=PAL, 1=NTSC)
 wire [1:0] osd_video_screen;    // 0=normal, 1=overscan, 2=wide screen (jailbars)
 wire [1:0] osd_video_filter;
@@ -467,7 +467,13 @@ wire [7:0] memory_config = { 4'b0_000, osd_slowmem, osd_chipmem };
 wire [2:0] fastram_config = { 1'b0, osd_fastmem };
 wire [3:0] floppy_config = { osd_floppy_drives, osd_floppy_wrprot, osd_floppy_turbo };
 wire [3:0] video_config = { osd_video_filter, osd_video_scanlines };
+`ifdef ENABLE_AGA
+// the AGA menu has no CPU entry (see amiga.xml), so the CPU is always the
+// 68020. A constant lets synthesis drop the unused 68000 path (238 cells).
+wire [1:0] cpu_config = 2'b11;
+`else
 wire [1:0] cpu_config = { osd_cpu };
+`endif
 wire [2:0] turbo_config = { osd_turbo };
  // bit 5 keeps GAYLE off the fast chipset bus used with the 68020
 wire [5:0] ide_config = { 5'b10000, osd_ide_enable };
