@@ -478,8 +478,24 @@ wire [2:0] turbo_config = { osd_turbo };
  // bit 5 keeps GAYLE off the fast chipset bus used with the 68020
 wire [5:0] ide_config = { 5'b10000, osd_ide_enable };
 
+`ifdef VID31_PASSTHROUGH
+// 31 kHz pass-through, see misc/video_timing.v
+wire        vid31;
+wire        vid_act_start, vid_act_ok;
+wire [10:0] vid_act_w, vid_act_off, vid_hlen;
+wire [9:0]  vid_act_h, vid_vlen;
+wire        vid_geo = vid31 && vid_act_ok;
+`endif
 nanomig nanomig
 (
+`ifdef VID31_PASSTHROUGH
+ .vid31(vid31),
+ .vid_act_start(vid_act_start),
+ .vid_act_w(vid_act_w),
+ .vid_act_off(vid_act_off),
+ .vid_act_h(vid_act_h),
+ .vid_act_ok(vid_act_ok),
+`endif
  .clk_sys(clk_28m),
  .reset(cpu_reset),
  .por(!pll_lock),
@@ -710,6 +726,14 @@ flash flash (
 
 wire vreset, vpal, interlace, short_frame;
 video_analyzer video_analyzer (
+`ifdef VID31_PASSTHROUGH
+    .fast        ( vid31     ),
+    .geo         ( vid_geo   ),
+    .geo_start   ( vid_act_start ),
+    .geo_size    ( { vid_act_off, vid_act_w, vid_act_h } ),
+    .hlen        ( vid_hlen  ),
+    .vlen        ( vid_vlen  ),
+`endif
     .clk         ( clk_28m   ),
     .hs          ( hs_n      ),
     .vs          ( vs_n      ),
@@ -820,6 +844,15 @@ hdmi #(
     .VENDOR_NAME( { "MiSTle", 16'd0} ),
     .PRODUCT_DESCRIPTION( {"Nanomig", 72'd0} )
 ) hdmi(
+`ifdef VID31_PASSTHROUGH
+  .fast(vid31),
+  .fast_width(vid_hlen),
+  .fast_height(vid_vlen),
+  .geo(vid_geo),
+  .geo_width(vid_act_w),
+  .geo_offset(vid_act_off),
+  .geo_height(vid_act_h),
+`endif
   .clk_pixel_x5(clk_pixel_x5),
   .clk_pixel(clk_pixel),
   .clk_audio(clk_audio),

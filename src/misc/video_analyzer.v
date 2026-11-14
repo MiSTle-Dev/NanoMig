@@ -11,6 +11,14 @@ module video_analyzer
  input		  hs,
  input		  vs,
  input [1:0]      screen, // standard, overscan or wide screen jailbars enabled
+`ifdef VID31_PASSTHROUGH
+ input            fast,   // 31 kHz pass-through: hs/vs are the raw Amiga sync
+ input            geo,        // pass-through placed by the Amiga's blanking
+ input            geo_start,  // one clock: first visible pixel of the frame
+ input [31:0]     geo_size,   // measured picture geometry, only compared
+ output reg [10:0] hlen,       // measured clocks per line
+ output reg [9:0]  vlen,       // measured lines per frame
+`endif
  output reg       pal,         // pal mode detected
  output reg       short_frame, // short frame has two lines less
  output reg       interlace,   // interlace modes have one line less
@@ -27,6 +35,22 @@ reg [12:0] hcntL;
 reg [10:0] vcnt;    // signal ranges 0..625
 reg [10:0] vcntL;
 reg changed;
+reg [31:0] geo_sizeL;
+reg geoD;
+
+// where the HDMI frame starts, counted from the Amiga sync edges.
+// 31 kHz pass-through (fast): estimated from two photos of DblPAL on 2026-11-13,
+// 127 clocks later and 31 lines earlier than the scandoubled PAL values.
+`ifndef VID31_PASSTHROUGH
+// no pass-through in this build: the inputs are tied off
+wire        fast = 1'b0;
+wire        geo = 1'b0;
+wire        geo_start = 1'b0;
+wire [31:0] geo_size = 32'd0;
+`endif
+wire [12:0] hstart = fast ? ((screen==2'd2)?13'd215:(screen==2'd1)?13'd247:13'd289)
+                          : ((screen==2'd2)?13'd88 :(screen==2'd1)?13'd120:13'd162);
+wire [10:0] vstart = fast ? 11'd15 : 11'd46;
 
 always @(posedge clk) begin
     // resync HDMI whenever screen setting changes
@@ -41,6 +65,9 @@ always @(posedge clk) begin
     if(!hs && hsD) begin
         // check if line length has changed during last cycle
         hcntL <= hcnt;
+`ifdef VID31_PASSTHROUGH
+        hlen <= hcnt[10:0] + 11'd1;
+`endif
         if(hcntL != hcnt)
             changed <= 1'b1;
 
@@ -55,6 +82,9 @@ always @(posedge clk) begin
         if(!vs && vsD) begin
             // check if image height has changed during last cycle
             vcntL <= vcnt;
+`ifdef VID31_PASSTHROUGH
+            vlen <= vcnt[9:0] + 10'd1;
+`endif
             if(vcntL != vcnt) begin
                 if(vcnt == 11'd523) begin
                     pal <= 1'b0; // NTSC
@@ -91,10 +121,27 @@ always @(posedge clk) begin
     // account for back porches to adjust image position within the
     // HDMI frame. Center screen according to screen type standard (0),
     // overscan (1) or wide (2)
-    if( hcnt == ((screen==2'd2)?88:(screen==2'd1)?120:162) && vcnt == 46 && changed) begin
+    if(geo) begin
+        // start the HDMI frame on the first visible Amiga pixel, once the
+        // measured picture size is the same two frames in a row
+        if(geo_start) begin
+            geo_sizeL <= geo_size;
+            if(geo_sizeL != geo_size)
+                changed <= 1'b1;
+            else if(changed) begin
+                vreset <= 1'b1;
+                changed <= 1'b0;
+            end
+        end
+    end else if( hcnt == hstart && vcnt == vstart && changed) begin
         vreset <= 1'b1;
         changed <= 1'b0;
     end
+
+    // resync when the placement method changes
+    geoD <= geo;
+    if(geoD != geo)
+        changed <= 1'b1;
 end
 
 endmodule

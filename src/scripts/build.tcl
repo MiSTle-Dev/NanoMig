@@ -335,6 +335,8 @@ if {$dev eq "nano20k"} {
 	
 	lappend defines "ENABLE_TG68K" "ENABLE_AGA" "CPU_SLOW14" "ENABLE_CACHE"
 	lappend defines "NO_WS2812" "ENABLE_RAM32" "CHIPRAM_CACHE"
+	# 31 kHz pass-through on HDMI (DblPAL), see misc/video_timing.v
+	lappend defines "VID31_PASSTHROUGH"
 
 	# options that may be worth testing
 	# lappend defines "DENISE_EBR"
@@ -567,6 +569,7 @@ if {[lsearch -exact $defines "ENABLE_TG68K"] >= 0} {
 }
 
 add_file_v misc/video_analyzer.v
+add_file_v misc/video_timing.v
 
 # include hdmi parts unless HDMI is disabled
 if {[lsearch -exact $defines "DISABLE_HDMI"] < 0} {
