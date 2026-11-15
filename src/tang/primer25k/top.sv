@@ -467,13 +467,7 @@ wire [7:0] memory_config = { 4'b0_000, osd_slowmem, osd_chipmem };
 wire [2:0] fastram_config = { 1'b0, osd_fastmem };
 wire [3:0] floppy_config = { osd_floppy_drives, osd_floppy_wrprot, osd_floppy_turbo };
 wire [3:0] video_config = { osd_video_filter, osd_video_scanlines };
-`ifdef ENABLE_AGA
-// the AGA menu has no CPU entry (see amiga.xml), so the CPU is always the
-// 68020. A constant lets synthesis drop the unused 68000 path (238 cells).
-wire [1:0] cpu_config = 2'b11;
-`else
 wire [1:0] cpu_config = { osd_cpu };
-`endif
 wire [2:0] turbo_config = { osd_turbo };
  // bit 5 keeps GAYLE off the fast chipset bus used with the 68020
 wire [5:0] ide_config = { 5'b10000, osd_ide_enable };

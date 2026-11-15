@@ -46,7 +46,7 @@
     <fileselector label="Floppy DF0:" ext="adf" index="0"/>
 	<cfgselector label="Config" ext="amiga.ini" default="amiga.ini"/>
     <menu label="System">
-      <!--IS mistle_gw5a_25 tang_primer25k -->
+      <!--IS mistle_gw5a_25 tang_primer25k_aga -->
       <list label="CPU:" id="T" default="2" action="reset">
 	<listentry label="68000" value="0"/>
 	<listentry label="68010" value="1"/>
