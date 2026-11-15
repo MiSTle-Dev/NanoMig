@@ -9,7 +9,7 @@
 
 if {$argc == 0} {
     puts "Usage: $argv0 <device> <optons...>"
-    puts "       device: nano20k, tp25k, gw5a_25, gw3a_20"
+    puts "       device: nano20k, tp25k, gw5a_25, gw3a_20, mega138kpro, console60k"
     puts "       options:"
     puts "               nano20k: aga, lcd   - build aga+020 and/or rgblcd variant"
     puts "               tp25k:   aga, dbg   - build aga and or debug variant"
@@ -118,6 +118,10 @@ proc write_xml_updater { board } {
 proc write_process_json { board } {
     global gprj_options
 
+    # The xxx_process_config.json file contains very similar information
+    # to the build.tcl although in a very different syntax. This table
+    # tries to convert from tcl to json variant
+    
     set table [list]
     lappend table [list "-output_base_name"  "OUTPUT_BASE_NAME" "str"] 
     lappend table [list "-use_mspi_as_gpio"  "MSPI"  "bool"] 
@@ -136,6 +140,7 @@ proc write_process_json { board } {
     lappend table [list "-mspi_jump"         "MSPI_JUMP" "bool" ]
     lappend table [list "-use_cpu_as_gpio"   "CPU" "bool" ]
     lappend table [list "-place_option"      "Place_Option" "str" ]
+    lappend table [list "-route_option"      "Route_Option" "str" ]
 
     puts "NOTE Creating \"gowin_prj/impl/nanomig_${board}_process_config.json\""
     set f [open "gowin_prj/impl/nanomig_${board}_process_config.json" w]
@@ -382,6 +387,26 @@ if {$dev eq "nano20k"} {
 
     set dev_path "mistle/gw3a_20"
 
+} elseif {$dev eq "mega138kpro"} {
+    set board "tang_mega138kpro"
+
+    set_device_info "GW5AST-LV138FPG676AC1/I0" "" "GW5AST-138B" "gw5ast138b-007"
+    set_option_int -output_base_name nanomig_tang_mega138kpro
+
+    # TODO: Full build!
+    #lappend defines "ENABLE_RAM32" "CHIPRAM_CACHE" "DISABLE_ROM_IMAGE" 
+    #lappend defines "ENABLE_TG68K" "ENABLE_AGA" "CPU_SLOW14" "DENISE_EBR"
+
+    set dev_path "tang/mega138kpro"
+    
+} elseif {$dev eq "console60k"} {
+    set board "tang_console60k"
+
+    set_device_info "GW5AT-LV60PG484AC1/I0" "" "GW5AT-60B" "gw5at60b-002"
+    set_option_int -output_base_name nanomig_tang_console60k
+
+    set dev_path "tang/console60k"
+    
 } else {
     puts "Error, unknown device $dev"
     exit 1
@@ -462,7 +487,6 @@ if {$dev eq "nano20k"} {
     set_option_int -place_option 1
 
 } elseif {$dev eq "gw3a_20"} {
-
     # the GW3A uses the same board as tge GW5A and thus shares a
     # lot of files and settings
     
@@ -481,6 +505,51 @@ if {$dev eq "nano20k"} {
     set_option_int -use_cpu_as_gpio 1
     set_option_int -loading_rate 70.000
     set_option_int -place_option 1
+
+} elseif {$dev eq "mega138kpro"} {
+    add_file_v tang/mega138kpro/top.sv
+    add_file_v tang/mega138kpro/gowin_clkdiv/gowin_clkdiv.v
+    add_file_v tang/mega138kpro/gowin_pll/pll_142m.v
+    add_file_v tang/mega138kpro/gowin_pll/pll_142m_mod.v
+    add_file_v tang/mega138kpro/gowin_pll/pll_init.v
+    add_file_v tang/mega138kpro/gowin_dpb/sector_dpram.v
+    add_file_v tang/mega138kpro/gowin_dpb/ide_dpram.v
+
+    add_file_cst tang/mega138kpro/nanomig.cst
+    add_file_sdc tang/mega138kpro/nanomig.sdc
+
+    set_option_int -use_mspi_as_gpio 1
+    set_option_int -use_sspi_as_gpio 1
+    set_option_int -use_done_as_gpio 1
+    set_option_int -use_cpu_as_gpio 1
+    set_option_int -use_ready_as_gpio 1
+    set_option_int -use_jtag_as_gpio 1
+    set_option_int -loading_rate 70.000
+    set_option_int -place_option 2
+    set_option_int -route_option 1
+
+} elseif {$dev eq "console60k"} {
+    add_file_v tang/console60k/top.sv
+    add_file_v tang/console60k/gowin_clkdiv/gowin_clkdiv.v
+    add_file_v tang/primer25k/gowin_pll/pll_142m.v
+    add_file_v tang/primer25k/gowin_pll/pll_142m_mod.v
+    add_file_v tang/primer25k/gowin_pll/pll_init.v
+    add_file_v tang/console60k/gowin_dpb/sector_dpram.v
+    add_file_v tang/console60k/gowin_dpb/ide_dpram.v
+
+    add_file_cst tang/console60k/nanomig.cst
+    add_file_sdc tang/console60k/nanomig.sdc
+
+    set_option_int -use_mspi_as_gpio 1
+    set_option_int -use_sspi_as_gpio 1
+    set_option_int -use_done_as_gpio 1
+    set_option_int -use_cpu_as_gpio 1
+    set_option_int -use_i2c_as_gpio 1
+    set_option_int -use_ready_as_gpio 1
+    set_option_int -use_jtag_as_gpio 1
+    set_option_int -loading_rate 70.000
+    set_option_int -place_option 2
+    set_option_int -route_option 1
 }
 
 # files common to all variants

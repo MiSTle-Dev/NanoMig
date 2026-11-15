@@ -170,7 +170,8 @@ wire [1:0] osd_floppy_drives;
 wire       osd_floppy_turbo;
 wire       osd_floppy_wrprot;
 wire       osd_ide_enable;
-wire [1:0] osd_chipset;         // 0=OCS-A500, 1=OCS-A1000, 2=ECS
+wire [2:0] osd_chipset;         // 0=OCS-A500, 1=OCS-A1000, 2=ECS, 6=AGA
+wire [1:0] osd_cpu;             // 00=68000, 01=68010, 11=68020
 wire       osd_video_mode;      // PAL (0=PAL, 1=NTSC)
 wire [1:0] osd_video_screen;    // 0=normal, 1=overscan, 2=wide screen (jailbars)
 wire [1:0] osd_video_filter;
@@ -384,6 +385,7 @@ sysctrl sysctrl (
 		.system_floppy_wrprot(osd_floppy_wrprot),
 		.system_ide_enable(osd_ide_enable),
 	    .system_chipset(osd_chipset),
+	    .system_cpu(osd_cpu),
 		.system_video_mode(osd_video_mode),
 		.system_video_screen(osd_video_screen),
 		.system_video_filter(osd_video_filter),
@@ -391,6 +393,7 @@ sysctrl sysctrl (
 		.system_chipmem(osd_chipmem),
 		.system_slowmem(osd_slowmem),
 		.system_fastmem(osd_fastmem),
+	    .system_turbo(osd_turbo),
 		.system_joy_swap(osd_joy_swap),
         .system_volume(osd_volume),
         .system_stereo_mix(osd_stereo_mix),
@@ -498,16 +501,29 @@ wire fastram_wr;
 wire fastram_ready;
 
 wire [15:0] sdram_dout;
+wire [47:0] chip48;         // upper 48 bits of 64 bit aligned chipram reads (AGA fmode>0)
+wire [47:0] fastram_dout48; // wide read data of the cpu cache port
 
 assign ram_din = sdram_dout;
 
 // pack config values into minimig config
 wire [5:0] chipset_config = { 1'b0,osd_chipset,osd_video_mode,1'b0 };
-wire [7:0] memory_config = { 4'b0_000, osd_slowmem, osd_chipmem };
-wire [2:0] fastram_config = { 1'b0, osd_fastmem };
+`ifdef DISABLE_TG68K_010
+// disabling the ability to select 010 cpu saves some luts
+wire [1:0] cpu_config = { |osd_cpu ? 2'b11 : 2'b00 };
+`else
+wire [1:0] cpu_config = { osd_cpu };
+`endif
+wire [7:0] memory_config = { 4'b0_000, osd_slowmem, osd_chipmem };   
+wire [2:0] fastram_config = { 1'b0, osd_fastmem };   
+wire [2:0] turbo_config = { osd_turbo };
 wire [3:0] floppy_config = { osd_floppy_drives, osd_floppy_wrprot, osd_floppy_turbo };
-wire [3:0] video_config = { osd_video_filter, osd_video_scanlines };
-wire [5:0] ide_config = { 5'b00000, osd_ide_enable };
+wire [3:0] video_config = { osd_video_filter, osd_video_scanlines };   
+// FIXME - setting ide_config[5] prevents minimig from using
+// fast chipset bus for GAYLE, which is by default in use
+// when 68020 CPU is selected; we may connect fast chip bus
+// to GAYLE and set ide_config[5] to 0 to improve performance
+wire [5:0] ide_config = { 5'b10000, osd_ide_enable };   
 
 nanomig nanomig
 (
@@ -524,9 +540,11 @@ nanomig nanomig
 
  .memory_config(memory_config),
  .fastram_config(fastram_config),
+ .cpu_config(cpu_config),
  .chipset_config(chipset_config),
  .floppy_config(floppy_config),
  .video_config(video_config),
+ .turbo_config(turbo_config),
  .ide_config(ide_config),
 
  // video
@@ -573,7 +591,11 @@ nanomig nanomig
  ._ram_ble(ram_be[0]),      // sram lower byte select
  ._ram_we(ram_we_n),        // sram write enable
  ._ram_oe(ram_oe_n),        // sram output enable
- .chip48(48'd0),
+`ifdef ENABLE_AGA
+ .chip48(chip48),
+`else
+ .chip48(48'b0),
+`endif
  .refresh(ram_refresh),
 
  .fastram_sel(fastram_sel),
@@ -581,6 +603,11 @@ nanomig nanomig
  .fastram_lds(fastram_lds),
  .fastram_uds(fastram_uds),
  .fastram_dout(fastram_dout),
+`ifdef ENABLE_CACHE
+ .fastram_dout48(fastram_dout48),
+`else
+ .fastram_dout48(48'b0),
+`endif
  .fastram_din(fastram_din),
  .fastram_wr(fastram_wr),
  .fastram_ready(fastram_ready)
@@ -673,18 +700,12 @@ end
 // there's a total of 16 sdram segments of 512kBytes. The last
 // one is being used to store the kick rom
 
-// run a counter at 28Mhz synchonous to the 7Mhz bus cycle
-reg	    [1:0] cyc;
-always @(posedge clk_28m)
-  if(clk7_en) cyc <= 2'd0;
-  else        cyc <= cyc + 2'd1;
-
 wire        sdram_access  = (!ram_oe_n || !ram_we_n);
 wire	    sdram_rw      = !ram_we_n;
 
 wire		sdram_cs      = rom_done?sdram_access:flash_ram_write;
 
-wire        sdram_sync    = rom_done?!cyc:flash_ram_write;
+wire		sdram_sync    = clk7_en;   
 
 wire		sdram_refresh = rom_done?ram_refresh:1'b0;
 
@@ -693,7 +714,19 @@ wire [15:0] sdram_din     = rom_done?ram_dout:flash_doutD;
 wire [1:0]  sdram_be      = rom_done?ram_be:2'b00;
 wire		sdram_we      = rom_done?sdram_rw:flash_ram_write;
 
-sdram sdram (
+localparam CHIP48_BURST = 0
+`ifdef ENABLE_AGA
+    | 1
+`endif
+`ifdef ENABLE_CACHE
+    | 1
+`endif
+;
+
+sdram #(
+    .SYNC_DELAY(2),
+    .CHIP48_BURST(CHIP48_BURST)    // the wide 64 bit fetch AGA or cache needs
+) sdram (
 	.sd_data    ( IO_sdram_dq   ), // 32 bit bidirectional data bus
 	.sd_addr    ( O_sdram_addr  ), // 11 bit multiplexed address bus
 	.sd_dqm     ( O_sdram_dqm   ), // two byte masks
@@ -712,6 +745,7 @@ sdram sdram (
 	.refresh    ( sdram_refresh ), // refresh cycle
 	.din        ( sdram_din     ), // data input from chipset/cpu
 	.dout       ( sdram_dout    ),
+	.dout48     ( chip48        ), // wide fetch data for AGA fmode>0
 	.addr       ( sdram_addr    ), // 22 bit word address
 	.ds         ( sdram_be      ), // upper/lower data strobe
 	.cs         ( sdram_cs      ), // cpu/chipset requests read/wrie
@@ -719,6 +753,7 @@ sdram sdram (
 
 	.p2_din        ( fastram_din     ), // data input from chipset/cpu
 	.p2_dout       ( fastram_dout    ),
+	.p2_dout48     ( fastram_dout48  ), // wide read data for the cache line fills
 	.p2_addr       ( fastram_addr    ), // 22 bit word address
 	.p2_ds         ( fastram_be      ), // upper/lower data strobe
 	.p2_cs         ( fastram_sel     ), // cpu/chipset requests read/wrie
