@@ -251,6 +251,7 @@ module minimig
 	output	      lace,
 	output	      hblank,
 	output	      vblank,
+	output	      hde_out, // horizontal display window (31 kHz pass-through placement)
 	output [7:0]  red,
 	output [7:0]  green,
 	output [7:0]  blue,
@@ -396,6 +397,7 @@ wire        _wprot;				//disk is write-protected
 wire  [1:0] blver = 2'b00;     // part of mister video config, originally set by MCU
 wire        hbl, hde;
 assign      hblank = blver ? ~hde : hbl;
+assign      hde_out = hde;
 
 //--------------------------------------------------------------------------------------
 

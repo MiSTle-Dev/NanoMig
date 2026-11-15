@@ -71,6 +71,7 @@
        <File path="../minimig-aga/dpram.v" type="file.verilog" enable="1"/>
        <File path="../minimig-aga/dpram_be_1024x16.v" type="file.verilog" enable="1"/>
        <File path="../misc/video_analyzer.v" type="file.verilog" enable="1"/>
+       <File path="../misc/video_timing.v" type="file.verilog" enable="1"/>
        <File path="../hdmi/audio_clock_regeneration_packet.sv" type="file.verilog" enable="1"/>
        <File path="../hdmi/audio_info_frame.sv" type="file.verilog" enable="1"/>
        <File path="../hdmi/audio_sample_packet.sv" type="file.verilog" enable="1"/>

@@ -9,4 +9,5 @@
 `define NO_WS2812
 `define ENABLE_RAM32
 `define CHIPRAM_CACHE
+`define VID31_PASSTHROUGH
 `define XML_GZIP_LEN 960

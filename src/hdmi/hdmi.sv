@@ -48,6 +48,18 @@ module hdmi
     input logic [1:0]                 screen,      // 0 std, 1 overscan, 2 for some jailbars
     input logic                       short_frame, // 1 if short frame has been detected
     input logic                       interlace,   // 1 if interlace has been detected
+`ifdef VID31_PASSTHROUGH
+    // 31 kHz pass-through: the raster follows the measured Amiga timing
+    input logic                       fast,        // 1 if the Amiga video is not line-doubled
+    input logic [10:0]                fast_width,  // measured clocks per line
+    input logic [9:0]                 fast_height, // measured lines per frame
+    // pass-through placed by the Amiga's blanking: reset comes on the first
+    // visible pixel, the visible part is centred in the HDMI picture
+    input logic                       geo,
+    input logic [10:0]                geo_width,   // width of the display window
+    input logic [10:0]                geo_offset,  // end of blanking to display window
+    input logic [9:0]                 geo_height,  // visible lines per frame
+`endif
     // synchronous reset back to 0,0
     input logic 		      reset,
     input logic [23:0] 		      rgb, 
@@ -87,19 +99,42 @@ wire [54:0] htiming0 =
 wire [102:0]  timing = pal_mode?{  htiming0, vtiming0, cea0 }:
                                 {  htiming0, vtiming1, cea1 };
 
-// demux timing parameters   
-wire [10:0] start_x           = timing[102:92];
+`ifndef VID31_PASSTHROUGH
+// no pass-through in this build: the inputs are tied off
+wire        fast = 1'b0;
+wire [10:0] fast_width = 11'd0;
+wire [9:0]  fast_height = 10'd0;
+wire        geo = 1'b0;
+wire [10:0] geo_width = 11'd0;
+wire [10:0] geo_offset = 11'd0;
+wire [9:0]  geo_height = 10'd0;
+`endif
 
-wire [10:0] frame_width       = timing[91:81];
+// demux timing parameters   
+wire [10:0] frame_width       = fast ? fast_width : timing[91:81];
 wire [10:0] screen_width      = timing[80:70];
+
+// geo: the reset arrives at the end of the Amiga's horizontal blanking, on the
+// first visible line. The display window starts geo_offset clocks later and is
+// geo_width wide; it is centred in the HDMI picture. A negative start means
+// the HDMI line begins that many clocks after the reset.
+wire signed [11:0] geo_slack  = $signed({1'b0, screen_width}) - $signed({1'b0, geo_width});
+wire signed [12:0] geo_pos    = $signed(geo_slack >>> 1) - $signed({2'b00, geo_offset});
+wire [10:0] geo_start_x       = geo_pos[12] ? frame_width + geo_pos[10:0] : geo_pos[10:0];
+wire [10:0] start_x           = geo ? geo_start_x : timing[102:92];
 wire [10:0] hsync_pulse_start = timing[69:59];
 wire [10:0] hsync_pulse_size  = timing[58:48];
 
 // if we have a short frame, then the scandoubler outputs two lines less
 // if amiga outputs interlaced video, then the scandoubler outputs one line
 // less resulting in an odd overall frame height
-wire [9:0] frame_height       = timing[47:38] - (short_frame ? 10'd2 : 10'd0) - (interlace ? 10'd1 : 10'd0);
-wire [9:0] screen_height      = timing[37:28];
+wire [9:0] frame_height       = fast ? fast_height :
+                                timing[47:38] - (short_frame ? 10'd2 : 10'd0) - (interlace ? 10'd1 : 10'd0);
+// in pass-through keep 26 lines of vertical blanking: that hides the Amiga's
+// own blanking in DblPAL (about 24 lines on the photo) and holds the vsync pulse
+// with geo the visible height is the Amiga's own, so its blanking is the HDMI blanking
+wire [9:0] screen_height      = geo  ? geo_height :
+                                fast ? fast_height - 10'd26 : timing[37:28];
 wire [9:0] vsync_pulse_start  = timing[27:18];
 wire [9:0] vsync_pulse_size   = timing[17: 8];
 
@@ -148,6 +183,12 @@ begin
     else
         video_data_period <= cx < screen_width && cy < screen_height;
 end
+
+// geo: the Amiga's border is wide on the left and almost absent on the right.
+// Black out the left border except for 4 clocks, so both sides look the same.
+wire [10:0] geo_left  = geo_slack[11:1] - 11'd4;
+wire        geo_mask  = geo && !geo_slack[11] && (cx < geo_left);
+wire [23:0] rgb_geo = geo_mask ? 24'd0 : rgb;
 
 logic [2:0] mode = 3'd1;
 logic [23:0] video_data = 24'd0;
@@ -251,7 +292,7 @@ generate
 `ifdef HDMI_TEST_PATTERN
                 video_data <= rgb_test;
 `else
-                video_data <= rgb;
+                video_data <= rgb_geo;
 `endif
                 control_data <= {{1'b0, data_island_preamble}, {1'b0, video_preamble || data_island_preamble}, {vsync, hsync}}; // ctrl3, ctrl2, ctrl1, ctrl0, vsync, hsync
                 data_island_data[11:4] <= packet_data[8:1];
@@ -277,7 +318,7 @@ generate
 `ifdef HDMI_TEST_PATTERN
                 video_data <= rgb_test;
 `else
-                video_data <= rgb;
+                video_data <= rgb_geo;
 `endif
                 control_data <= {4'b0000, {vsync, hsync}}; // ctrl3, ctrl2, ctrl1, ctrl0, vsync, hsync
             end
