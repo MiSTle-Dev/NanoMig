@@ -9,4 +9,4 @@
 `define NO_WS2812
 `define ENABLE_RAM32
 `define CHIPRAM_CACHE
-`define XML_GZIP_LEN 960
+`define XML_GZIP_LEN 1024

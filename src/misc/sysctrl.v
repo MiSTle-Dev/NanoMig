@@ -98,7 +98,12 @@ reg [26:0] main_reset_timeout; // 84,000,000 cycles fits in 27 bits
 reg [11:0] menu_rom_addr;
 reg  [7:0] menu_rom_data;
 
-reg [7:0] amiga_xml[1536];
+// fallback for unknown length, should be removed one day
+`ifndef XML_GZIP_LEN
+ `define XML_GZIP_LEN 1536
+`endif
+   
+reg [7:0] amiga_xml[`XML_GZIP_LEN];
 initial $readmemh("amiga_xml.hex", amiga_xml);
 
 `ifdef ENABLE_RTC

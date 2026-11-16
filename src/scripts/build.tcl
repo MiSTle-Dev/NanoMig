@@ -9,7 +9,7 @@
 
 if {$argc == 0} {
     puts "Usage: $argv0 <device> <optons...>"
-    puts "       device: nano20k, tp25k, gw5a_25, gw3a_20, mega138kpro, console60k"
+    puts "       device: nano20k, tp25k, gw5a_25, gw3a_20, mega138kpro, console60k, console138k"
     puts "       options:"
     puts "               nano20k: aga, lcd   - build aga+020 and/or rgblcd variant"
     puts "               tp25k:   aga, dbg   - build aga and or debug variant"
@@ -363,7 +363,7 @@ if {$dev eq "nano20k"} {
 } elseif {$dev eq "gw5a_25"} {
     set board "mistle_gw5a_25"
     set_device_info "GW5A-LV25LQ144C1/I0" "" "GW5A-25A" "gw5a25a-036"
-    set_option_int -output_base_name nanomig_mistle_gw5a_25
+    set_option_int -output_base_name nanomig_${board}
 
     # remove the FX68K support to save some space
     set defines [lsearch -inline -all -not -exact $defines "ENABLE_FX68K"]
@@ -376,7 +376,7 @@ if {$dev eq "nano20k"} {
 } elseif {$dev eq "gw3a_20"} {
     set board "mistle_gw3a_20"
     set_device_info "GW3A-LV20LQ144C1/I0" "" "GW3A-20A" "gw3a20a-010"
-    set_option_int -output_base_name nanomig_mistle_gw3a_20
+    set_option_int -output_base_name nanomig_${board}
 
     # remove the FX68K support to save some space
     set defines [lsearch -inline -all -not -exact $defines "ENABLE_FX68K"]
@@ -391,7 +391,7 @@ if {$dev eq "nano20k"} {
     set board "tang_mega138kpro"
 
     set_device_info "GW5AST-LV138FPG676AC1/I0" "" "GW5AST-138B" "gw5ast138b-007"
-    set_option_int -output_base_name nanomig_tang_mega138kpro
+    set_option_int -output_base_name nanomig_${board}
 
     # TODO: Full build!
     #lappend defines "ENABLE_RAM32" "CHIPRAM_CACHE" "DISABLE_ROM_IMAGE" 
@@ -403,9 +403,17 @@ if {$dev eq "nano20k"} {
     set board "tang_console60k"
 
     set_device_info "GW5AT-LV60PG484AC1/I0" "" "GW5AT-60B" "gw5at60b-002"
-    set_option_int -output_base_name nanomig_tang_console60k
+    set_option_int -output_base_name nanomig_${board}
 
     set dev_path "tang/console60k"
+    
+} elseif {$dev eq "console138k"} {
+    set board "tang_console138k"
+
+    set_device_info "GW5AST-LV138PG484AC1/I0" "C" "GW5AST-138C" "gw5ast138c-007"
+    set_option_int -output_base_name nanomig_${board}
+
+    set dev_path "tang/console138k"
     
 } else {
     puts "Error, unknown device $dev"
@@ -414,6 +422,10 @@ if {$dev eq "nano20k"} {
 
 # process the xml config
 source scripts/update_xml.tcl
+
+# round value up to multiple of 512 to avoid changes in the config_xxx.vh for
+# every tiny change in the xml
+set gzip_len [expr {(($gzip_len + 511) / 512) * 512}]
 
 # the actual length of the gzipped data should now be in gzip_len
 lappend defines "XML_GZIP_LEN $gzip_len"
@@ -539,6 +551,29 @@ if {$dev eq "nano20k"} {
 
     add_file_cst tang/console60k/nanomig.cst
     add_file_sdc tang/console60k/nanomig.sdc
+
+    set_option_int -use_mspi_as_gpio 1
+    set_option_int -use_sspi_as_gpio 1
+    set_option_int -use_done_as_gpio 1
+    set_option_int -use_cpu_as_gpio 1
+    set_option_int -use_i2c_as_gpio 1
+    set_option_int -use_ready_as_gpio 1
+    set_option_int -use_jtag_as_gpio 1
+    set_option_int -loading_rate 70.000
+    set_option_int -place_option 2
+    set_option_int -route_option 1
+
+} elseif {$dev eq "console138k"} {
+    add_file_v tang/console138k/top.sv
+    add_file_v tang/mega138kpro/gowin_clkdiv/gowin_clkdiv.v
+    add_file_v tang/console138k/gowin_pll/pll_142m.v
+    add_file_v tang/console138k/gowin_pll/pll_142m_mod.v
+    add_file_v tang/console138k/pll_init.v
+    add_file_v tang/mega138kpro/gowin_dpb/sector_dpram.v
+    add_file_v tang/mega138kpro/gowin_dpb/ide_dpram.v
+
+    add_file_cst tang/console138k/nanomig.cst
+    add_file_sdc tang/console138k/nanomig.sdc
 
     set_option_int -use_mspi_as_gpio 1
     set_option_int -use_sspi_as_gpio 1
