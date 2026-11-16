@@ -88,7 +88,7 @@ assign leds[1] =  drv_leds[1] || drv_leds[0];
 // -> The resulting effective Amiga clock is slightly lower than the
 // NTSC's 7.15909 and the PAL's 7.09379 Mhz
 
-`define PIXEL_CLOCK 28400000
+`define PIXEL_CLOCK 28333333
 
 wire clk_pixel_x5;
 wire clk_85m;
