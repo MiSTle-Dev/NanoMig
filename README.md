@@ -46,7 +46,7 @@ Network options:
 
 Planned features: 
 
-  * Roadshow / Companion PPP Tunnel (Internet access)  
+  * Roadshow / PLIP or Clockport networking (Internet access)  
 
 ## Videos
 
