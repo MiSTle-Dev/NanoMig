@@ -37,8 +37,12 @@ Usage: scripts/build.tcl <device> <optons...>
        device: nano20k, tp25k, gw5a_25, gw3a_20, mega138kpro, console60k, console138k
        options:
                nano20k: aga, lcd   - build aga+020 and/or rgblcd variant
-               tp25k:   aga, dbg   - build aga and or debug variant
+               tp25k:   aga        - build aga variant
+               gw5a_25: aga        - build aga variant
                all:     nosyn      - generate files only, don't run synthesis
+                        dbgcpu     - include cpu test rom "pwr_led_blink"
+                        dbgvid     - include video test rom "video_init"
+                        dbgram     - include rom/ram test "ram_test"
 ```
 
 In this process various files are being generated which can also be
@@ -47,6 +51,12 @@ Gowin IDE project files are being generated in ```gowin_prj```. Only
 the most common variants are distributed through github. Build files
 for other variants like e.g. the GW3A_20 dev board can be generated
 from the command line as needed.
+
+The ```dbgcpu```, ```dbgvid``` ```dbgram``` options will include
+debug code into the build. This is mainly meant to help debugging
+sdram memory and flash memory access problems which are the most
+common problems when bringing up a new board. More details can
+be found [here](../test_roms).
 
 ## Details
 
@@ -78,7 +88,30 @@ build. But they are automatically re-generated to make sure the
 configuration for the IDE build matches the one for the command line.
 
 ```misc/amiga_xml.hex``` is the file holding the converted and
-compressed menu information.  It is generated from the
+compressed menu information. It is generated from the
 ```misc/amiga.xml``` file. This is the only file that is being
 re-generated during IDE builds as well.
 
+## TODO
+
+There a several things that still need some cleanup. This includes:
+
+- Further splitting of SDC files into parts allowing to share
+  SDCs between the build variants. This e.g. would allow for
+  constraints for MiSTer SDRAMs, or the two CPU variants.
+
+- Further splitting of CST files to e.g. make external companion
+  interfaces optional and to allow to re-use those pins for other
+  purposes like PMODs.
+
+- Add more flexibility into the PMOD handling allowing for various
+  build variants using PMODs for debugging as well as IO features
+  like dualshock controller PMODs.
+
+- Currently most configuration details are hidden within the
+  [build.tcl](build.tcl) script which makes it somewhat difficult
+  to maintain. These details may be moved into a seperate
+  human readable config file which in turn is being read and
+  parsed by the ```build.tcl```. This in turn could make the
+  ```build.tcl``` project independent and could allow it to be
+  re-used e.g. for the MiSTeryNano.
