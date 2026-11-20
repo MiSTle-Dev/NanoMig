@@ -21,7 +21,6 @@ set_false_path -from [get_cells {sysctrl/system_video*}]
 set_false_path -from [get_cells {sysctrl/system_chipmem*}]
 set_false_path -from [get_cells {sysctrl/system_slowmem*}]
 set_false_path -from [get_cells {sysctrl/system_fastmem*}]
-set_false_path -from [get_cells {sysctrl/system_turbo*}]
 set_false_path -from [get_cells {sysctrl/system_volume*}]
 
 // The disk length register reaches the blitter through the dma priority logic.

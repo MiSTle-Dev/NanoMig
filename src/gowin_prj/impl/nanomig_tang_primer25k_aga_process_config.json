@@ -1,6 +1,5 @@
 {
     "Process_Configuration_Verion": "1.0",
-    "OUTPUT_BASE_NAME": "nanomig_tang_primer25k",
     "OUTPUT_BASE_NAME": "nanomig_tang_primer25k_aga",
     "MSPI": true,
     "SSPI": true,

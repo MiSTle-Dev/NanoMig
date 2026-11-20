@@ -28,8 +28,6 @@
 // - suppress ready bit for drives not present
 // - reduce buffer size when only HDDs are being used
 
-`ifndef DISABLE_IDE
-
 module ide
 (
 	input             clk,
@@ -372,5 +370,3 @@ end
 //------------------------------------------------------------------------------
 
 endmodule
-
-`endif // DISABLE_IDE

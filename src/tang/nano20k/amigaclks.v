@@ -13,6 +13,16 @@ module amigaclks (
 	output video_locked
 );
 
+// HDMI clock:  141.8758 MHz
+// Pixel clock: 28.37516 MHz (HDMI/5)
+// SDRAM and flash clock: 85 MHz
+// Amiga clock: 7.09379 (Pixel/4)
+   
+// 27MHz crystal * 19/6 = 85.5MHz, divided by 3. The nominal PAL clock would
+// be 28.37516MHz, but this is the one the hardware actually runs at, and the
+// audio rate below is derived from it.
+
+`define PIXEL_CLOCK 28500000
 
 // Video clocks
 wire clk_28_i;

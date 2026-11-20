@@ -54,13 +54,37 @@ cplp:	move.l	(a0)+,(a1)+
 	move.b	#$aa,VIDMEM+4082
 	move.b	#$55,VIDMEM+4083
 
-mainlp:	bclr.b	#1,$bfe001	; LED on
+mainlp:
+
+	;;  some memory r/w
+	move.l	#VIDMEM+4000,a0
+	move.l	#VIDMEM+4160,a1
+	move.l	#VIDMEM+0,a2
+	move 	#160-1,d0
+mm0:	move.l	(a0),(a1)+
+	move.l	(a0),(a2)+
+	dbra	d0,mm0	
+
+
+	bclr.b	#1,$bfe001	; LED on
 
 	move 	#1,d1
 owlp0:	move 	#50000,d0
 wlp0:	dbra	d0,wlp0
 	dbra	d1,owlp0
 	
+	;;  some memory r/w
+	move.l	#VIDMEM+4000,a0
+	move.l	#VIDMEM+4160,a1
+	move.l	#VIDMEM+0,a2
+	move 	#160-1,d0
+mm1:	move.l 	(a0),d1
+	neg.l	d1
+	move.l	d1,(a1)+
+	move.l	d1,(a2)+
+	dbra	d0,mm1	
+
+
 	bset.b	#1,$bfe001	; LED off
 	
 	move 	#5,d1

@@ -1,16 +1,26 @@
-module pll_142m_MOD (lock, clkout0, clkout1, clkout2, clkout3, clkin, reset, icpsel, lpfres, lpfcap);
+//Copyright (C)2014-2025 Gowin Semiconductor Corporation.
+//All rights reserved.
+//File Title: IP file
+//Tool Version: V1.9.12.01
+//IP Version: 1.0
+//Part Number: GW5AST-LV138FPG676AC1/I0
+//Device: GW5AST-138
+//Device Version: B
+//Created Time: Sat Jan 24 15:25:56 2026
+
+module pll_142m_MOD (lock, clkout0, clkout1, clkout2, clkin, reset, icpsel, lpfres, lpfcap);
 
 output lock;
 output clkout0;
 output clkout1;
 output clkout2;
-output clkout3;
 input clkin;
 input reset;
 input [5:0] icpsel;
 input [2:0] lpfres;
 input [1:0] lpfcap;
 
+wire clkout3;
 wire clkout4;
 wire clkout5;
 wire clkout6;
@@ -73,22 +83,22 @@ PLL PLL_inst (
 );
 
 defparam PLL_inst.FCLKIN = "50";
-defparam PLL_inst.IDIV_SEL = 1;
+defparam PLL_inst.IDIV_SEL = 2;
 defparam PLL_inst.FBDIV_SEL = 1;
 defparam PLL_inst.ODIV0_SEL = 6;
 defparam PLL_inst.ODIV1_SEL = 10;
 defparam PLL_inst.ODIV2_SEL = 10;
-defparam PLL_inst.ODIV3_SEL = 10;
+defparam PLL_inst.ODIV3_SEL = 8;
 defparam PLL_inst.ODIV4_SEL = 8;
 defparam PLL_inst.ODIV5_SEL = 8;
 defparam PLL_inst.ODIV6_SEL = 8;
-defparam PLL_inst.MDIV_SEL = 17;
+defparam PLL_inst.MDIV_SEL = 34;
 defparam PLL_inst.MDIV_FRAC_SEL = 0;
 defparam PLL_inst.ODIV0_FRAC_SEL = 0;
 defparam PLL_inst.CLKOUT0_EN = "TRUE";
 defparam PLL_inst.CLKOUT1_EN = "TRUE";
 defparam PLL_inst.CLKOUT2_EN = "TRUE";
-defparam PLL_inst.CLKOUT3_EN = "TRUE";
+defparam PLL_inst.CLKOUT3_EN = "FALSE";
 defparam PLL_inst.CLKOUT4_EN = "FALSE";
 defparam PLL_inst.CLKOUT5_EN = "FALSE";
 defparam PLL_inst.CLKOUT6_EN = "FALSE";
@@ -120,9 +130,9 @@ defparam PLL_inst.CLKOUT0_PE_COARSE = 0;
 defparam PLL_inst.CLKOUT0_PE_FINE = 0;
 defparam PLL_inst.CLKOUT1_PE_COARSE = 0;
 defparam PLL_inst.CLKOUT1_PE_FINE = 0;
-defparam PLL_inst.CLKOUT2_PE_COARSE = 7;
-defparam PLL_inst.CLKOUT2_PE_FINE = 4;
-defparam PLL_inst.CLKOUT3_PE_COARSE = 5;
+defparam PLL_inst.CLKOUT2_PE_COARSE = 5;
+defparam PLL_inst.CLKOUT2_PE_FINE = 0;
+defparam PLL_inst.CLKOUT3_PE_COARSE = 0;
 defparam PLL_inst.CLKOUT3_PE_FINE = 0;
 defparam PLL_inst.CLKOUT4_PE_COARSE = 0;
 defparam PLL_inst.CLKOUT4_PE_FINE = 0;

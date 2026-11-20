@@ -14,20 +14,13 @@
 //
 //  This takes two optional global defines:
 //  - NO_COMPANION, disables the FPGA Companion interface entirely
-//  - DISABLE_ROM_IMAGE disables the ROM image download interface
+//  - ENABLE_ROM_LOADER enables the ROM image download interface
 //       to save some logic if unused. This is implied by NO_COMPANION
 //  - IMAGE_INDEX, index of an (optional) image to be used for direct
 //       SD card access without companion (NO_COMPANION set)
 //  - IMAGE_SIZE, size in bytes of an (optional) image to be used for direct
 //       SD card access without companion (NO_COMPANION set)
 //
-
-// without companion interface the rom interface is also disabled
-`ifdef NO_COMPANION
- `ifndef DISABLE_ROM_IMAGE
-  `define DISABLE_ROM_IMAGE
- `endif
-`endif
 
 `ifdef IMAGE_INDEX
  `ifndef IMAGE_SIZE
@@ -76,7 +69,7 @@ module sd_card # (
     // up to eight drive images supported
     output reg [7:0]  image_mounted,
 
-`ifndef DISABLE_ROM_IMAGE
+`ifdef ENABLE_ROM_LOADER
     // up to eight rom images supported
 	output reg		  rom_image_selection_strobe,
     output reg [2:0]  rom_image_selected,
@@ -262,7 +255,7 @@ sector_dpram buffer(
 
 `ifndef NO_COMPANION   // no IRQ handling without companion
    
-`ifndef DISABLE_ROM_IMAGE
+`ifdef ENABLE_ROM_LOADER
 reg	      rom_image_trigger_irq;   
 `endif
    
@@ -288,7 +281,7 @@ always @(posedge clk, negedge rstn) begin
       if(start_any && !startD && !direct_enable)
         irq <= 1'b1;
 
-`ifndef DISABLE_ROM_IMAGE
+`ifdef ENABLE_ROM_LOADER
 	  // if a rom image transfer has been accepted by the core, raise
 	  // interrupt to start transfer
 	  if(rom_image_accepted || rom_image_trigger_irq )  // initial IRQ
@@ -298,7 +291,7 @@ always @(posedge clk, negedge rstn) begin
 end
 `endif // !`ifndef NO_COMPANION
    
-`ifndef DISABLE_ROM_IMAGE
+`ifdef ENABLE_ROM_LOADER
 // register indicating whether the core has accepted a rom image
 reg [7:0] rom_image_valid;   
 
@@ -353,7 +346,7 @@ always @(posedge clk, negedge rstn) begin
 `endif
 `endif
 	  
-`ifndef DISABLE_ROM_IMAGE
+`ifdef ENABLE_ROM_LOADER
 	  // rom image handling related values
       rom_image_selection_strobe <= 1'b0;
       rom_image_selected <= 3'd0;
@@ -383,7 +376,7 @@ always @(posedge clk, negedge rstn) begin
 `endif
 `endif
 
-`ifndef DISABLE_ROM_IMAGE
+`ifdef ENABLE_ROM_LOADER
 	  // store core reply to the rom image selection request
 	  if(rom_image_selection_strobe) begin
 		 rom_image_valid[rom_image_selected] <= rom_image_accepted;
@@ -695,7 +688,7 @@ always @(posedge clk, negedge rstn) begin
                end
             end
 
-`ifndef DISABLE_ROM_IMAGE
+`ifdef ENABLE_ROM_LOADER
             // SDC CMD 8: IMAGE, used to e.g. load kickstart (unless read from flash)
             if(command == 8'd8) begin
                if(byte_cnt == 4'd0) sub_command <= data_in;
@@ -774,7 +767,7 @@ always @(posedge clk, negedge rstn) begin
 				  endcase
 			   end
 			end // if (command == 8'd8)
-`endif   // !DISABLE_ROM_IMAGE
+`endif //  `ifdef ENABLE_ROM_LOADER			
 			   
 			if(byte_cnt != 4'd15) byte_cnt <= byte_cnt + 4'd1;    
          end

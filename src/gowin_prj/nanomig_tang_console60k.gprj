@@ -6,7 +6,8 @@
     <Device name="GW5AT-60B" pn="GW5AT-LV60PG484AC1/I0">gw5at60b-002</Device>
     <FileList>
        <File path="../tang/console60k/config_tang_console60k.vh" type="file.verilog" enable="1"/>
-       <File path="../tang/console60k/top.sv" type="file.verilog" enable="1"/>
+       <File path="../tang/console60k/amigaclks.v" type="file.verilog" enable="1"/>
+       <File path="../top.sv" type="file.verilog" enable="1"/>
        <File path="../tang/console60k/gowin_clkdiv/gowin_clkdiv.v" type="file.verilog" enable="1"/>
        <File path="../tang/primer25k/gowin_pll/pll_142m.v" type="file.verilog" enable="1"/>
        <File path="../tang/primer25k/gowin_pll/pll_142m_mod.v" type="file.verilog" enable="1"/>
@@ -65,9 +66,14 @@
        <File path="../minimig-aga/minimig_syscontrol.v" type="file.verilog" enable="1"/>
        <File path="../minimig-aga/userio.v" type="file.verilog" enable="1"/>
        <File path="../minimig/Amber.v" type="file.verilog" enable="1"/>
+       <File path="../minimig-aga/bitplane_ram.v" type="file.verilog" enable="1"/>
+       <File path="../minimig-aga/sprite_ram.v" type="file.verilog" enable="1"/>
        <File path="../fx68k/fx68k.sv" type="file.verilog" enable="1"/>
        <File path="../fx68k/fx68kAlu.sv" type="file.verilog" enable="1"/>
        <File path="../fx68k/uaddrPla.sv" type="file.verilog" enable="1"/>
+       <File path="../minimig-aga/cpu_cache_new.v" type="file.verilog" enable="1"/>
+       <File path="../minimig-aga/dpram.v" type="file.verilog" enable="1"/>
+       <File path="../minimig-aga/dpram_be_1024x16.v" type="file.verilog" enable="1"/>
        <File path="../misc/video_analyzer.v" type="file.verilog" enable="1"/>
        <File path="../hdmi/audio_clock_regeneration_packet.sv" type="file.verilog" enable="1"/>
        <File path="../hdmi/audio_info_frame.sv" type="file.verilog" enable="1"/>
@@ -93,10 +99,14 @@
        <File path="../misc/uart_port.v" type="file.verilog" enable="1"/>
        <File path="../misc/io_fifo.v" type="file.verilog" enable="1"/>
        <File path="../misc/amiga_keymap.v" type="file.verilog" enable="1"/>
+       <File path="../tg68k/TG68K_Pack.vhd" type="file.vhdl" enable="1"/>
+       <File path="../tg68k/TG68K.vhd" type="file.vhdl" enable="1"/>
+       <File path="../tg68k/TG68K_ALU.vhd" type="file.vhdl" enable="1"/>
+       <File path="../tg68k/TG68KdotC_Kernel.vhd" type="file.vhdl" enable="1"/>
        <File path="../fx68k/microrom.mem" type="file.other" enable="1"/>
        <File path="../fx68k/nanorom.mem" type="file.other" enable="1"/>
        <File path="../misc/amiga_xml.hex" type="file.other" enable="1"/>
        <File path="../tang/console60k/nanomig.cst" type="file.cst" enable="1"/>
-       <File path="../tang/console60k/nanomig.sdc" type="file.sdc" enable="1"/>
+       <File path="../tang/console60k/nanomig_tang_console60k.sdc" type="file.sdc" enable="1"/>
     </FileList>
 </Project>

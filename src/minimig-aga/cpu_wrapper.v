@@ -417,28 +417,6 @@ TG68KdotC_Kernel
 `endif
 cpu_inst_p
 (
-`ifdef VERILATOR
-  // the verilog translation of the kernel used for simulation has
-  // all-lowercase port names
-  .clk(clk),
-  .nreset(reset),
-  .clkena_in(cpu_clkena),
-  .data_in(cpu_din),
-  .ipl(cpu_ipl),
-  .ipl_autovector(1),
-  .regin_out(),
-  .addr_out(cpu_addr_p),
-  .data_write(cpu_dout_p),
-  .nwr(wr_p),
-  .nuds(uds_p),
-  .nlds(lds_p),
-  .nresetout(reset_out_p),
-  .longword(longword),
-  .cpu(cpucfg),
-  .busstate(cpustate_p),		// 0: fetch code, 1: no memaccess, 2: read data, 3: write data
-  .cacr_out(cacr_p),
-  .vbr_out(vbr_p)
-`else
   .clk(clk),
  `ifdef ENABLE_FX68K
   .nReset(reset && cpucfg[1]),
@@ -465,7 +443,6 @@ cpu_inst_p
   .regin_out(),
   .CACR_out(cacr_p),
   .VBR_out(vbr_p)
-`endif
 );
 `endif
 

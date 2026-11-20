@@ -9,8 +9,6 @@
     "READY": true,
     "JTAG": true,
     "DOWNLOAD_SPEED": "210/3",
-    "Place_Option": "2",
-    "Route_Option": "1",
     "Synthesize_tool": "GowinSyn",
     "Verilog_Standard": "Vlg_Std_Sysv2017",
     "TopModule": "top",

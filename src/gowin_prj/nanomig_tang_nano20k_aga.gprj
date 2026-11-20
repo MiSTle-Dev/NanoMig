@@ -6,8 +6,8 @@
     <Device name="GW2AR-18C" pn="GW2AR-LV18QN88C8/I7">gw2ar18c-000</Device>
     <FileList>
        <File path="../tang/nano20k/config_tang_nano20k_aga.vh" type="file.verilog" enable="1"/>
-       <File path="../tang/nano20k/top.sv" type="file.verilog" enable="1"/>
        <File path="../tang/nano20k/amigaclks.v" type="file.verilog" enable="1"/>
+       <File path="../top.sv" type="file.verilog" enable="1"/>
        <File path="../tang/nano20k/gowin_dpb/sector_dpram.v" type="file.verilog" enable="1"/>
        <File path="../tang/nano20k/gowin_dpb/ide_dpram.v" type="file.verilog" enable="1"/>
        <File path="../nanomig.v" type="file.verilog" enable="1"/>

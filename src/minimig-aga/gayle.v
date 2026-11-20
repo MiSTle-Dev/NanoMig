@@ -136,7 +136,6 @@ wire [31:0] ide0_data;
 wire [15:0] ide0_readdata;
 wire        ide0_intreq, ide0_drq, ide0_nodata;
 
-`ifndef DISABLE_IDE
 ide ide0
 (
 	.clk(clk),
@@ -164,14 +163,12 @@ ide ide0
 	.mgmt_read(ide_read & ~ide_address[4]),
 	.mgmt_readdata(ide0_readdata)
 );
-`endif
    
 wire [31:0] ide1_data;
 wire [15:0] ide1_readdata;
 wire        ide1_intreq, ide1_drq, ide1_nodata;
 
-`ifndef DISABLE_IDE
-`ifndef DISABLE_IDE1
+`ifdef ENABLE_IDE1
 ide ide1
 (
 	.clk(clk),
@@ -199,15 +196,14 @@ ide ide1
 	.mgmt_read(ide_read & ide_address[4]),
 	.mgmt_readdata(ide1_readdata)
 );
-`else
+`else // !`ifdef ENABLE_IDE1   
 assign ide1_req = 1'b0;   
 assign ide1_drq = 1'b0;   
 assign ide1_nodata = 1'b0;   
 assign ide1_data = 32'd0;   
 assign ide1_readdata = 32'd0;
 assign ide_req[5:3] = 3'b000;   
-`endif
-`endif
+`endif // !`ifdef ENABLE_IDE1
    
 wire   intreq  = ide0_intreq | ide1_intreq;
 wire   gayleid = ~gayleid_cnt[1] | gayleid_cnt[0];

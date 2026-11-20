@@ -6,7 +6,8 @@
     <Device name="GW5A-25A" pn="GW5A-LV25MG121NC1/I0">gw5a25a-002</Device>
     <FileList>
        <File path="../tang/primer25k/config_tang_primer25k_aga.vh" type="file.verilog" enable="1"/>
-       <File path="../tang/primer25k/top.sv" type="file.verilog" enable="1"/>
+       <File path="../tang/primer25k/amigaclks.v" type="file.verilog" enable="1"/>
+       <File path="../top.sv" type="file.verilog" enable="1"/>
        <File path="../tang/primer25k/gowin_clkdiv/gowin_clkdiv.v" type="file.verilog" enable="1"/>
        <File path="../tang/primer25k/gowin_pll/pll_142m.v" type="file.verilog" enable="1"/>
        <File path="../tang/primer25k/gowin_pll/pll_142m_mod.v" type="file.verilog" enable="1"/>

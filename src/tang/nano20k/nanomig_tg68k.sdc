@@ -1,3 +1,4 @@
+set_false_path -from [get_cells {sysctrl/system_turbo*}]
 set_false_path -from [get_cells {sysctrl/system_cpu*}]
 // the TG68K advances at most every second clk28 cycle (CPU_SLOW14 in
 // cpu_wrapper.v), so all its internal register to register paths are

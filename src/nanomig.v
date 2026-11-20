@@ -21,8 +21,8 @@ module nanomig (
    output	 fdd_step_n,
 
    // video
-   output	 hs, // horizontal sync
-   output	 vs, // vertical sync
+   output	 hs,		 // horizontal sync
+   output	 vs,		 // vertical sync
    output [3:0]	 r,
    output [3:0]	 g,
    output [3:0]	 b,
@@ -33,17 +33,19 @@ module nanomig (
    input [5:0]	 chipset_config,
    input [3:0]	 floppy_config,
    input [3:0]	 video_config,
-   input [2:0]  turbo_config,
-`ifndef DISABLE_IDE
+`ifdef ENABLE_TURBO
+   input [2:0]	 turbo_config,
+`endif
+`ifdef ENABLE_IDE
    input [5:0]	 ide_config,
    output	 hdd_led,
 `endif
 		
-   output [14:0] audio_left, // left DAC data
-   output [14:0] audio_right, // right DAC data
+   output [14:0] audio_left,	 // left DAC data
+   output [14:0] audio_right,	 // right DAC data
 
    // mouse and keyboard
-   input [2:0]	 mouse_buttons, // mouse buttons
+   input [2:0]	 mouse_buttons,	 // mouse buttons
    input	 kbd_mouse_level,
    input [1:0]	 kbd_mouse_type,
    input [7:0]	 kbd_mouse_data,
@@ -51,7 +53,7 @@ module nanomig (
    input [7:0]	 joystick1,
 
    // explicit ACK after consuming keyboard event
-   output       keyboard_ack,
+   output	 keyboard_ack,
 
    // UART/RS232 for e.g. DiagROM or MIDI
    output	 uart_tx,
@@ -61,10 +63,10 @@ module nanomig (
    // serial port as byte stream to/from the MCU (virtual AT modem of the
    // FPGA Companion). Replaces the uart_rx pin.
    output [31:0] serial_status,
-   output [7:0]  serial_tx_available,
+   output [7:0]	 serial_tx_available,
    input	 serial_tx_strobe,
-   output [7:0]  serial_tx_data,
-   output [7:0]  serial_rx_available,
+   output [7:0]	 serial_tx_data,
+   output [7:0]	 serial_rx_available,
    input	 serial_rx_strobe,
    input [7:0]	 serial_rx_data,
 `endif
@@ -89,17 +91,17 @@ module nanomig (
    output [7:0]	 sdc_byte_out_data,
 		
    // (s)ram interface
-   output [15:0] ram_data, // sram data bus
-   input [15:0]	 ramdata_in, // sram data bus in
-   input [47:0]	 chip48, // big chip read
-   output	 refresh, // ram refresh cycle
-   output [23:1] ram_address, // sram address bus
-   output	 _ram_bhe, // sram upper byte select
-   output	 _ram_ble, // sram lower byte select
-   output	 _ram_we, // sram write enable
-   output	 _ram_oe, // sram output enable
+   output [15:0] ram_data,	 // sram data bus
+   input [15:0]	 ramdata_in,	 // sram data bus in
+   input [47:0]	 chip48,	 // big chip read
+   output	 refresh,	 // ram refresh cycle
+   output [23:1] ram_address,	 // sram address bus
+   output	 _ram_bhe,	 // sram upper byte select
+   output	 _ram_ble,	 // sram lower byte select
+   output	 _ram_we,	 // sram write enable
+   output	 _ram_oe,	 // sram output enable
 
-   output 	 fastram_sel,
+   output	 fastram_sel,
    output [23:1] fastram_addr,
    output	 fastram_lds,
    output	 fastram_uds,
@@ -218,6 +220,10 @@ wire [1:0] slowram_config = (fastram_config[1:0] != 2'b11 ? memory_config[3:2] :
 wire [1:0] slowram_config = memory_config[3:2];
 `endif
 
+`ifndef ENABLE_TURBO
+wire [2:0] turbo_config = 3'b000;
+`endif   
+   
 // cache bits: data, kick, chip
 wire [2:0] turbocfg = turbo_config & { 1'b1, 1'b1, ~ovl };  // turbo data, turbo kick, turbo chip when no overlay
 
@@ -296,17 +302,6 @@ cpu_wrapper cpu_wrapper
 	.chip_rw      (chip_rw         ),
 	.chip_dtack   (chip_dtack      ),
 	.chip_ipl     (chip_ipl        ),
-
-`ifdef FASTCHIP_DEPRECATED
-	.fastchip_dout   (  ),
-	.fastchip_sel    (  ),
-	.fastchip_lds    (  ),
-	.fastchip_uds    (  ),
-	.fastchip_rnw    (  ),
-	.fastchip_selack (  ),
-	.fastchip_ready  ( 1'b0 ),
-	.fastchip_lw     (  ),
-`endif
 
 	.cpucfg       (cpucfg          ),
 	.turbocfg     (turbocfg        ),
@@ -587,7 +582,7 @@ wire [31:0] sdc_sector_fdc;  // from inside minimig/floppy
 // ==============================================================================
 // ===================================== IDE ====================================
 // ==============================================================================
-`ifndef DISABLE_IDE
+`ifdef ENABLE_IDE
    
 // In a real minimig much of the IDE specific stuff is done on the
 // microcontroller side. The concept of NanoMig (and MiSTeryNano)
@@ -1371,13 +1366,13 @@ wire ide_write = (!ide_exec_cnt[0] && (
      // forward the word every second byte received from the sd card
      ||((ide_exec == IDE_EXEC_SEND_PAYLOAD) && sdc_byte_in_strobe && sdc_byte_addr[0]));
 
-`else // !`ifndef DISABLE_IDE
+`else // !`ifdef ENABLE_IDE
 assign sdc_sector = sdc_sector_fdc;      
 assign sdc_rd[7:4] = 4'b0000; 
 assign sdc_wr[7:4] = 4'b0000; 
 assign sdc_byte_out_data = sdc_byte_out_data_fdc;
-`endif // !`ifndef DISABLE_IDE   
-
+`endif // !`ifdef ENABLE_IDE
+   
 ///////////////////////////////////////////////////////////////////////
 
 // apply blanking to video. May actually not be needed as the HDMI
@@ -1404,8 +1399,6 @@ wire [15:0] JOYA1 = 16'h0000;
 /* ======================================================================================== */
 /* =============================== internal ROM and RAM =================================== */
 /* ======================================================================================== */
-/* =============================== internal ROM and RAM =================================== */
-/* ======================================================================================== */
 
 /* option to map a (small) internal rom. This can be useful for testing if
    flash and/or sdram aren't working properly during board bringup */
@@ -1415,13 +1408,13 @@ reg [15:0] rom[1024];  // 2kbytes rom
 
 // here, one of the rom images from the test_roms directory may be selected
 `ifdef ENABLE_INT_ROM_BLINK_LED
-initial $readmemh("pwr_led_blink.hex", rom);   // pwr_led_blink is a very basic cpu test
+initial $readmemh("test_roms/pwr_led_blink.hex", rom);   // pwr_led_blink is a very basic cpu test
 `elsif ENABLE_INT_ROM_VIDEO_INIT
-initial $readmemh("video_init.hex", rom);
+initial $readmemh("test_roms/video_init.hex", rom);
 `elsif ENABLE_INT_ROM_FLASH_READ
-initial $readmemh("flash_read.hex", rom);
+initial $readmemh("test_roms/flash_read.hex", rom);
 `elsif ENABLE_INT_ROM_RAM_TEST
-initial $readmemh("ram_test.hex", rom);
+initial $readmemh("test_roms/ram_test.hex", rom);
 `else
 $error "Please specify a ROM to use internally"
 `endif
@@ -1442,31 +1435,32 @@ wire int_rom_sel = ram_address[22:11] == 12'hf00;
 reg [7:0] raml[1024];  // 2kbytes ram
 reg [7:0] ramh[1024];
 
-wire int_ram_sel = ram_address[22:11] == 12'h000;
+wire int_ram_sel = ram_address[23:11] == 13'h0000;
 reg [15:0] ramD;
 always_ff @(posedge clk_sys) begin
-	if(clk7n_en) begin
-		if(!_ram_oe)
-			ramD <= { ramh[ram_address[10:1]], raml[ram_address[10:1]] };
-	   end
+   if(clk7n_en) begin
+      if(!_ram_oe)
+	ramD <= { ramh[ram_address[10:1]], raml[ram_address[10:1]] };
+   end
    
-           if(!_ram_we && int_ram_sel) begin
-		   if(!_ram_bhe) ramh[ram_address[10:1]] <= ram_data[15:8];
-		   if(!_ram_ble) raml[ram_address[10:1]] <= ram_data[7:0];
-	   end
+   if(!_ram_we && int_ram_sel) begin
+      if(!_ram_bhe) ramh[ram_address[10:1]] <= ram_data[15:8];
+      if(!_ram_ble) raml[ram_address[10:1]] <= ram_data[7:0];
+   end
 end
 
-wire [15:0] ramdata_in_ext = int_rom_sel?romD:
-						       int_ram_sel?ramD:
-							   ramdata_in;
-`else
-wire [15:0] ramdata_in_ext = int_rom_sel?romD:
-							   ramdata_in;
+wire [15:0] ramdata_in_ext = int_rom_sel?romD:int_ram_sel?ramD:ramdata_in;
+`else // !`ifdef ENABLE_INT_RAM
+
+// only rom enabled
+wire [15:0] ramdata_in_ext = int_rom_sel?romD:ramdata_in;
 `endif
 
 `else
 wire [15:0] ramdata_in_ext = ramdata_in;
 `endif
+
+/* ======================================================================================== */
 
 `ifdef ENABLE_AT_MODEM
 // bridge between the serial port of paula and the virtual AT modem in the
@@ -1517,7 +1511,7 @@ minimig minimig
         .memory_config ({memory_config[7:4], slowram_config, memory_config[1:0]}), // effective RAM sizes
         .chipset_config(chipset_config  ), 
         .floppy_config (floppy_config   ), 
-`ifndef DISABLE_IDE
+`ifdef ENABLE_IDE
         .ide_config    (ide_config      ), 
 `endif
  
@@ -1605,7 +1599,7 @@ minimig minimig
 	//user i/o
 	.cpucfg       (cpucfg ), // CPU config
 
-`ifndef DISABLE_IDE
+`ifdef ENABLE_IDE
 	.hdd_led      ( hdd_led         ),
 	.ide_fast     (                 ),
 	.ide_ext_irq  ( 1'b0            ),

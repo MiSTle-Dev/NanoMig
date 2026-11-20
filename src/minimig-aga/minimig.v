@@ -224,7 +224,7 @@ module minimig
 	input [7:0]   memory_config,
 	input [5:0]   chipset_config,
 	input [3:0]   floppy_config,
-`ifndef DISABLE_IDE
+`ifdef ENABLE_IDE
 	input [5:0]   ide_config,
 	output	      hdd_led,
 `endif
@@ -272,7 +272,7 @@ module minimig
 	output [15:0] toccata_aud_right,
 `endif
  
-`ifndef DISABLE_IDE
+`ifdef ENABLE_IDE
 	output	      ide_ena,
 
 	output	      ide_fast,
@@ -311,7 +311,7 @@ wire [15:0] paula_data_out;	//paula data bus out
 wire [15:0] denise_data_out;	//denise data bus out
 wire [15:0] user_data_out;	   //user IO data out
 wire [15:0] gary_data_out;	   //data out from memory bus multiplexer
-`ifndef DISABLE_IDE
+`ifdef ENABLE_IDE
 wire [15:0] gayle_data_out;	//Gayle data out
 `endif
 wire [15:0] cia_data_out;	   //cia A+B data bus out
@@ -411,7 +411,7 @@ wire [15:0] cart_data_out;
 
 wire        hires;				//hires signal from Denise for interpolation filter enable in Amber
 
-`ifndef DISABLE_IDE
+`ifdef ENABLE_IDE
 //gayle stuff
 wire        sel_ide;				//select IDE drive registers
 wire        sel_gayle;			//select GAYLE control registers
@@ -436,7 +436,7 @@ assign pwr_led = ~_led;
 // NTSC/PAL switching is controlled by OSD menu, change requires reset to take effect
 always @(posedge clk) if (clk7_en && reset) ntsc <= chipset_config[1];
 
-`ifndef DISABLE_IDE
+`ifdef ENABLE_IDE
 assign ide_ena  = ide_config[0];
 assign ide_fast = ~ide_config[5] & cpucfg[1];
 `endif
@@ -514,7 +514,7 @@ paula PAULA1
 	.sof(sof),
 	.strhor(strhor_paula),
 	.vblint(vbl_int),
- `ifndef DISABLE_IDE
+ `ifdef ENABLE_IDE
 	.int2(int2|(ide_fast ? ide_ext_irq : gayle_irq)),
 `else
 	.int2(int2), 
@@ -678,7 +678,7 @@ minimig_m68k_bridge CPU1
 	.dbr(dbr),
 	.dbs(dbs),
 	.xbs(xbs),
-`ifndef DISABLE_IDE
+`ifdef ENABLE_IDE
 	.nrdy(gayle_nrdy & rd_cyc),
 `else
 	.nrdy(1'b0),
@@ -795,7 +795,7 @@ gary GARY1
 	.dbs(dbs),
 	.xbs(xbs),
 	.memory_config(memory_config[3:0]),
-`ifndef DISABLE_IDE
+`ifdef ENABLE_IDE
 	.hdc_ena(ide_ena & ~ide_fast), // Gayle decoding enable
 `else
 	.hdc_ena(1'b0),
@@ -817,7 +817,7 @@ gary GARY1
 	.sel_reg(sel_reg),
 	.sel_cia_a(sel_cia_a),
 	.sel_cia_b(sel_cia_b),
-`ifndef DISABLE_IDE
+`ifdef ENABLE_IDE
 	.sel_ide(sel_ide),
 	.sel_gayle(sel_gayle),
 `endif
@@ -834,7 +834,7 @@ gary GARY1
 	.bootrom(1'b0)
 );
 
-`ifndef DISABLE_IDE
+`ifdef ENABLE_IDE
 gayle GAYLE1
 (
 	.clk(clk),
@@ -1040,7 +1040,7 @@ assign int6_toccata = 1'b0;
 //data multiplexer
 assign cpu_data_in = gary_data_out
 		     | cia_data_out
-`ifndef DISABLE_IDE
+`ifdef ENABLE_IDE
 		     | gayle_data_out
 `endif
 `ifdef ENABLE_CART

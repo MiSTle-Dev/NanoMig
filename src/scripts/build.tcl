@@ -4,16 +4,17 @@
 # board variants. It also generates config files, cst and sdc files and it creates
 # GPRJ and JSON files to be used with the IDE.
 
-# TODO:
-# - document the options
-
 if {$argc == 0} {
     puts "Usage: $argv0 <device> <optons...>"
     puts "       device: nano20k, tp25k, gw5a_25, gw3a_20, mega138kpro, console60k, console138k"
     puts "       options:"
     puts "               nano20k: aga, lcd   - build aga+020 and/or rgblcd variant"
-    puts "               tp25k:   aga, dbg   - build aga and or debug variant"
+    puts "               tp25k:   aga        - build aga variant"
+    puts "               gw5a_25: aga        - build aga variant"
     puts "               all:     nosyn      - generate files only, don't run synthesis"
+    puts "                        dbgcpu     - include cpu test rom \"pwr_led_blink\""
+    puts "                        dbgvid     - include video test rom \"video_init\""
+    puts "                        dbgram     - include rom/ram test \"ram_test\""
     exit 1
 }
 
@@ -105,11 +106,16 @@ proc set_option_int { name value } {
 # the gprj/ide build process. Thus custom wrapper scripts
 # are written for each variant. This is the script that is
 # being referenced in the json via option TclPre
-proc write_xml_updater { board } {
+proc write_xml_updater { board xml_enable } {
     puts "NOTE Creating \"scripts/update_xml_${board}.tcl\""
     set f [open "scripts/update_xml_${board}.tcl" w]
-    puts $f "set board \"$board\""
     puts $f "set config \"amiga\""
+    puts $f "set board \"$board\""
+    puts -nonewline $f "set xml_enable \[list"
+    foreach str $xml_enable {
+        puts -nonewline $f " \"$str\""
+    }
+    puts $f "\]"
     puts $f "scripts/update_xml.tcl"
     close $f
 }
@@ -267,13 +273,34 @@ if {$dev eq "nano20k"} {
 
     # board is used in amiga.xml to enable/disable stuff
     set board "tang_nano20k"
-    lappend defines [list "DISABLE_ROM_LOADER"]
+
+    # six inverted (active low) leds
+    lappend defines "LEDS 6"
+    lappend defines "LEDS_N"
+
+    # sdram config
+    lappend defines "SDRAM_CKE"
+    lappend defines "SDRAM_DATA_WIDTH 32"
+    lappend defines "SDRAM_RAS_WIDTH 11"
+    lappend defines "SDRAM_CAS_WIDTH 8"
+    # the GW2AR-LV18 has only 8MB SDRAM which leaves only 5.5MB FASRAM
+    lappend defines "ENABLE_FASTMEM_5_5MB"
+    
+    # there's an internal bl616 on this board
+    lappend defines "INTERNAL_COMPANION"
+    
+    # lappend defines "ENABLE_KICKSWITCH"
+
+    # only IDE0 is currently being used
+    lappend defines "ENABLE_IDE"
+
     set dev_path "tang/nano20k"
 
     # ====================== parse options =============================
 
     # AGA option
     if {[lsearch -exact $options "aga"] >= 0} {
+	set options [lsearch -inline -all -not -exact $options "aga"]
 	puts "Building AGA variant"
 	append board "_aga"
 	
@@ -281,8 +308,8 @@ if {$dev eq "nano20k"} {
 	# fx68k if tg68k is being included
 	set defines [lsearch -inline -all -not -exact $defines "ENABLE_FX68K"]
 	
-	lappend defines "ENABLE_TG68K" "ENABLE_AGA" "CPU_SLOW14" "ENABLE_CACHE"
-	lappend defines "NO_WS2812" "DENISE_EBR" "DISABLE_TG68K_010"
+	lappend defines "ENABLE_TG68K" "ENABLE_AGA" "CPU_SLOW14" "ENABLE_CACHE" "ENABLE_TURBO"
+	lappend defines "NO_WS2812" "DENISE_EBR" "DISABLE_TG68K_010" "ENABLE_TG68K_MENU_NO_010"
 
 	# once tg68k is enabled add its timing constraints
 	lappend sdc tang/nano20k/nanomig_tg68k.sdc
@@ -290,40 +317,77 @@ if {$dev eq "nano20k"} {
 	
     # LCD option
     if {[lsearch -exact $options "lcd"] >= 0} {
+	set options [lsearch -inline -all -not -exact $options "lcd"]
 	puts "Building LCD variant"
 	append board "_lcd"
 
 	# On tang nano 20k, the lcd interface and the hdmi interface overlap
 	# and cannot be used at the same time. Also the db09, midi and companion pins are
 	# not available and the internal bl616 has to be used
-	lappend defines "ENABLE_LCD" "DISABLE_HDMI" "DISABLE_DB9" "DISABLE_MIDI"
-	lappend defines "DISABLE_EXTERNAL_COMPANION"
+	lappend defines "ENABLE_LCD"
+	lappend defines "LCD_R 5"
+	lappend defines "LCD_G 6"
+	lappend defines "LCD_B 5"
+	lappend defines "LCD_HS"
+	lappend defines "LCD_VS"
 
+	# also enable the audio amplifier
+	lappend defines "ENABLE_PA"
+	
 	lappend cst tang/nano20k/nanomig_lcd.cst
+
+	# LCD companion option
+	if {[lsearch -exact $options "lcd_companion"] >= 0} {
+	    set options [lsearch -inline -all -not -exact $options "lcd_companion"]
+
+	    lappend defines "EXTERNAL_COMPANION"
+	    lappend cst tang/nano20k/nanomig_lcd_companion.cst
+	}
     } else {
 	puts "Building HDMI variant"
 	
+	lappend defines "ENABLE_HDMI"
+
 	# all non-lcd builds use drive sounds
 	lappend defines "ENABLE_DRIVE_SOUNDS" "HQ_DRIVE_SOUNDS"
+	lappend defines "EXTERNAL_COMPANION"
+	lappend defines "ENABLE_DB9A" "ENABLE_DB9B"
+	lappend defines	"ENABLE_MIDI"
 
 	# on nano20k only non-lcd cores can use hdmi
 	lappend cst tang/nano20k/nanomig_hdmi.cst
 	lappend sdc tang/nano20k/nanomig_hdmi.sdc
     }
 
-    # set the core name to include the variant built
-    set_option_int -output_base_name nanomig_$board
-
 } elseif {$dev eq "tp25k"} {
     set board "tang_primer25k"
     set_device_info "GW5A-LV25MG121NC1/I0" "" "GW5A-25A" "gw5a25a-002"
-    set_option_int -output_base_name nanomig_tang_primer25k
 
     # we use more than one sdc file, so add them
     # to the lists to be concatenated later
     lappend sdc tang/primer25k/nanomig_common.sdc
 
-    lappend defines "ENABLE_RTC" "DISABLE_ROM_IMAGE"
+    # only two leds
+    lappend defines "LEDS 2"
+
+    # sdram config for MiSTer RAM module
+    lappend defines "SDRAM_DATA_WIDTH 16"
+    lappend defines "SDRAM_RAS_WIDTH 13"
+    lappend defines "SDRAM_CAS_WIDTH 9"
+    lappend defines "SDRAM_SYNC_DELAY 2"
+
+    lappend defines "ENABLE_JTAGSELN"
+    
+    # there's an internal bl616 on this board
+    # and an external one can be used
+    lappend defines "INTERNAL_COMPANION"
+    lappend defines "EXTERNAL_COMPANION"
+
+    # only IDE0 is currently being used
+    lappend defines "ENABLE_IDE"
+
+    lappend defines "ENABLE_RTC"
+    lappend defines "ENABLE_HDMI"
     
     # board is used in amiga.xml to enable/disable stuff
     set board "tang_primer25k"
@@ -331,6 +395,7 @@ if {$dev eq "nano20k"} {
 
     # AGA option
     if {[lsearch -exact $options "aga"] >= 0} {
+	set options [lsearch -inline -all -not -exact $options "aga"]
 	puts "Building AGA variant"
 	append board "_aga"
 	
@@ -338,52 +403,104 @@ if {$dev eq "nano20k"} {
 	# fx68k if tg68k is being included
 	set defines [lsearch -inline -all -not -exact $defines "ENABLE_FX68K"]
 	
-	lappend defines "ENABLE_TG68K" "ENABLE_AGA" "CPU_SLOW14" "ENABLE_CACHE"
-	lappend defines "NO_WS2812" "ENABLE_RAM32" "CHIPRAM_CACHE"
+	lappend defines "ENABLE_TG68K" "ENABLE_AGA" "CPU_SLOW14" "ENABLE_CACHE" "ENABLE_TURBO"
+	lappend defines "NO_WS2812" "ENABLE_RAM32" "CHIPRAM_CACHE" "ENABLE_TG68K_MENU_ALL"
 
-	# options that may be worth testing
-	# lappend defines "DENISE_EBR"
-	
 	# once tg68k is enabled add its timing constraints.
 	lappend sdc tang/primer25k/nanomig_tg68k.sdc
     }
 	
-    # debug option
-    if {[lsearch -exact $options "dbg"] >= 0} {
-	puts "Building Debug variant"
-	append board "_dbg"
-
-	lappend defines "ENABLE_DEBUG"
-    }
-
-    # set the core name to include the variant built
-    set_option_int -output_base_name nanomig_$board
-
-    
 } elseif {$dev eq "gw5a_25"} {
     set board "mistle_gw5a_25"
     set_device_info "GW5A-LV25LQ144C1/I0" "" "GW5A-25A" "gw5a25a-036"
-    set_option_int -output_base_name nanomig_${board}
 
-    # remove the FX68K support to save some space
-    set defines [lsearch -inline -all -not -exact $defines "ENABLE_FX68K"]
+    # six inverted (active low) leds
+    lappend defines "LEDS 6"
+    lappend defines "LEDS_N"
 
-    lappend defines "ENABLE_RAM32" "ENABLE_RTC" "DISABLE_ROM_IMAGE"
-    lappend defines "ENABLE_TG68K" "ENABLE_AGA" "CPU_SLOW14" "ENABLE_CACHE" "DENISE_EBR"
+    # user (menu) button is active low
+    lappend defines "USER_N"
 
+    lappend defines "ENABLE_MIDI"
+
+    # sdram config
+    lappend defines "SDRAM_DATA_WIDTH 16"
+    lappend defines "SDRAM_RAS_WIDTH 13"
+    lappend defines "SDRAM_CAS_WIDTH 9"
+    lappend defines "ENABLE_FASTMEM_8MB"
+    
+    # there's no internal bl616 on this board
+    lappend defines "EXTERNAL_COMPANION"
+
+    # this board has two physical db9 ports
+    lappend defines "ENABLE_DB9A" "ENABLE_DB9B"
+
+    # only IDE0 is currently being used
+    lappend defines "ENABLE_IDE"
+
+    lappend defines "ENABLE_RTC"
+    
+    lappend defines "ENABLE_HDMI"
+
+    lappend sdc mistle/gw5a_25/nanomig_common.sdc
+    
+    # AGA option
+    if {[lsearch -exact $options "aga"] >= 0} {
+	set options [lsearch -inline -all -not -exact $options "aga"]
+	puts "Building AGA variant"
+	append board "_aga"
+	
+	# remove the FX68K support to save some space
+	set defines [lsearch -inline -all -not -exact $defines "ENABLE_FX68K"]
+
+	lappend defines "ENABLE_TG68K" "ENABLE_AGA" "CPU_SLOW14" "ENABLE_CACHE" "DENISE_EBR" "ENABLE_TURBO"
+	lappend defines "ENABLE_RAM32" "ENABLE_TG68K_MENU_ALL"
+
+	# once tg68k is enabled add its timing constraints
+	lappend sdc mistle/gw5a_25/nanomig_tg68k.sdc
+    }
+	
     set dev_path "mistle/gw5a_25"
 
 } elseif {$dev eq "gw3a_20"} {
     set board "mistle_gw3a_20"
     set_device_info "GW3A-LV20LQ144C1/I0" "" "GW3A-20A" "gw3a20a-010"
-    set_option_int -output_base_name nanomig_${board}
 
     # remove the FX68K support to save some space
     set defines [lsearch -inline -all -not -exact $defines "ENABLE_FX68K"]
 
-    lappend defines "PLL_NO_MDCLK" "DISABLE_IDE1"
-    lappend defines "ENABLE_RAM32" "CHIPRAM_CACHE" "DISABLE_ROM_IMAGE" 
-    lappend defines "ENABLE_TG68K" "ENABLE_AGA" "CPU_SLOW14" "DENISE_EBR"
+    lappend defines "ENABLE_HDMI"
+
+    lappend defines "PLL_NO_MDCLK"
+
+    lappend defines "ENABLE_MIDI"
+
+    # six inverted (active low) leds
+    lappend defines "LEDS 6"
+    lappend defines "LEDS_N"
+
+    # user (menu) button is active low
+    lappend defines "USER_N"
+
+    # sdram config
+    lappend defines "SDRAM_DATA_WIDTH 16"
+    lappend defines "SDRAM_RAS_WIDTH 13"
+    lappend defines "SDRAM_CAS_WIDTH 9"
+    
+    # there's no internal bl616 on this board
+    lappend defines "EXTERNAL_COMPANION"
+
+    # this board has two physical db9 ports
+    lappend defines "ENABLE_DB9A" "ENABLE_DB9B"
+
+    # only IDE0 is currently being used
+    lappend defines "ENABLE_IDE"
+
+    lappend defines "ENABLE_RTC"
+    
+    lappend defines "ENABLE_HDMI"
+
+    lappend sdc mistle/gw5a_25/nanomig_common.sdc
 
     set dev_path "mistle/gw3a_20"
 
@@ -391,19 +508,132 @@ if {$dev eq "nano20k"} {
     set board "tang_mega138kpro"
 
     set_device_info "GW5AST-LV138FPG676AC1/I0" "" "GW5AST-138B" "gw5ast138b-007"
-    set_option_int -output_base_name nanomig_${board}
 
-    # TODO: Full build!
-    #lappend defines "ENABLE_RAM32" "CHIPRAM_CACHE" "DISABLE_ROM_IMAGE" 
-    #lappend defines "ENABLE_TG68K" "ENABLE_AGA" "CPU_SLOW14" "DENISE_EBR"
+    # six inverted (active low) leds
+    lappend defines "LEDS 6"
+    lappend defines "LEDS_N"
 
+    # reset and user (menu) buttons are active low
+    lappend defines "RESET_N"
+    lappend defines "USER_N"
+
+    # sdram config for MiSTer RAM module. Unlike all other
+    # boards, this one needs to run the sdram clock shifted
+    # by 180 degrees (270 deg for all other boards) 
+    lappend defines "SDRAM_DATA_WIDTH 16"
+    lappend defines "SDRAM_RAS_WIDTH 13"
+    lappend defines "SDRAM_CAS_WIDTH 9"
+    lappend defines "SDRAM_SYNC_DELAY 2"
+
+    # For unknown reason the mega138k delivers the flash
+    # data one cycle later than all other boards. Also the
+    # uncommon shifted sdram clock is unsuited for
+    # flash. It's thus driven from an unshifted clock.
+    lappend defines "FLASH_READ_DELAY 1"
+    lappend defines "FLASH_CLOCK_NO_SHIFT"
+
+    lappend defines "ENABLE_JTAGSELN"
+    
+    # there's an internal bl616 on this board
+    # and an external one can be used
+    lappend defines "INTERNAL_COMPANION"
+    lappend defines "EXTERNAL_COMPANION"
+
+    # only IDE0 is currently being used
+    lappend defines "ENABLE_IDE"
+    
+    lappend defines "ENABLE_RTC"
+    
+    lappend defines "ENABLE_HDMI"
+
+    lappend defines "ENABLE_LCD"
+    lappend defines "LCD_R 6"
+    lappend defines "LCD_G 6"
+    lappend defines "LCD_B 6"
+
+    # also enable the audio amplifier
+    lappend defines "ENABLE_PA"
+
+    # enable PMOD0 and PMOD2 and map the ROM hex debugger to pmod0
+    # PMOD1 is being used by the external companion
+    lappend defines "PMOD0"
+    lappend defines "PMOD_HEX_DEBUG pmod0"
+    lappend defines "PMOD2"
+
+    # the mega138k core is bigger and thus occupies more flash space, so
+    # the default amiga kickstart doesn't start at 4MB (2M words) as usual
+    # but at 6MB (3M words)
+    lappend defines "DEFAULT_FLASH_ADDR  23'h300000"
+    
+    lappend defines "ENABLE_TG68K" "ENABLE_AGA" "CPU_SLOW14" "ENABLE_CACHE"
+    lappend defines "DENISE_EBR" "ENABLE_TURBO" "ENABLE_RAM32" "ENABLE_TG68K_MENU_ALL"
+
+    # once tg68k is enabled add its timing constraints
+    lappend sdc mistle/gw5a_25/nanomig_tg68k.sdc
+	
     set dev_path "tang/mega138kpro"
     
 } elseif {$dev eq "console60k"} {
     set board "tang_console60k"
 
     set_device_info "GW5AT-LV60PG484AC1/I0" "" "GW5AT-60B" "gw5at60b-002"
-    set_option_int -output_base_name nanomig_${board}
+
+    # the board actually has three leds
+    # but the "sys act" LED on the CFG_LED pin is not current limited
+   lappend defines "LEDS 2"
+
+    # reset and user (menu) buttons are active low
+    lappend defines "RESET_N"
+    lappend defines "USER_N"
+
+    # sdram config for MiSTer RAM module
+    lappend defines "SDRAM_DATA_WIDTH 16"
+    lappend defines "SDRAM_RAS_WIDTH 13"
+    lappend defines "SDRAM_CAS_WIDTH 9"
+    lappend defines "SDRAM_SYNC_DELAY 2"
+
+    # For unknown reason and like the mega138k the conmsole138k
+    # delivers the flash data one cycle later than all other boards. Also the
+    # uncommon shifted sdram clock is unsuited for
+    # flash. It's thus driven from an unshifted clock.
+    lappend defines "FLASH_READ_DELAY 1"
+    lappend defines "FLASH_CLOCK_NO_SHIFT"
+
+    lappend defines "ENABLE_JTAGSELN"
+    
+    # there's an internal bl616 on this board
+    # and an external one can be used
+    lappend defines "INTERNAL_COMPANION"
+    lappend defines "EXTERNAL_COMPANION"
+
+    # only IDE0 is currently being used
+    lappend defines "ENABLE_IDE"
+
+    lappend defines "ENABLE_RTC"
+    
+    lappend defines "ENABLE_HDMI"
+
+    # external RGBLCD
+    lappend defines "ENABLE_LCD"
+    lappend defines "LCD_R 8"
+    lappend defines "LCD_G 8"
+    lappend defines "LCD_B 8"
+    lappend defines "LCD_HS"
+    lappend defines "LCD_VS"
+
+    # This FPGA is big enough for fx68k + tg68k + AGA
+    lappend defines "ENABLE_TG68K" "ENABLE_AGA" "CPU_SLOW14" "ENABLE_CACHE"
+    lappend defines "DENISE_EBR" "ENABLE_TURBO" "ENABLE_RAM32" "ENABLE_TG68K_MENU_ALL"
+
+    # once tg68k is enabled add its timing constraints
+    lappend sdc mistle/gw5a_25/nanomig_tg68k.sdc
+
+    # also enable the audio amplifier
+    lappend defines "ENABLE_PA"
+
+    # enable PMOD1 and map the ROM hex debugger to it
+    lappend defines "PMOD1"
+    lappend defines "PMOD_HEX_DEBUG pmod1"
 
     set dev_path "tang/console60k"
     
@@ -411,7 +641,48 @@ if {$dev eq "nano20k"} {
     set board "tang_console138k"
 
     set_device_info "GW5AST-LV138PG484AC1/I0" "C" "GW5AST-138C" "gw5ast138c-007"
-    set_option_int -output_base_name nanomig_${board}
+
+    # the board actually has three leds
+    # but the "sys act" LED on the CFG_LED pin is not current limited
+   lappend defines "LEDS 2"
+
+    # reset and user (menu) buttons are active low
+    lappend defines "RESET_N"
+    lappend defines "USER_N"
+
+    # sdram config for MiSTer RAM module
+    lappend defines "SDRAM_DATA_WIDTH 16"
+    lappend defines "SDRAM_RAS_WIDTH 13"
+    lappend defines "SDRAM_CAS_WIDTH 9"
+    lappend defines "SDRAM_SYNC_DELAY 2"
+
+    lappend defines "ENABLE_JTAGSELN"
+    
+    # there's an internal bl616 on this board
+    # and an external one can be used
+    lappend defines "INTERNAL_COMPANION"
+    lappend defines "EXTERNAL_COMPANION"
+
+    # external RGBLCD
+    lappend defines "ENABLE_LCD"
+    lappend defines "LCD_R 8"
+    lappend defines "LCD_G 8"
+    lappend defines "LCD_B 8"
+    lappend defines "LCD_HS"
+    lappend defines "LCD_VS"
+
+    lappend defines "ENABLE_PA"
+    
+    # only IDE0 is currently being used
+    lappend defines "ENABLE_IDE"
+
+    lappend defines "ENABLE_RTC"
+    
+    lappend defines "ENABLE_HDMI"
+
+    # enable PMOD1 and map the ROM hex debugger to it
+    lappend defines "PMOD1"
+    lappend defines "PMOD_HEX_DEBUG pmod1"
 
     set dev_path "tang/console138k"
     
@@ -420,7 +691,50 @@ if {$dev eq "nano20k"} {
     exit 1
 }
 
+# To debug ram and/or rom problems, some internal rom and ram
+# can be enabled including some debig rom routines
+if {[lsearch -exact $options "dbgcpu"] >= 0} {
+    set options [lsearch -inline -all -not -exact $options "dbgcpu"]
+
+    puts "WARN Enabling internal ram and rom"
+    lappend defines "ENABLE_INT_ROM"
+    lappend defines "ENABLE_INT_ROM_BLINK_LED"
+}
+
+if {[lsearch -exact $options "dbgvid"] >= 0} {
+    set options [lsearch -inline -all -not -exact $options "dbgvid"]
+
+    puts "WARN Enabling internal ram and rom"
+    lappend defines "ENABLE_INT_ROM"
+    lappend defines "ENABLE_INT_RAM"
+    lappend defines "ENABLE_INT_ROM_VIDEO_INIT"
+}
+
+if {[lsearch -exact $options "dbgram"] >= 0} {
+    set options [lsearch -inline -all -not -exact $options "dbgram"]
+
+    puts "WARN Enabling internal ram and rom"
+    lappend defines "ENABLE_INT_ROM"
+    lappend defines "ENABLE_INT_ROM_RAM_TEST"
+}
+
+# set the core name to include the variant built
+set_option_int -output_base_name nanomig_${board}
+
 # process the xml config
+
+# some defines set previously affect the menu and thus the
+# amiga.xml. These are built into the variable xml_options
+# and being read by the update_xml.tcl script
+set xml_enable [list]
+foreach define $defines {
+    set prefix [string range $define 0 [expr {[string first "_" $define] - 1}]]
+    set rest [string range $define [expr {[string first _ $define] + 1}] end]
+    if { $prefix == "ENABLE" } {
+	lappend xml_enable $rest
+    }
+}
+
 source scripts/update_xml.tcl
 
 # round value up to multiple of 512 to avoid changes in the config_xxx.vh for
@@ -448,8 +762,8 @@ if {[llength $defines] > 0} {
 if {$dev eq "nano20k"} {
 
     # files common to all nano20k variants
-    add_file_v tang/nano20k/top.sv
     add_file_v tang/nano20k/amigaclks.v
+    add_file_v top.sv
     add_file_v tang/nano20k/gowin_dpb/sector_dpram.v
     add_file_v tang/nano20k/gowin_dpb/ide_dpram.v
 
@@ -458,7 +772,9 @@ if {$dev eq "nano20k"} {
     set_option_int -use_jtag_as_gpio 0
     set_option_int -loading_rate 25.000
 } elseif {$dev eq "tp25k"} {
-    add_file_v tang/primer25k/top.sv
+    add_file_v tang/primer25k/amigaclks.v
+    add_file_v top.sv
+    
     add_file_v tang/primer25k/gowin_clkdiv/gowin_clkdiv.v
     add_file_v tang/primer25k/gowin_pll/pll_142m.v
     add_file_v tang/primer25k/gowin_pll/pll_142m_mod.v
@@ -478,7 +794,9 @@ if {$dev eq "nano20k"} {
     set_option_int -loading_rate 70.000
 
 } elseif {$dev eq "gw5a_25"} {
-    add_file_v mistle/gw5a_25/top.sv
+    add_file_v mistle/gw5a_25/amigaclks.v
+    add_file_v top.sv
+
     add_file_v tang/primer25k/gowin_clkdiv/gowin_clkdiv.v
     add_file_v tang/primer25k/gowin_pll/pll_142m.v
     add_file_v tang/primer25k/gowin_pll/pll_142m_mod.v
@@ -486,11 +804,7 @@ if {$dev eq "nano20k"} {
     add_file_v tang/primer25k/gowin_dpb/sector_dpram.v
     add_file_v tang/primer25k/gowin_dpb/ide_dpram.v
 
-    # there are no gw5a variants, so use the single cst and sdc
-    # files directly
-    
     add_file_cst mistle/gw5a_25/nanomig.cst
-    add_file_sdc mistle/gw5a_25/nanomig.sdc
 
     set_option_int -use_mspi_as_gpio 1
     set_option_int -use_sspi_as_gpio 1
@@ -502,7 +816,9 @@ if {$dev eq "nano20k"} {
     # the GW3A uses the same board as tge GW5A and thus shares a
     # lot of files and settings
     
-    add_file_v mistle/gw5a_25/top.sv
+    add_file_v mistle/gw5a_25/amigaclks.v
+    add_file_v top.sv
+    
     add_file tang/primer25k/gowin_clkdiv/gowin_clkdiv.v
     add_file_v mistle/gw3a_20/gowin_pll/pll_142m.v
     add_file_v mistle/gw3a_20/gowin_dp/sector_dpram.v
@@ -519,11 +835,14 @@ if {$dev eq "nano20k"} {
     set_option_int -place_option 1
 
 } elseif {$dev eq "mega138kpro"} {
-    add_file_v tang/mega138kpro/top.sv
+    add_file_v tang/mega138kpro/amigaclks.v
+    add_file_v top.sv    
+
     add_file_v tang/mega138kpro/gowin_clkdiv/gowin_clkdiv.v
     add_file_v tang/mega138kpro/gowin_pll/pll_142m.v
     add_file_v tang/mega138kpro/gowin_pll/pll_142m_mod.v
     add_file_v tang/mega138kpro/gowin_pll/pll_init.v
+
     add_file_v tang/mega138kpro/gowin_dpb/sector_dpram.v
     add_file_v tang/mega138kpro/gowin_dpb/ide_dpram.v
 
@@ -541,7 +860,8 @@ if {$dev eq "nano20k"} {
     set_option_int -route_option 1
 
 } elseif {$dev eq "console60k"} {
-    add_file_v tang/console60k/top.sv
+    add_file_v tang/console60k/amigaclks.v
+    add_file_v top.sv
     add_file_v tang/console60k/gowin_clkdiv/gowin_clkdiv.v
     add_file_v tang/primer25k/gowin_pll/pll_142m.v
     add_file_v tang/primer25k/gowin_pll/pll_142m_mod.v
@@ -560,11 +880,14 @@ if {$dev eq "nano20k"} {
     set_option_int -use_ready_as_gpio 1
     set_option_int -use_jtag_as_gpio 1
     set_option_int -loading_rate 70.000
-    set_option_int -place_option 2
-    set_option_int -route_option 1
 
 } elseif {$dev eq "console138k"} {
-    add_file_v tang/console138k/top.sv
+    puts "ERROR ============================================================"
+    puts "ERROR ======== Not properly implemented and tested, yet =========="
+    puts "ERROR ============================================================"
+    
+    add_file_v tang/console138k/amigaclks.v
+    add_file_v top.sv
     add_file_v tang/mega138kpro/gowin_clkdiv/gowin_clkdiv.v
     add_file_v tang/console138k/gowin_pll/pll_142m.v
     add_file_v tang/console138k/gowin_pll/pll_142m_mod.v
@@ -632,8 +955,12 @@ add_file_v minimig-aga/denise_bitplane_shifter.v
 add_file_v minimig-aga/denise_sprites.v
 add_file_v minimig-aga/denise_sprites_shifter.v
 add_file_v minimig-aga/gary.v
-add_file_v minimig-aga/gayle.v
-add_file_v minimig-aga/ide.v
+
+if {[lsearch -exact $defines "ENABLE_IDE"] >= 0} {
+    add_file_v minimig-aga/gayle.v
+    add_file_v minimig-aga/ide.v
+}
+    
 add_file_v minimig-aga/minimig_m68k_bridge.v
 add_file_v minimig-aga/minimig_bankmapper.v
 add_file_v minimig-aga/minimig_sram_bridge.v
@@ -673,7 +1000,7 @@ if {[lsearch -exact $defines "ENABLE_TG68K"] >= 0} {
 add_file_v misc/video_analyzer.v
 
 # include hdmi parts unless HDMI is disabled
-if {[lsearch -exact $defines "DISABLE_HDMI"] < 0} {
+if {[lsearch -exact $defines "ENABLE_HDMI"] >= 0} {
     add_file_v hdmi/audio_clock_regeneration_packet.sv
     add_file_v hdmi/audio_info_frame.sv
     add_file_v hdmi/audio_sample_packet.sv
@@ -722,6 +1049,8 @@ add_file_other misc/amiga_xml.hex
 # if cst list is not empty, then create one file from
 # this and add the result
 if {[llength $cst] > 0} {
+    puts "NOTE Creating \"$dev_path/nanomig_$board.cst\""
+    
     set outfile [open "$dev_path/nanomig_$board.cst" w]
     puts $outfile "// do not edit, auto generated from:"
     foreach file $cst {
@@ -740,6 +1069,8 @@ if {[llength $cst] > 0} {
 # if sdc list is not empty, then create one file from
 # this and add the result
 if {[llength $sdc] > 0} {
+    puts "NOTE Creating \"$dev_path/nanomig_$board.sdc\""
+    
     set outfile [open "$dev_path/nanomig_$board.sdc" w]
     puts $outfile "// do not edit, auto generated from:"
     foreach file $sdc {
@@ -763,12 +1094,26 @@ set_option_int -cst_warn_to_error 1
 set_option_int -multi_boot 0
 set_option_int -mspi_jump 0
 
-# (re-)generate the gprj to make
+# check if we have unparsed options and complain if so
+if { [llength $options] != 0 } {    
+    # if only the nosyn option remains, that's fine
+    if { [llength $options] != 1 || [lsearch -exact $options "nosyn"] < 0} {    
+	puts "ERROR Unprocessed options $options"
+	exit -1
+    }
+}
+
+# (re-)generate the gprj files for IDE builds
 write_gprj $board
 write_process_json $board
-write_xml_updater $board
+write_xml_updater $board $xml_enable
 
 # run synthesis unless option "nosyn" was given
 if {[lsearch -exact $options "nosyn"] < 0} {
     run all
+
+    puts "NOTE built nanomig_${board}"
+    if {[lsearch -exact $defines "ENABLE_INT_ROM"] >= 0} {
+	puts "WARN This is a debug version!!!!!"
+    }
 }

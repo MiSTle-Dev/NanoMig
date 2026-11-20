@@ -26,7 +26,6 @@ set_false_path -from [get_cells {sysctrl/system_video*}]
 set_false_path -from [get_cells {sysctrl/system_chipmem*}]
 set_false_path -from [get_cells {sysctrl/system_slowmem*}]
 set_false_path -from [get_cells {sysctrl/system_fastmem*}]
-set_false_path -from [get_cells {sysctrl/system_turbo*}]
 set_false_path -from [get_cells {sysctrl/system_volume*}]
 
 // The disk length register reaches the blitter through the dma priority logic.
@@ -34,6 +33,7 @@ set_false_path -from [get_cells {sysctrl/system_volume*}]
 // enables, so these are multi cycle paths on the 28MHz clock.
 set_multicycle_path -from [get_regs {*PAULA1/pf1/dsklen*}] -to [get_regs {*AGNUS1/bl1/*}] -setup -end 4
 set_multicycle_path -from [get_regs {*PAULA1/pf1/dsklen*}] -to [get_regs {*AGNUS1/bl1/*}] -hold -end 3
+set_false_path -from [get_cells {sysctrl/system_turbo*}]
 set_false_path -from [get_cells {sysctrl/system_cpu*}]
 // the TG68K advances at most every second clk28 cycle (CPU_SLOW14 in
 // cpu_wrapper.v), so all its internal register to register paths are

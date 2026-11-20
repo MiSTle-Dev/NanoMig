@@ -7,12 +7,18 @@
 package require zlib
 puts "MiSTle XML Tool, board = $board, config = $config"
 
+puts "NOTE enabled: $xml_enable"
+
 # it would be nice if we could access the project options from
 # here as e.g. OUTPUT_BASE_NAME would nice to distinguish which
 # board we are building for
 
 if {[catch {exec git describe --tags --always --dirty} tag]} {
-    set tag "unknown"
+    if {[catch {exec svn info --show-item revision} tag]} {
+	set tag "unknown"
+    } else {
+	set tag "SVN r$tag"
+    }
 }
 puts "Version: $tag"
 
@@ -84,14 +90,17 @@ puts [ format "Read %d bytes from $filename_xml" [ string length $data_xml ] ]
 # replace the version string
 regsub -all {version="unset"} $data_xml "version=\"$tag\"" data_xml
 
-# mark parts to be kept or removed based in the board name ...
-regsub -all -line "<!--IS.*? $board .*?-->" $data_xml "<!--KEEP-->" data_xml
-regsub -all -line "<!--IS.*? $board-->" $data_xml "<!--KEEP-->" data_xml
-regsub -all -line {<!--IS.*?-->} $data_xml "<!--REMOVE-->" data_xml
-regsub -all -line "<!--NOT.*? $board .*?-->" $data_xml "<!--REMOVE-->" data_xml
-regsub -all -line "<!--NOT.*? $board-->" $data_xml "<!--REMOVE-->" data_xml
-regsub -all -line "<!--NOT.*?-->" $data_xml "<!--KEEP-->" data_xml
+foreach ena $xml_enable {
+    # mark parts to be kept or removed based on the enable flags ...
+    regsub -all -line "<!--IS.*? $ena .*?-->" $data_xml "<!--KEEP-->" data_xml
+    regsub -all -line "<!--IS.*? $ena-->" $data_xml "<!--KEEP-->" data_xml
+    regsub -all -line "<!--NOT.*? $ena .*?-->" $data_xml "<!--REMOVE-->" data_xml
+    regsub -all -line "<!--NOT.*? $ena-->" $data_xml "<!--REMOVE-->" data_xml
+}
 
+regsub -all -line {<!--IS.*?-->} $data_xml "<!--REMOVE-->" data_xml
+regsub -all -line "<!--NOT.*?-->" $data_xml "<!--KEEP-->" data_xml
+   
 # ... and actually remove or keep those parts
 regsub -all {<!--REMOVE-->.*?<!--END-->} $data_xml "" data_xml
 regsub -all {<!--KEEP-->(.*?)<!--END-->} $data_xml {\1} data_xml
