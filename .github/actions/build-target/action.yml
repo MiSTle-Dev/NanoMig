@@ -1,0 +1,19 @@
+name: Build NanoMig target
+description: Build one board variant and stage its two bitstream formats.
+runs:
+  using: composite
+  steps:
+    - name: Build bitstreams
+      shell: bash
+      run: |
+        cd src
+        read -r -a args <<< "$BUILD_ARGS"
+        output="impl/pnr/nanomig_$BOARD"
+        rm -f "$output.fs" "$output.bin"
+        LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libfreetype.so.6 bash -e ./build.sh "${args[@]}"
+        test -s "$output.fs"
+        test -s "$output.bin"
+        mkdir -p ../artifacts
+        asset="../artifacts/nanomig_${BOARD}${ASSET_SUFFIX:-}"
+        cp "$output.fs" "$asset.fs"
+        cp "$output.bin" "$asset.bin"
