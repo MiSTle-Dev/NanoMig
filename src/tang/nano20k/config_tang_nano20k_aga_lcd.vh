@@ -16,8 +16,7 @@
 `define ENABLE_TURBO
 `define NO_WS2812
 `define DENISE_EBR
-`define DISABLE_TG68K_010
-`define ENABLE_TG68K_MENU_NO_010
+`define ENABLE_TG68K_020_ONLY
 `define ENABLE_LCD
 `define LCD_R 5
 `define LCD_G 6

@@ -894,7 +894,10 @@ assign ram_din = sdram_dout;
 // pack config values into minimig config
 wire [5:0] chipset_config = { 1'b0,osd_chipset,osd_video_mode,1'b0 };
 
-`ifdef DISABLE_TG68K_010
+`ifdef ENABLE_TG68K_020_ONLY
+// cpu hard-wired to 68020, saves the tg68k 68000/010 mode logic
+wire [1:0] cpu_config = 2'b11;
+`elsif DISABLE_TG68K_010
 // disabling the ability to select 010 cpu saves some luts
 wire [1:0] cpu_config = { |osd_cpu ? 2'b11 : 2'b00 };
 `else

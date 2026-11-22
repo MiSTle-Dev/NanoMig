@@ -8,7 +8,7 @@ if {$argc == 0} {
     puts "Usage: $argv0 <device> <optons...>"
     puts "       device: nano20k, tp25k, gw5a_25, gw3a_20, mega138kpro, console60k, console138k"
     puts "       options:"
-    puts "               nano20k: aga, lcd   - build aga+020 and/or rgblcd variant"
+    puts "               nano20k: aga, lcd   - build aga+020 (fixed 68020) and/or rgblcd variant"
     puts "               tp25k:   aga        - build aga variant"
     puts "               gw5a_25: aga        - build aga variant"
     puts "               all:     nosyn      - generate files only, don't run synthesis"
@@ -309,7 +309,7 @@ if {$dev eq "nano20k"} {
 	set defines [lsearch -inline -all -not -exact $defines "ENABLE_FX68K"]
 	
 	lappend defines "ENABLE_TG68K" "ENABLE_AGA" "CPU_SLOW14" "ENABLE_CACHE" "ENABLE_TURBO"
-	lappend defines "NO_WS2812" "DENISE_EBR" "DISABLE_TG68K_010" "ENABLE_TG68K_MENU_NO_010"
+	lappend defines "NO_WS2812" "DENISE_EBR" "ENABLE_TG68K_020_ONLY"
 
 	# once tg68k is enabled add its timing constraints
 	lappend sdc tang/nano20k/nanomig_tg68k.sdc
