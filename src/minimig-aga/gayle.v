@@ -197,8 +197,8 @@ ide ide1
 	.mgmt_readdata(ide1_readdata)
 );
 `else // !`ifdef ENABLE_IDE1   
-// DISABLE_IDE1: only remove the second IDE port (ide1), frees its 16kB buffer (8 BRAM).
-// Behave exactly like an ide1 without drive: reads return ffffffff, no irq/drq/no_data,
+// ! ENABLE_IDE1: remove the second IDE port (IDE1), frees its 16kB buffer (8 BRAM).
+// Behave exactly like an IDE1 without drive: reads return ffffffff, no irq/drq/no_data,
 // request stays in reset state.
 assign ide1_data     = 32'hffffffff;
 assign ide1_readdata = 16'h0000;
