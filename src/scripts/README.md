@@ -36,7 +36,7 @@ gw_sh scripts/build.tcl
 Usage: scripts/build.tcl <device> <optons...>
        device: nano20k, tp25k, gw5a_25, gw3a_20, mega138kpro, console60k, console138k
        options:
-               nano20k: aga, lcd   - build aga+020 (fixed 68020) and/or rgblcd variant
+               nano20k: aga, lcd   - build aga+020 and/or rgblcd variant
                tp25k:   aga        - build aga variant
                gw5a_25: aga        - build aga variant
                all:     nosyn      - generate files only, don't run synthesis
