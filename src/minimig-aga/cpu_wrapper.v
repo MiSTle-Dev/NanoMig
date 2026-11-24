@@ -406,12 +406,22 @@ TG68KdotC_Kernel
 // verilator runs the verilog translated variant which doesn't support configuration but
 // is hard coded for full configurability (all configs set to 2)
 #(
+`ifdef ENABLE_TG68K_020_ONLY
+	// 68020 features fixed on (1), same behaviour as 2 with cpu=2'b11
+	.SR_Read(1),
+	.VBR_Stackframe(1),
+	.extAddr_Mode(1),
+	.MUL_Mode(1),
+	.DIV_Mode(1),
+	.BitField(1),
+`else
 	.SR_Read(2),        // 0=>user,   1=>privileged,    2=>switchable with CPU(0)
 	.VBR_Stackframe(2), // 0=>no,     1=>yes/extended,  2=>switchable with CPU(0)
 	.extAddr_Mode(2),   // 0=>no,     1=>yes,           2=>switchable with CPU(1)
 	.MUL_Mode(2),       // 0=>16Bit,  1=>32Bit,         2=>switchable with CPU(1),  3=>no MUL,
 	.DIV_Mode(2),       // 0=>16Bit,  1=>32Bit,         2=>switchable with CPU(1),  3=>no DIV,
 	.BitField(2),       // 0=>no,     1=>yes,           2=>switchable with CPU(1)
+`endif
 	.MUL_Hardware(1)    // 0=>no,  	  1=>yes,
 )
 `endif
