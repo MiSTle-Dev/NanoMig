@@ -438,7 +438,11 @@ cpu_inst_p
   .IPL(cpu_ipl),
   .IPL_autovector(1'b1),
   .berr(1'b0),
+`ifdef ENABLE_TG68K_020_ONLY
+  .CPU(2'b11),  // constant right at the vhdl boundary
+`else
   .CPU(cpucfg),
+`endif
   .addr_out(cpu_addr_p),
   .data_write(cpu_dout_p),
   .nWr(wr_p),
