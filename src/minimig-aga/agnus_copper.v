@@ -64,6 +64,7 @@ module agnus_copper
 	output	reqdma,						// copper requests dma cycle
 	input	ackdma,						// agnus dma priority logic grants dma cycle
 	input	enadma,						// current slot is not used by any higher priority DMA channel
+	input	copen,						// Copper DMA is enabled (DMACON COPEN and DMAEN)
 	input	sof,						// start of frame input
 	input	blit_busy,					// blitter busy flag input
 	input	[7:0] vpos,					// vertical beam counter
@@ -252,6 +253,8 @@ always @(posedge clk)
   if (clk7_en) begin
   	if (copjmp1 && clk_ena)
   		strobe1 <= 1;
+  	else if (copjmp2 && clk_ena && !copen)	// a COPJMP2 written while Copper DMA is off overrides a pending restart from COP1LC
+  		strobe1 <= 0;
   	else if (copper_state==RESET && dma_ack)
   		strobe1 <= 0;
   end
@@ -261,6 +264,8 @@ always @(posedge clk)
   if (clk7_en) begin
   	if (copjmp2 && clk_ena)
   		strobe2 <= 1;
+  	else if (copjmp1 && clk_ena)	// a later COPJMP1 or start of frame overrides a pending COPJMP2
+  		strobe2 <= 0;
   	else if (copper_state==RESET && dma_ack)
   		strobe2 <= 0;
   end
