@@ -1,0 +1,173 @@
+name: Build NanoMig
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['**']
+    paths:
+      - 'src/**'
+      - '!src/**/*.md'
+      - '.github/workflows/build.yml'
+      - '.github/actions/build-target/**'
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'push' }}
+
+jobs:
+  build:
+    runs-on: ubuntu-26.04
+    outputs:
+      artifact_id: ${{ steps.bitstreams.outputs.artifact-id }}
+    env:
+      GOWIN_URL: https://github.com/electrified/fpga-toolchains/releases/download/1.9.12.03-Linux/Gowin_V1.9.12.03_linux.tar.gz
+      GOWIN_SHA256: 4cf60a8ffd0337da23191a911c69b1e0ca3457a6070c15c9dc245005212ecb51
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            grc libasound2t64 libnss3 libgl1 libglu1-mesa libfontconfig1 libfreetype6 \
+            libxrender1 libxcomposite1 libxdamage1 libxrandr2 libxtst6 \
+            libxi6 libxss1 libxkbcommon-x11-0
+
+      - name: Restore Gowin download
+        id: gowin-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ runner.temp }}/gowin.tar.gz
+          key: gowin-linux-${{ env.GOWIN_SHA256 }}
+
+      - name: Install Gowin EDA
+        id: setup
+        env:
+          GOWIN_LICENSE_SERVER: ${{ secrets.GOWIN_LICENSE_SERVER || 'gowinlic.sipeed.com:10559' }}
+        run: |
+          archive="$RUNNER_TEMP/gowin.tar.gz"
+          mkdir -p "$RUNNER_TEMP/gowin"
+          if [[ ! -s $archive ]]; then
+            curl --fail --location --retry 3 --connect-timeout 30 --max-time 1200 \
+              --output "$archive" "$GOWIN_URL"
+          fi
+          printf '%s  %s\n' "$GOWIN_SHA256" "$archive" | sha256sum --check --strict
+          tar -xzf "$archive" -C "$RUNNER_TEMP/gowin"
+          gowin_bin=$(dirname "$(find "$RUNNER_TEMP/gowin" -path '*/IDE/bin/gw_sh' -type f -print -quit)")
+          test -x "$gowin_bin/gw_sh"
+          printf '[license]\nlic="%s"\n' "$GOWIN_LICENSE_SERVER" > "$gowin_bin/gwlicense.ini"
+          echo "$gowin_bin" >> "$GITHUB_PATH"
+          echo "LD_LIBRARY_PATH=$gowin_bin/../lib" >> "$GITHUB_ENV"
+          echo 'QT_QPA_PLATFORM=offscreen' >> "$GITHUB_ENV"
+
+      - name: Cache Gowin download
+        if: steps.gowin-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ runner.temp }}/gowin.tar.gz
+          key: gowin-linux-${{ env.GOWIN_SHA256 }}
+
+      - name: Build nano20k
+        if: &build_target_if ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        env:
+          BOARD: tang_nano20k
+          BUILD_ARGS: nano20k
+        uses: ./.github/actions/build-target
+
+      - name: Build nano20k aga
+        if: *build_target_if
+        env:
+          BOARD: tang_nano20k_aga
+          BUILD_ARGS: nano20k aga
+        uses: ./.github/actions/build-target
+
+      - name: Build nano20k lcd
+        if: *build_target_if
+        env:
+          BOARD: tang_nano20k_lcd
+          BUILD_ARGS: nano20k lcd
+        uses: ./.github/actions/build-target
+
+      - name: Build nano20k aga lcd
+        if: *build_target_if
+        env:
+          BOARD: tang_nano20k_aga_lcd
+          BUILD_ARGS: nano20k aga lcd
+        uses: ./.github/actions/build-target
+
+      - name: Build nano20k lcd lcd_companion
+        if: *build_target_if
+        env:
+          BOARD: tang_nano20k_lcd
+          BUILD_ARGS: nano20k lcd lcd_companion
+          ASSET_SUFFIX: _companion
+        uses: ./.github/actions/build-target
+
+      - name: Build nano20k aga lcd lcd_companion
+        if: *build_target_if
+        env:
+          BOARD: tang_nano20k_aga_lcd
+          BUILD_ARGS: nano20k aga lcd lcd_companion
+          ASSET_SUFFIX: _companion
+        uses: ./.github/actions/build-target
+
+      - name: Build tp25k
+        if: *build_target_if
+        env:
+          BOARD: tang_primer25k
+          BUILD_ARGS: tp25k
+        uses: ./.github/actions/build-target
+
+      - name: Build tp25k aga
+        if: *build_target_if
+        env:
+          BOARD: tang_primer25k_aga
+          BUILD_ARGS: tp25k aga
+        uses: ./.github/actions/build-target
+
+      - name: Build gw5a_25
+        if: *build_target_if
+        env:
+          BOARD: mistle_gw5a_25
+          BUILD_ARGS: gw5a_25
+        uses: ./.github/actions/build-target
+
+      - name: Upload bitstream archive
+        id: bitstreams
+        if: ${{ !cancelled() && hashFiles('artifacts/*.bin') != '' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: nanomig-bitstreams
+          path: artifacts/
+          overwrite: true
+          if-no-files-found: error
+
+  attach-to-release:
+    needs: build
+    if: ${{ !cancelled() && github.event_name == 'release' && needs.build.outputs.artifact_id != '' }}
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          artifact-ids: ${{ needs.build.outputs.artifact_id }}
+          path: artifacts
+
+      - name: Attach bitstreams to the published release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: gh release upload "$TAG" artifacts/*.fs artifacts/*.bin --clobber
