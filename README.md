@@ -1,4 +1,4 @@
-# NanoMig
+u# NanoMig
 
 NanoMig is a port of the [Minimig](https://en.wikipedia.org/wiki/Minimig) Commodore Amiga FPGA implementation to the [Tang Nano 20K](https://wiki.sipeed.com/hardware/en/tang/tang-nano-20k/nano-20k.html), [Tang Primer 25K](https://wiki.sipeed.com/hardware/en/tang/tang-primer-25k/primer-25k.html), [Tang Mega 138K Pro](https://wiki.sipeed.com/hardware/en/tang/tang-mega-138k/mega-138k-pro.html) and [Tang Console with Mega 60k / 138k module](https://wiki.sipeed.com/hardware/en/tang/tang-console/mega-console.html) FPGA development boards.
 
@@ -110,7 +110,7 @@ Change the target driver to WinUSB and click Replace Driver (or Install Driver).
 3.) flash Kickstart  
 
 ```openFPGALoader -c ft231X --pins=7:3:5:6 -f -o 0x400000 kick31.rom```   
-```openFPGALoader -c ft231X --pins=7:3:5:6 -f -o 0x700000 kick13.rom``` or ```512k Kick 1.3 HDD Boot Rom```
+```openFPGALoader -c ft231X --pins=7:3:5:6 -f -o 0x700000 kick13.rom``` or ```512k Kick 1.3 HDD Boot Rom```  
 ```openFPGALoader -c ft231X --pins=7:3:5:6 -f -o 0x740000 kick13.rom```  
 ```openFPGALoader -c ft231X --pins=7:3:5:6 -f -o 0x780000 kick32.rom```  
   
