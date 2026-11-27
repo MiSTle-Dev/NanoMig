@@ -46,7 +46,9 @@ Network options:
 
 Planned features: 
 
-  * Roadshow / PLIP or Clockport networking (Internet access)  
+  * Virtual Zorro II Network Card for Sana II & Roadshow
+  * Double PAL and NTSC support
+  * Flicker Fixer 
 
 ## Videos
 
